@@ -14,6 +14,13 @@ export function setupBridge(webamp: Webamp) {
 
 function setupClose(webamp: Webamp) {
   const appWindow = getCurrentWindow();
+
+  // X button in Webamp triggers onWillClose
+  webamp.onWillClose(() => {
+    appWindow.close();
+  });
+
+  // Programmatic close
   webamp.onClose(() => {
     appWindow.close();
   });
