@@ -47,18 +47,9 @@ function openOverlay() {
 
   input.focus();
 
-  let debounceTimer: ReturnType<typeof setTimeout>;
-  input.addEventListener("input", () => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => doSearch(input.value), 500);
-  });
-
   input.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeOverlay();
-    if (e.key === "Enter") {
-      clearTimeout(debounceTimer);
-      doSearch(input.value);
-    }
+    if (e.key === "Enter") doSearch(input.value);
   });
 
   closeBtn.addEventListener("click", closeOverlay);

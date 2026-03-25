@@ -41,22 +41,7 @@ fn cache_dir(app: &tauri::AppHandle) -> PathBuf {
 
 /// Find yt-dlp binary: sidecar next to exe, then system PATH
 fn find_ytdlp(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    // 1. Check sidecar next to the executable
-    if let Ok(exe_dir) = app.path().resource_dir() {
-        let candidates = if cfg!(target_os = "windows") {
-            vec!["yt-dlp.exe"]
-        } else {
-            vec!["yt-dlp"]
-        };
-        for name in &candidates {
-            let p = exe_dir.join(name);
-            if p.exists() {
-                return Ok(p);
-            }
-        }
-    }
-
-    // Also check next to the executable itself
+    // Check next to the executable itself
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let name = if cfg!(target_os = "windows") {
@@ -71,36 +56,64 @@ fn find_ytdlp(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         }
     }
 
-    // 2. Fall back to system PATH
-    let name = if cfg!(target_os = "windows") {
-        "yt-dlp.exe"
-    } else {
-        "yt-dlp"
-    };
+    // Check resource dir (bundled builds)
+    if let Ok(exe_dir) = app.path().resource_dir() {
+        let name = if cfg!(target_os = "windows") {
+            "yt-dlp.exe"
+        } else {
+            "yt-dlp"
+        };
+        let p = exe_dir.join(name);
+        if p.exists() {
+            return Ok(p);
+        }
+    }
 
-    // Check if it exists in PATH
-    if let Ok(output) = std::process::Command::new(if cfg!(target_os = "windows") { "where" } else { "which" })
+    // Fall back to system PATH
+    let check_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+    if let Ok(output) = std::process::Command::new(check_cmd)
         .arg("yt-dlp")
         .output()
     {
         if output.status.success() {
-            return Ok(PathBuf::from(name));
+            return Ok(PathBuf::from("yt-dlp"));
         }
     }
 
     Err("yt-dlp not found. Place yt-dlp binary next to goamp executable or install it system-wide.".into())
 }
 
+fn new_command(program: &PathBuf) -> tokio::process::Command {
+    let mut cmd = tokio::process::Command::new(program);
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    // Hide console window on Windows
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    cmd
+}
+
 async fn run_ytdlp(app: &tauri::AppHandle, args: &[&str]) -> Result<std::process::Output, String> {
     let ytdlp = find_ytdlp(app)?;
+    eprintln!("[GOAMP] yt-dlp: {} {:?}", ytdlp.display(), args);
 
-    tokio::process::Command::new(&ytdlp)
+    let output = new_command(&ytdlp)
         .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
         .output()
         .await
-        .map_err(|e| format!("Failed to run yt-dlp ({}): {}", ytdlp.display(), e))
+        .map_err(|e| format!("Failed to run yt-dlp ({}): {}", ytdlp.display(), e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("[GOAMP] yt-dlp stderr: {}", stderr);
+    }
+
+    Ok(output)
 }
 
 #[tauri::command]
@@ -164,17 +177,22 @@ pub async fn extract_audio(
     video_id: String,
 ) -> Result<String, String> {
     let cache = cache_dir(&app);
-    let out_path = cache.join(format!("{}.opus", video_id));
+    eprintln!("[GOAMP] extract_audio: video_id={}, cache={}", video_id, cache.display());
 
-    // Return cached file if exists
-    if out_path.exists() {
-        return Ok(out_path.to_string_lossy().to_string());
+    // Return cached file if exists (any format)
+    for ext in &["opus", "m4a", "webm", "ogg", "mp3", "wav"] {
+        let p = cache.join(format!("{}.{}", video_id, ext));
+        if p.exists() {
+            eprintln!("[GOAMP] cache hit: {}", p.display());
+            return Ok(p.to_string_lossy().to_string());
+        }
     }
 
     let out_template = cache.join(format!("{}.%(ext)s", video_id));
     let out_template_str = out_template.to_string_lossy().to_string();
     let url = format!("https://www.youtube.com/watch?v={}", video_id);
 
+    // Try with audio extraction (needs ffmpeg)
     let output = run_ytdlp(&app, &[
         "-x",
         "--audio-format", "opus",
@@ -186,15 +204,49 @@ pub async fn extract_audio(
     ])
     .await?;
 
+    // If -x failed (no ffmpeg), try downloading best audio directly
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("yt-dlp extract error: {}", stderr));
+        eprintln!("[GOAMP] extract with -x failed, trying direct download: {}", stderr);
+
+        let output2 = run_ytdlp(&app, &[
+            "-f", "bestaudio",
+            "-o", &out_template_str,
+            "--no-playlist",
+            "--no-warnings",
+            &url,
+        ])
+        .await?;
+
+        if !output2.status.success() {
+            let stderr2 = String::from_utf8_lossy(&output2.stderr);
+            return Err(format!("yt-dlp extract error: {}", stderr2));
+        }
     }
 
-    // yt-dlp might output with different extension, find the actual file
-    for ext in &["opus", "m4a", "webm", "ogg", "mp3"] {
+    // Find the downloaded file
+    for ext in &["opus", "m4a", "webm", "ogg", "mp3", "wav"] {
         let p = cache.join(format!("{}.{}", video_id, ext));
         if p.exists() {
+            eprintln!("[GOAMP] downloaded: {}", p.display());
+            return Ok(p.to_string_lossy().to_string());
+        }
+    }
+
+    // List what's actually in cache dir for debugging
+    if let Ok(entries) = fs::read_dir(&cache) {
+        let files: Vec<String> = entries
+            .filter_map(|e| e.ok())
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().to_string();
+                if name.starts_with(&video_id) { Some(name) } else { None }
+            })
+            .collect();
+        eprintln!("[GOAMP] files matching video_id in cache: {:?}", files);
+
+        // Return first match
+        if let Some(name) = files.first() {
+            let p = cache.join(name);
             return Ok(p.to_string_lossy().to_string());
         }
     }
