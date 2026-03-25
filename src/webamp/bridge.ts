@@ -1,19 +1,23 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { scanDirectory } from "../lib/tauri-ipc";
-import { toWebampTracks, type WebampTrack } from "./tracks";
+import { toWebampTracks } from "./tracks";
 import type Webamp from "webamp";
 
 export function setupBridge(webamp: Webamp) {
-  setupFilePicker(webamp);
-  setupDragDrop(webamp);
+  setupKeyboard(webamp);
 }
 
-function setupFilePicker(webamp: Webamp) {
+function setupKeyboard(webamp: Webamp) {
   document.addEventListener("keydown", async (e) => {
-    // Ctrl+O / Cmd+O — open folder
+    // Ctrl+O — open folder
     if ((e.ctrlKey || e.metaKey) && e.key === "o") {
       e.preventDefault();
       await openFolder(webamp);
+    }
+    // Ctrl+Shift+O — open files
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "O") {
+      e.preventDefault();
+      await openFiles(webamp);
     }
   });
 }
@@ -34,7 +38,7 @@ export async function openFolder(webamp: Webamp): Promise<void> {
   if (tracks.length === 0) return;
 
   const webampTracks = toWebampTracks(tracks);
-  loadTracks(webamp, webampTracks);
+  webamp.setTracksToPlay(webampTracks);
 }
 
 export async function openFiles(webamp: Webamp): Promise<void> {
@@ -57,14 +61,5 @@ export async function openFiles(webamp: Webamp): Promise<void> {
   const { readMetadata } = await import("../lib/tauri-ipc");
   const metas = await Promise.all(paths.map((p) => readMetadata(p)));
   const webampTracks = toWebampTracks(metas);
-  loadTracks(webamp, webampTracks);
-}
-
-function loadTracks(webamp: Webamp, tracks: WebampTrack[]) {
-  webamp.setTracksToPlay(tracks);
-}
-
-function setupDragDrop(_webamp: Webamp) {
-  // Webamp handles drag-drop of files natively onto its playlist window.
-  // Custom drag-drop for folders can be added later.
+  webamp.setTracksToPlay(webampTracks);
 }

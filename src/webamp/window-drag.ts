@@ -6,29 +6,40 @@ export function setupWindowDrag() {
   document.addEventListener("mousedown", (e) => {
     const target = e.target as HTMLElement;
 
-    // Webamp title bar has class "title-bar" inside "#main-window"
-    // Also handle the title bars of EQ and playlist windows
-    if (isTitleBar(target)) {
-      e.preventDefault();
-      appWindow.startDragging();
-    }
+    // Don't drag if clicking on interactive elements
+    if (isInteractive(target)) return;
+
+    // Allow dragging from any non-interactive area (title bars, empty space, etc.)
+    e.preventDefault();
+    appWindow.startDragging();
   });
 }
 
-function isTitleBar(el: HTMLElement): boolean {
-  // Walk up from target to check if we're in a draggable title bar area
+function isInteractive(el: HTMLElement): boolean {
   let current: HTMLElement | null = el;
   while (current) {
-    const id = current.id;
-    const cls = current.className;
+    const tag = current.tagName.toLowerCase();
+    const cls = typeof current.className === "string" ? current.className : "";
 
-    // Webamp title bar areas — these are the drag handles in classic Winamp skin
-    if (typeof cls === "string" && cls.includes("title-bar")) {
-      return true;
-    }
+    // Standard interactive elements
+    if (["button", "input", "select", "textarea", "a"].includes(tag)) return true;
 
-    // Webamp uses specific IDs for window chrome
-    if (id === "title-bar") {
+    // Webamp sliders, buttons, and controls
+    if (
+      cls.includes("slider") ||
+      cls.includes("button") ||
+      cls.includes("volume") ||
+      cls.includes("balance") ||
+      cls.includes("position") ||
+      cls.includes("seek") ||
+      cls.includes("eject") ||
+      cls.includes("close") ||
+      cls.includes("minimize") ||
+      cls.includes("shade") ||
+      cls.includes("clutterbar") ||
+      cls.includes("playlist-tracks") ||
+      cls.includes("visualizer")
+    ) {
       return true;
     }
 
