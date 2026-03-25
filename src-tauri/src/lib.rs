@@ -1,8 +1,6 @@
 use tauri::Manager;
 mod commands;
 
-const APTABASE_KEY: &str = "A-EU-4215436752";
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let _sentry_guard = sentry::init(sentry::ClientOptions {
@@ -12,7 +10,7 @@ pub fn run() {
         ..Default::default()
     });
 
-    let mut builder = tauri::Builder::default()
+    tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -24,13 +22,7 @@ pub fn run() {
             let win = app.get_webview_window("main").unwrap();
             let _ = win.maximize();
             Ok(())
-        });
-
-    if !APTABASE_KEY.is_empty() {
-        builder = builder.plugin(tauri_plugin_aptabase::Builder::new(APTABASE_KEY).build());
-    }
-
-    builder
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

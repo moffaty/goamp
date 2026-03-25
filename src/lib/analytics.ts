@@ -1,9 +1,13 @@
-import { trackEvent } from "@aptabase/tauri";
+import { trackEvent, init as initAptabase } from "@aptabase/web";
 import * as Sentry from "@sentry/browser";
 
 const SENTRY_DSN = ""; // TODO: set your Sentry DSN
 
+const APTABASE_KEY = "A-EU-4215436752";
+
 export function initAnalytics() {
+  initAptabase(APTABASE_KEY, { host: "https://eu.aptabase.com" });
+
   if (SENTRY_DSN) {
     Sentry.init({
       dsn: SENTRY_DSN,

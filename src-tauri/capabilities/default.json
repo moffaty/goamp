@@ -15,7 +15,6 @@
     {
       "identifier": "fs:scope",
       "allow": [{ "path": "**" }]
-    },
-    "aptabase:allow-track-event"
+    }
   ]
 }
