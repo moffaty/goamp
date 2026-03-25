@@ -52,6 +52,19 @@ function isAppContent(el: HTMLElement): boolean {
   const contextMenu = document.getElementById("webamp-context-menu");
   if (contextMenu && contextMenu.contains(el)) return true;
 
+  // YouTube search overlay
+  const ytOverlay = document.getElementById("yt-search-overlay");
+  if (ytOverlay && ytOverlay.contains(el)) return true;
+
+  // Fullscreen visualizer (canvas in gen-window, or any fullscreen element)
+  if (el.tagName === "CANVAS" || el.closest(".gen-window")) return true;
+
+  // Any element in fullscreen mode
+  if (document.fullscreenElement && document.fullscreenElement.contains(el)) return true;
+
+  // Any overlay with class goamp-overlay
+  if (el.closest(".goamp-overlay")) return true;
+
   return false;
 }
 

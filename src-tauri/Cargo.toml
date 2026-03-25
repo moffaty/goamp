@@ -24,3 +24,5 @@ walkdir = "2"
 uuid = { version = "1", features = ["v4"] }
 sentry = "0.42"
 rdev = "0.5.3"
+tauri-plugin-shell = "2"
+tokio = { version = "1", features = ["process"] }

@@ -68,6 +68,13 @@ function setupKeyboard(webamp: Webamp) {
       e.preventDefault();
       toggleSearchOverlay();
     }
+    // L — toggle preset overlay (Milkdrop preset list, same as yaamp)
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === "KeyL") {
+      const store = (webamp as any).store;
+      if (store) {
+        store.dispatch({ type: "TOGGLE_PRESET_OVERLAY" });
+      }
+    }
     // Ctrl+S — load skin
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyS") {
       e.preventDefault();
