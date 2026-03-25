@@ -1,9 +1,6 @@
 export function getButterchurnOptions() {
   return {
-    importButterchurn: async () => {
-      const mod = await import("butterchurn");
-      return mod.default || mod;
-    },
+    importButterchurn: () => import("butterchurn"),
     getPresets: async () => {
       const mod = await import("butterchurn-presets");
       const presetMap = mod.default || mod;

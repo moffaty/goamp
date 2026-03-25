@@ -1,4 +1,3 @@
-use tauri::Manager;
 mod commands;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -18,9 +17,7 @@ pub fn run() {
             commands::files::scan_directory,
             commands::files::read_metadata,
         ])
-        .setup(|app| {
-            let win = app.get_webview_window("main").unwrap();
-            let _ = win.maximize();
+        .setup(|_app| {
             Ok(())
         })
         .run(tauri::generate_context!())
