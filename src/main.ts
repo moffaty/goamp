@@ -1,6 +1,7 @@
 import Webamp from "webamp";
 import { setupBridge } from "./webamp/bridge";
 import { setupWindowDrag, setupFullscreenCanvas } from "./webamp/window-drag";
+import { initAnalytics, track } from "./lib/analytics";
 
 const webamp = new Webamp({
   __initialWindowLayout: {
@@ -22,8 +23,11 @@ const webamp = new Webamp({
 
 const container = document.getElementById("app")!;
 
+initAnalytics();
+
 webamp.renderWhenReady(container).then(() => {
   setupBridge(webamp);
   setupWindowDrag();
   setupFullscreenCanvas();
+  track("app_launched");
 });

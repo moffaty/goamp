@@ -1,10 +1,37 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { scanDirectory } from "../lib/tauri-ipc";
 import { toWebampTracks } from "./tracks";
+import { track, trackError } from "../lib/analytics";
 import type Webamp from "webamp";
 
 export function setupBridge(webamp: Webamp) {
   setupKeyboard(webamp);
+  setupTrackTracking(webamp);
+}
+
+function setupTrackTracking(webamp: Webamp) {
+  webamp.onTrackDidChange((trackInfo) => {
+    if (!trackInfo) return;
+
+    const url = trackInfo.url || "";
+    const source = url.startsWith("http") ? "youtube" : "local";
+    const ext = url.split(".").pop()?.toLowerCase() || "unknown";
+
+    track("track_played", {
+      source,
+      format: source === "local" ? ext : "stream",
+    });
+
+    // Track with artist/title for future charts
+    const meta = (trackInfo as any).metaData;
+    if (meta?.artist || meta?.title) {
+      track("track_info", {
+        artist: (meta.artist || "Unknown").slice(0, 100),
+        title: (meta.title || "Unknown").slice(0, 100),
+        source,
+      });
+    }
+  });
 }
 
 function setupKeyboard(webamp: Webamp) {
@@ -34,11 +61,16 @@ export async function openFolder(webamp: Webamp): Promise<void> {
   const path = typeof selected === "string" ? selected : selected[0];
   if (!path) return;
 
-  const tracks = await scanDirectory(path);
-  if (tracks.length === 0) return;
+  try {
+    const tracks = await scanDirectory(path);
+    if (tracks.length === 0) return;
 
-  const webampTracks = toWebampTracks(tracks);
-  webamp.setTracksToPlay(webampTracks);
+    const webampTracks = toWebampTracks(tracks);
+    webamp.setTracksToPlay(webampTracks);
+    track("folder_opened", { track_count: tracks.length });
+  } catch (e) {
+    trackError(e, { action: "open_folder" });
+  }
 }
 
 export async function openFiles(webamp: Webamp): Promise<void> {
@@ -58,8 +90,13 @@ export async function openFiles(webamp: Webamp): Promise<void> {
   const paths = Array.isArray(selected) ? selected : [selected];
   if (paths.length === 0) return;
 
-  const { readMetadata } = await import("../lib/tauri-ipc");
-  const metas = await Promise.all(paths.map((p) => readMetadata(p)));
-  const webampTracks = toWebampTracks(metas);
-  webamp.setTracksToPlay(webampTracks);
+  try {
+    const { readMetadata } = await import("../lib/tauri-ipc");
+    const metas = await Promise.all(paths.map((p) => readMetadata(p)));
+    const webampTracks = toWebampTracks(metas);
+    webamp.setTracksToPlay(webampTracks);
+    track("files_opened", { track_count: metas.length });
+  } catch (e) {
+    trackError(e, { action: "open_files" });
+  }
 }

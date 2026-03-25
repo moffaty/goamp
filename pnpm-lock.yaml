@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@aptabase/tauri':
+        specifier: ^0.4.1
+        version: 0.4.1
+      '@sentry/browser':
+        specifier: ^10.45.0
+        version: 10.45.0
       '@tauri-apps/api':
         specifier: ^2
         version: 2.10.1
@@ -41,6 +47,9 @@ importers:
         version: 6.4.1
 
 packages:
+
+  '@aptabase/tauri@0.4.1':
+    resolution: {integrity: sha512-ZjCtPN1Tw0y90nxMLR64UqFjgikxfc9NZouxqXlqZFkfpF8D/tPf1xUn0Anu8nvERGND/hAkO3x7ZLyLGI1HRg==}
 
   '@assemblyscript/loader@0.17.14':
     resolution: {integrity: sha512-+PVTOfla/0XMLRTQLJFPg4u40XcdTfon6GGea70hBGi8Pd7ZymIXyVUR+vK8wt5Jb4MVKTKPIz43Myyebw5mZA==}
@@ -342,6 +351,34 @@ packages:
     resolution: {integrity: sha512-PrsWNQ8BuE00O3Xsx3ALh2Df8fAj9+cvvX9AIA6o4KpATR98c9mud4XtDWVvsEuyia5U4tVSTKygawyJkjm60w==}
     cpu: [x64]
     os: [win32]
+
+  '@sentry-internal/browser-utils@10.45.0':
+    resolution: {integrity: sha512-ZPZpeIarXKScvquGx2AfNKcYiVNDA4wegMmjyGVsTA2JPmP0TrJoO3UybJS6KGDeee8V3I3EfD/ruauMm7jOFQ==}
+    engines: {node: '>=18'}
+
+  '@sentry-internal/feedback@10.45.0':
+    resolution: {integrity: sha512-vCSurazFVq7RUeYiM5X326jA5gOVrWYD6lYX2fbjBOMcyCEhDnveNxMT62zKkZDyNT/jyD194nz/cjntBUkyWA==}
+    engines: {node: '>=18'}
+
+  '@sentry-internal/replay-canvas@10.45.0':
+    resolution: {integrity: sha512-nvq/AocdZTuD7y0KSiWi3gVaY0s5HOFy86mC/v1kDZmT/jsBAzN5LDkk/f1FvsWma1peqQmpUqxvhC+YIW294Q==}
+    engines: {node: '>=18'}
+
+  '@sentry-internal/replay@10.45.0':
+    resolution: {integrity: sha512-vjosRoGA1bzhVAEO1oce+CsRdd70quzBeo7WvYqpcUnoLe/Rv8qpOMqWX3j26z7XfFHMExWQNQeLxmtYOArvlw==}
+    engines: {node: '>=18'}
+
+  '@sentry/browser@10.45.0':
+    resolution: {integrity: sha512-e/a8UMiQhqqv706McSIcG6XK+AoQf9INthi2pD+giZfNRTzXTdqHzUT5OIO5hg8Am6eF63nDJc+vrYNPhzs51Q==}
+    engines: {node: '>=18'}
+
+  '@sentry/core@10.45.0':
+    resolution: {integrity: sha512-s69UXxvefeQxuZ5nY7/THtTrIEvJxNVCp3ns4kwoCw1qMpgpvn/296WCKVmM7MiwnaAdzEKnAvLAwaxZc2nM7Q==}
+    engines: {node: '>=18'}
+
+  '@tauri-apps/api@1.6.0':
+    resolution: {integrity: sha512-rqI++FWClU5I2UBp4HXFvl+sBWkdigBkxnpJDQUWttNyG7IZP4FwQGhTNL5EOw0vI8i6eSAJ5frLqO7n7jbJdg==}
+    engines: {node: '>= 14.6.0', npm: '>= 6.6.0', yarn: '>= 1.19.1'}
 
   '@tauri-apps/api@2.10.1':
     resolution: {integrity: sha512-hKL/jWf293UDSUN09rR69hrToyIXBb8CjGaWC7gfinvnQrBVvnLr08FeFi38gxtugAVyVcTa5/FD/Xnkb1siBw==}
@@ -1224,6 +1261,10 @@ packages:
 
 snapshots:
 
+  '@aptabase/tauri@0.4.1':
+    dependencies:
+      '@tauri-apps/api': 1.6.0
+
   '@assemblyscript/loader@0.17.14': {}
 
   '@babel/runtime@7.29.2': {}
@@ -1380,6 +1421,36 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.60.0':
     optional: true
+
+  '@sentry-internal/browser-utils@10.45.0':
+    dependencies:
+      '@sentry/core': 10.45.0
+
+  '@sentry-internal/feedback@10.45.0':
+    dependencies:
+      '@sentry/core': 10.45.0
+
+  '@sentry-internal/replay-canvas@10.45.0':
+    dependencies:
+      '@sentry-internal/replay': 10.45.0
+      '@sentry/core': 10.45.0
+
+  '@sentry-internal/replay@10.45.0':
+    dependencies:
+      '@sentry-internal/browser-utils': 10.45.0
+      '@sentry/core': 10.45.0
+
+  '@sentry/browser@10.45.0':
+    dependencies:
+      '@sentry-internal/browser-utils': 10.45.0
+      '@sentry-internal/feedback': 10.45.0
+      '@sentry-internal/replay': 10.45.0
+      '@sentry-internal/replay-canvas': 10.45.0
+      '@sentry/core': 10.45.0
+
+  '@sentry/core@10.45.0': {}
+
+  '@tauri-apps/api@1.6.0': {}
 
   '@tauri-apps/api@2.10.1': {}
 
