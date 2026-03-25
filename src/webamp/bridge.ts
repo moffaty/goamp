@@ -4,12 +4,14 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { scanDirectory } from "../lib/tauri-ipc";
 import { toWebampTracks } from "./tracks";
 import { track, trackError } from "../lib/analytics";
+import { initSearchOverlay, toggleSearchOverlay } from "../youtube/SearchOverlay";
 import type Webamp from "webamp";
 
 export function setupBridge(webamp: Webamp) {
   setupKeyboard(webamp);
   setupTrackTracking(webamp);
   setupClose(webamp);
+  initSearchOverlay(webamp);
 }
 
 function setupClose(webamp: Webamp) {
@@ -60,6 +62,11 @@ function setupKeyboard(webamp: Webamp) {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyO") {
       e.preventDefault();
       await openFiles(webamp);
+    }
+    // Ctrl+Y — YouTube search
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyY") {
+      e.preventDefault();
+      toggleSearchOverlay();
     }
     // Ctrl+S — load skin
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyS") {
