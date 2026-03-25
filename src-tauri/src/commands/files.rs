@@ -25,11 +25,11 @@ fn is_audio_file(path: &Path) -> bool {
 fn read_track_meta(path: &Path) -> TrackMeta {
     let path_str = path.to_string_lossy().to_string();
 
-    let (title, artist, album, duration) = match Probe::open(path)
-        .and_then(|probe| probe.read())
-    {
+    let (title, artist, album, duration) = match Probe::open(path).and_then(|probe| probe.read()) {
         Ok(tagged_file) => {
-            let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());
+            let tag = tagged_file
+                .primary_tag()
+                .or_else(|| tagged_file.first_tag());
             let props = tagged_file.properties();
             let duration_secs = props.duration().as_secs_f64();
 
