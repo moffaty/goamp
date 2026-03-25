@@ -64,8 +64,10 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
+  # Build only on master pushes and manual triggers (not on PRs)
   build:
     needs: lint-and-test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
