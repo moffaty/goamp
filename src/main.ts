@@ -1,6 +1,6 @@
 import Webamp from "webamp";
 import { setupBridge } from "./webamp/bridge";
-import { setupWindowDrag } from "./webamp/window-drag";
+import { setupWindowDrag, setupAutoResize } from "./webamp/window-drag";
 
 const webamp = new Webamp({
   initialTracks: [
@@ -20,4 +20,5 @@ const container = document.getElementById("app")!;
 webamp.renderWhenReady(container).then(() => {
   setupBridge(webamp);
   setupWindowDrag();
+  setupAutoResize();
 });

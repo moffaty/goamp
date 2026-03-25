@@ -15,9 +15,11 @@
       {
         "title": "GOAMP",
         "width": 275,
-        "height": 550,
+        "height": 116,
+        "minWidth": 275,
+        "minHeight": 116,
         "decorations": false,
-        "transparent": true,
+        "transparent": false,
         "resizable": true
       }
     ],
