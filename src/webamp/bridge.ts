@@ -1,4 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { scanDirectory } from "../lib/tauri-ipc";
 import { toWebampTracks } from "./tracks";
 import { track, trackError } from "../lib/analytics";
@@ -46,6 +47,11 @@ function setupKeyboard(webamp: Webamp) {
       e.preventDefault();
       await openFiles(webamp);
     }
+    // Ctrl+S — load skin
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyS") {
+      e.preventDefault();
+      await loadSkin(webamp);
+    }
   });
 }
 
@@ -70,6 +76,32 @@ export async function openFolder(webamp: Webamp): Promise<void> {
     track("folder_opened", { track_count: tracks.length });
   } catch (e) {
     trackError(e, { action: "open_folder" });
+  }
+}
+
+export async function loadSkin(webamp: Webamp): Promise<void> {
+  const selected = await open({
+    multiple: false,
+    title: "Select Winamp skin (.wsz)",
+    filters: [
+      {
+        name: "Winamp Skin",
+        extensions: ["wsz", "zip"],
+      },
+    ],
+  });
+
+  if (!selected) return;
+
+  const path = typeof selected === "string" ? selected : selected[0];
+  if (!path) return;
+
+  try {
+    const skinUrl = convertFileSrc(path);
+    webamp.setSkinFromUrl(skinUrl);
+    track("skin_loaded");
+  } catch (e) {
+    trackError(e, { action: "load_skin" });
   }
 }
 

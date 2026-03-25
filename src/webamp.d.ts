@@ -1,3 +1,13 @@
+declare module "butterchurn" {
+  const butterchurn: any;
+  export default butterchurn;
+}
+
+declare module "butterchurn-presets" {
+  const presets: Record<string, unknown>;
+  export default presets;
+}
+
 declare module "webamp" {
   interface TrackInfo {
     metaData?: {

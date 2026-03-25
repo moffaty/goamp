@@ -26,6 +26,12 @@ importers:
       '@tauri-apps/plugin-opener':
         specifier: ^2
         version: 2.5.3
+      butterchurn:
+        specifier: ^2.6.7
+        version: 2.6.7
+      butterchurn-presets:
+        specifier: ^2.4.7
+        version: 2.4.7
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -523,8 +529,14 @@ packages:
   buffer@6.0.3:
     resolution: {integrity: sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==}
 
+  butterchurn-presets@2.4.7:
+    resolution: {integrity: sha512-4MdM8ripz/VfH1BCldrIKdAc/1ryJFBDvqlyow6Ivo1frwj0H3duzvSMFC7/wIjAjxb1QpwVHVqGqS9uAFKhpg==}
+
   butterchurn-presets@3.0.0-beta.4:
     resolution: {integrity: sha512-TbQLUPvGOYMZAtWKoCmBtludh9aQZ6NaMGQU4lvPeadBPy3Du3yNmwBjlTMLP5c5mRWElxQPjTL1PtR7FZK3OQ==}
+
+  butterchurn@2.6.7:
+    resolution: {integrity: sha512-BJiRA8L0L2+84uoG2SSfkp0kclBuN+vQKf217pK7pMlwEO2ZEg3MtO2/o+l8Qpr8Nbejg8tmL1ZHD1jmhiaaqg==}
 
   butterchurn@3.0.0-beta.5:
     resolution: {integrity: sha512-BStK4OAbBb9Pvt8PuQlS4WVmYBwU1KuDMRHF1V89QjoIFauAqq7tpV4EpYXj7K563r5daLrMX+2y5DBhZZ9Xig==}
@@ -1585,9 +1597,20 @@ snapshots:
       base64-js: 1.5.1
       ieee754: 1.2.1
 
+  butterchurn-presets@2.4.7:
+    dependencies:
+      babel-runtime: 6.26.0
+      ecma-proposal-math-extensions: 0.0.2
+      lodash: 4.17.23
+
   butterchurn-presets@3.0.0-beta.4:
     dependencies:
       '@babel/runtime': 7.29.2
+
+  butterchurn@2.6.7:
+    dependencies:
+      '@babel/runtime': 7.29.2
+      ecma-proposal-math-extensions: 0.0.2
 
   butterchurn@3.0.0-beta.5:
     dependencies:

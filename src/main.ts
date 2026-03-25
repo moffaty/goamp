@@ -1,6 +1,7 @@
 import Webamp from "webamp";
 import { setupBridge } from "./webamp/bridge";
 import { setupWindowDrag, setupFullscreenCanvas } from "./webamp/window-drag";
+import { getButterchurnOptions } from "./webamp/butterchurn";
 import { initAnalytics, track } from "./lib/analytics";
 
 const webamp = new Webamp({
@@ -19,6 +20,7 @@ const webamp = new Webamp({
       duration: 0,
     },
   ],
+  __butterchurnOptions: getButterchurnOptions(),
 } as any);
 
 const container = document.getElementById("app")!;
