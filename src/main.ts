@@ -1,11 +1,12 @@
 import Webamp from "webamp";
+import { setupBridge } from "./webamp/bridge";
 
 const webamp = new Webamp({
   initialTracks: [
     {
       metaData: {
         artist: "GOAMP",
-        title: "Welcome to GOAMP",
+        title: "Press Ctrl+O to open a folder",
       },
       url: "",
       duration: 0,
@@ -13,4 +14,8 @@ const webamp = new Webamp({
   ],
 });
 
-webamp.renderWhenReady(document.getElementById("app")!);
+const container = document.getElementById("app")!;
+
+webamp.renderWhenReady(container).then(() => {
+  setupBridge(webamp);
+});
