@@ -50,6 +50,7 @@ declare module "webamp" {
       callback: (track: TrackInfo | null) => void,
     ): () => void;
     onWillClose(callback: (cancel: () => void) => void): () => void;
+    onClose(callback: () => void): () => void;
     onMinimize(callback: () => void): () => void;
     getMediaStatus(): string;
     dispose(): void;

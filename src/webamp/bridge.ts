@@ -1,5 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { scanDirectory } from "../lib/tauri-ipc";
 import { toWebampTracks } from "./tracks";
 import { track, trackError } from "../lib/analytics";
@@ -8,6 +9,14 @@ import type Webamp from "webamp";
 export function setupBridge(webamp: Webamp) {
   setupKeyboard(webamp);
   setupTrackTracking(webamp);
+  setupClose(webamp);
+}
+
+function setupClose(webamp: Webamp) {
+  const appWindow = getCurrentWindow();
+  webamp.onClose(() => {
+    appWindow.close();
+  });
 }
 
 function setupTrackTracking(webamp: Webamp) {
