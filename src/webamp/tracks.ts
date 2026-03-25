@@ -11,12 +11,14 @@ export interface WebampTrack {
 }
 
 export function toWebampTrack(meta: TrackMeta): WebampTrack {
+  const url = convertFileSrc(meta.path);
+  console.log(`[GOAMP] Track: ${meta.path} -> ${url}`);
   return {
     metaData: {
       artist: meta.artist || "Unknown Artist",
       title: meta.title || "Unknown Track",
     },
-    url: convertFileSrc(meta.path),
+    url,
     duration: meta.duration,
   };
 }

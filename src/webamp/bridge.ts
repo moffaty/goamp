@@ -9,13 +9,13 @@ export function setupBridge(webamp: Webamp) {
 
 function setupKeyboard(webamp: Webamp) {
   document.addEventListener("keydown", async (e) => {
-    // Ctrl+O — open folder
-    if ((e.ctrlKey || e.metaKey) && e.key === "o") {
+    // Ctrl+O — open folder (works on any keyboard layout via physical key code)
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyO") {
       e.preventDefault();
       await openFolder(webamp);
     }
     // Ctrl+Shift+O — open files
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "O") {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyO") {
       e.preventDefault();
       await openFiles(webamp);
     }
