@@ -15,6 +15,9 @@
     {
       "identifier": "fs:scope",
       "allow": [{ "path": "**" }]
-    }
+    },
+    "core:window:allow-close",
+    "core:window:allow-destroy",
+    "core:window:allow-set-size"
   ]
 }
