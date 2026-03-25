@@ -1,6 +1,6 @@
 import Webamp from "webamp";
 import { setupBridge } from "./webamp/bridge";
-import { setupWindowDrag, setupAutoResize } from "./webamp/window-drag";
+import { setupWindowDrag, setupClickThrough } from "./webamp/window-drag";
 import { getButterchurnOptions } from "./webamp/butterchurn";
 import { initAnalytics, track } from "./lib/analytics";
 
@@ -30,6 +30,6 @@ initAnalytics();
 webamp.renderWhenReady(container).then(() => {
   setupBridge(webamp);
   setupWindowDrag();
-  setupAutoResize();
+  setupClickThrough();
   track("app_launched");
 });

@@ -15,6 +15,6 @@ export function getButterchurnOptions() {
         butterchurnPresetObject: preset,
       }));
     },
-    butterchurnOpen: false,
+    butterchurnOpen: true,
   };
 }

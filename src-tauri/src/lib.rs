@@ -1,4 +1,7 @@
+use tauri::Manager;
+
 mod commands;
+mod hook;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -17,7 +20,10 @@ pub fn run() {
             commands::files::scan_directory,
             commands::files::read_metadata,
         ])
-        .setup(|_app| {
+        .setup(|app| {
+            let window = app.get_webview_window("main").unwrap();
+            let _ = window.maximize();
+            hook::start_global_mouse_stream(window);
             Ok(())
         })
         .run(tauri::generate_context!())

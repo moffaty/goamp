@@ -1,120 +1,61 @@
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 const appWindow = getCurrentWindow();
+const appWebview = getCurrentWebviewWindow();
 
 /**
- * Drag the Tauri window when clicking on non-interactive Webamp areas.
- * Prevents Webamp's internal window dragging by calling preventDefault.
+ * Click-through: transparent areas pass clicks to windows behind.
+ * Rust (rdev) tracks global mouse position and emits events even when
+ * the window ignores cursor events. Frontend toggles ignore on/off
+ * based on whether the cursor is over Webamp content.
  */
-export function setupWindowDrag() {
-  document.addEventListener("mousedown", (e) => {
-    const target = e.target as HTMLElement;
-    if (isInteractive(target)) return;
+export function setupClickThrough() {
+  let isIgnored: boolean | null = null;
 
-    e.preventDefault();
-    appWindow.startDragging();
+  appWebview.listen<{ x: number; y: number }>(
+    "device-mouse-move",
+    ({ payload }) => {
+      // rdev gives device pixels, DOM uses CSS pixels
+      const ratio = window.devicePixelRatio || 1;
+      const cssX = payload.x / ratio;
+      const cssY = payload.y / ratio;
+
+      const el = document.elementFromPoint(cssX, cssY);
+      const inContent = el !== null && isAppContent(el as HTMLElement);
+
+      const shouldIgnore = !inContent;
+
+      if (shouldIgnore !== isIgnored) {
+        appWindow.setIgnoreCursorEvents(shouldIgnore);
+        isIgnored = shouldIgnore;
+      }
+    }
+  );
+
+  // When WebView receives any mouse event, ensure ignore is off.
+  // This catches edge cases like context menus appearing under cursor.
+  document.addEventListener("mousemove", () => {
+    if (isIgnored) {
+      appWindow.setIgnoreCursorEvents(false);
+      isIgnored = false;
+    }
   });
 }
 
-/**
- * Auto-resize Tauri window to tightly fit Webamp content.
- * Polls on startup, then watches for layout changes via MutationObserver.
- */
-export function setupAutoResize() {
-  let resizeTimer: number | null = null;
-  let lastWidth = 0;
-  let lastHeight = 0;
-
-  function resizeToContent() {
-    const webampEl = document.getElementById("webamp");
-    if (!webampEl) return;
-
-    const windows = webampEl.querySelectorAll("[id$='-window']");
-    if (windows.length === 0) return;
-
-    let maxRight = 0;
-    let maxBottom = 0;
-
-    windows.forEach((win) => {
-      const el = win as HTMLElement;
-      const wrapper = el.closest("[style*='translate']") as HTMLElement | null;
-      if (!wrapper) return;
-
-      const rect = wrapper.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-
-      maxRight = Math.max(maxRight, rect.left + rect.width);
-      maxBottom = Math.max(maxBottom, rect.top + rect.height);
-    });
-
-    if (maxRight > 0 && maxBottom > 0) {
-      const w = Math.ceil(maxRight);
-      const h = Math.ceil(maxBottom);
-
-      // Only resize if dimensions actually changed
-      if (w !== lastWidth || h !== lastHeight) {
-        lastWidth = w;
-        lastHeight = h;
-        appWindow.setSize(new LogicalSize(w, h));
-      }
-    }
-  }
-
-  function debouncedResize() {
-    if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(resizeToContent, 50);
-  }
-
-  // Poll until content renders
-  let attempts = 0;
-  const poll = setInterval(() => {
-    attempts++;
-    resizeToContent();
-    if (lastWidth > 0 || attempts > 30) {
-      clearInterval(poll);
-    }
-  }, 100);
-
-  // Watch for layout changes
+function isAppContent(el: HTMLElement): boolean {
+  // Webamp main container
   const webampEl = document.getElementById("webamp");
-  if (webampEl) {
-    const observer = new MutationObserver(debouncedResize);
-    observer.observe(webampEl, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["style", "class"],
-    });
-  }
-}
+  if (webampEl && webampEl.contains(el)) return true;
 
-function isInteractive(el: HTMLElement): boolean {
-  let current: HTMLElement | null = el;
-  while (current) {
-    const tag = current.tagName.toLowerCase();
-    const cls = typeof current.className === "string" ? current.className : "";
+  // Webamp context menu (rendered in body, outside #webamp)
+  const contextMenu = document.getElementById("webamp-context-menu");
+  if (contextMenu && contextMenu.contains(el)) return true;
 
-    if (["button", "input", "select", "textarea", "a"].includes(tag)) return true;
-
-    if (
-      cls.includes("slider") ||
-      cls.includes("button") ||
-      cls.includes("volume") ||
-      cls.includes("balance") ||
-      cls.includes("position") ||
-      cls.includes("seek") ||
-      cls.includes("eject") ||
-      cls.includes("close") ||
-      cls.includes("minimize") ||
-      cls.includes("shade") ||
-      cls.includes("clutterbar") ||
-      cls.includes("playlist-tracks") ||
-      cls.includes("visualizer")
-    ) {
-      return true;
-    }
-
-    current = current.parentElement;
-  }
   return false;
 }
+
+/**
+ * No-op: Webamp handles its own internal window dragging.
+ */
+export function setupWindowDrag() {}
