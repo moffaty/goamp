@@ -125,7 +125,14 @@ function openOverlay() {
   const input = document.getElementById("yt-search-input") as HTMLInputElement;
   const closeBtn = document.getElementById("yt-search-close")!;
 
+  // Restore last search query
+  const lastQuery = localStorage.getItem("goamp_yt_last_query") || "";
+  if (lastQuery) {
+    input.value = lastQuery;
+  }
+
   input.focus();
+  input.select();
 
   input.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeOverlay();
@@ -152,6 +159,7 @@ function closeOverlay() {
 
 async function doSearch(query: string) {
   if (!query.trim()) return;
+  localStorage.setItem("goamp_yt_last_query", query.trim());
 
   const status = document.getElementById("yt-search-status");
   const results = document.getElementById("yt-search-results");
