@@ -8,6 +8,11 @@ import {
   type SearchSource,
 } from "./youtube-service";
 import {
+  yandexSearch,
+  yandexGetTrackUrl,
+  type YandexTrack,
+} from "../yandex/yandex-service";
+import {
   listPlaylists,
   createPlaylist,
   addTrackToPlaylist,
@@ -123,6 +128,7 @@ function openOverlay() {
       <div class="yt-source-tabs" style="border-color:${c.fg}">
         <div class="yt-source-tab${currentSource === "youtube" ? " yt-source-active" : ""}" data-source="youtube" style="color:${currentSource === "youtube" ? c.accent : c.text}">YouTube</div>
         <div class="yt-source-tab${currentSource === "soundcloud" ? " yt-source-active" : ""}" data-source="soundcloud" style="color:${currentSource === "soundcloud" ? c.accent : c.text}">SoundCloud</div>
+        <div class="yt-source-tab${currentSource === "yandex" ? " yt-source-active" : ""}" data-source="yandex" style="color:${currentSource === "yandex" ? c.accent : c.text}">Yandex</div>
       </div>
       <div class="yt-search-header" style="border-color:${c.fg}">
         <div class="yt-search-icon">
@@ -130,7 +136,7 @@ function openOverlay() {
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
         </div>
-        <input type="text" id="yt-search-input" placeholder="Search ${currentSource === "soundcloud" ? "SoundCloud" : "YouTube"}..." autocomplete="off"
+        <input type="text" id="yt-search-input" placeholder="Search ${currentSource === "soundcloud" ? "SoundCloud" : currentSource === "yandex" ? "Yandex Music" : "YouTube"}..." autocomplete="off"
                style="background:${c.textBg};color:${c.text};border-color:${c.fg}" />
         <button id="yt-search-close" style="color:${c.text}">\u00d7</button>
       </div>
@@ -160,7 +166,7 @@ function openOverlay() {
       });
       // Update placeholder
       const inp = document.getElementById("yt-search-input") as HTMLInputElement;
-      if (inp) inp.placeholder = `Search ${src === "soundcloud" ? "SoundCloud" : "YouTube"}...`;
+      if (inp) inp.placeholder = `Search ${src === "soundcloud" ? "SoundCloud" : src === "yandex" ? "Yandex Music" : "YouTube"}...`;
       // Clear results on source switch
       allResults = [];
       const results = document.getElementById("yt-search-results");
@@ -234,12 +240,19 @@ async function doSearch(query: string) {
   allResults = [];
 
   try {
-    const items = await searchYoutube(currentQuery, PAGE_SIZE, currentSource);
+    let items: YoutubeResult[];
+    if (currentSource === "yandex") {
+      const yaTracks = await yandexSearch(currentQuery, 0);
+      items = yaTracks.map(yaTrackToResult);
+    } else {
+      items = await searchYoutube(currentQuery, PAGE_SIZE, currentSource);
+    }
     allResults = items;
     localStorage.setItem("goamp_yt_last_results", JSON.stringify(items));
     track("youtube_search", {
       query: currentQuery.slice(0, 50),
       results: items.length,
+      source: currentSource,
     });
     showPage(results, 0, "none");
   } catch (e) {
@@ -256,7 +269,15 @@ async function ensureResultsForPage(page: number): Promise<boolean> {
   if (status) status.innerHTML = `<span class="yt-loading">Loading</span>`;
 
   try {
-    const items = await searchYoutube(currentQuery, needed, currentSource);
+    let items: YoutubeResult[];
+    if (currentSource === "yandex") {
+      const yaPage = Math.floor(allResults.length / PAGE_SIZE);
+      const yaTracks = await yandexSearch(currentQuery, yaPage);
+      if (yaTracks.length === 0) return false;
+      items = [...allResults, ...yaTracks.map(yaTrackToResult)];
+    } else {
+      items = await searchYoutube(currentQuery, needed, currentSource);
+    }
     if (items.length <= allResults.length) return false; // no more results
     allResults = items;
     localStorage.setItem("goamp_yt_last_results", JSON.stringify(items));
@@ -593,8 +614,11 @@ async function downloadAndAddToPlaylist(item: YoutubeResult, playlistId: string)
   }
 }
 
-/** Extract audio file path — uses video_id for YouTube, webpage_url for other sources */
+/** Extract audio file path / URL — uses video_id for YouTube, webpage_url for SoundCloud, direct URL for Yandex */
 async function extractForItem(item: YoutubeResult): Promise<string> {
+  if (item.source === "yandex") {
+    return yandexGetTrackUrl(item.id);
+  }
   if (item.source === "youtube" || !item.webpage_url) {
     return extractAudio(item.id);
   }
@@ -942,4 +966,17 @@ function injectStyles(c: ReturnType<typeof getSkinColors>) {
     }
   `;
   document.head.appendChild(style);
+}
+
+/** Convert Yandex track to common YoutubeResult format for unified rendering */
+function yaTrackToResult(t: YandexTrack): YoutubeResult {
+  return {
+    id: t.id,
+    title: `${t.artist} — ${t.title}`,
+    channel: t.artist || "Unknown",
+    duration: t.duration,
+    thumbnail: t.cover,
+    source: "yandex",
+    webpage_url: "",
+  };
 }

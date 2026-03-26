@@ -10,6 +10,7 @@ import { initSearchOverlay, toggleSearchOverlay } from "../youtube/SearchOverlay
 import { initPlaylistPanel, togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { initAudioDevicePanel, toggleAudioDevicePanel, restoreAudioDevice } from "../settings/AudioDevicePanel";
 import { initScrobbleSettings, toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
+import { initYandexPanel, toggleYandexPanel } from "../yandex/YandexPanel";
 import { lastfmNowPlaying, lastfmScrobble, lastfmGetStatus } from "../scrobble/scrobble-service";
 import type Webamp from "webamp";
 
@@ -23,6 +24,7 @@ export function setupBridge(webamp: Webamp) {
   initPlaylistPanel(webamp);
   initAudioDevicePanel(webamp);
   initScrobbleSettings();
+  initYandexPanel(webamp);
   restoreAudioDevice();
   setupScrobbling(webamp);
 }
@@ -243,6 +245,11 @@ function setupKeyboard(webamp: Webamp) {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyL") {
       e.preventDefault();
       toggleScrobbleSettings();
+    }
+    // Ctrl+Shift+Y — Yandex Music panel
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyY") {
+      e.preventDefault();
+      toggleYandexPanel();
     }
   });
 }

@@ -3,9 +3,11 @@ use tauri::Manager;
 mod commands;
 mod db;
 mod hook;
+mod md5;
 mod media_keys;
 mod scrobble;
 mod tray;
+mod yandex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -45,6 +47,16 @@ pub fn run() {
             scrobble::lastfm_scrobble,
             scrobble::lastfm_save_settings,
             scrobble::lastfm_get_status,
+            yandex::yandex_save_token,
+            yandex::yandex_get_status,
+            yandex::yandex_logout,
+            yandex::yandex_search,
+            yandex::yandex_get_track_url,
+            yandex::yandex_list_stations,
+            yandex::yandex_station_tracks,
+            yandex::yandex_list_playlists,
+            yandex::yandex_get_playlist_tracks,
+            yandex::yandex_import_playlist,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");
