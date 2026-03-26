@@ -53,6 +53,22 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
             value TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS scrobble_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            artist TEXT NOT NULL,
+            track TEXT NOT NULL,
+            album TEXT NOT NULL DEFAULT '',
+            timestamp INTEGER NOT NULL,
+            duration INTEGER NOT NULL DEFAULT 0,
+            service TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            attempts INTEGER NOT NULL DEFAULT 0,
+            last_error TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_scrobble_queue_status
+            ON scrobble_queue(status, service);
+
         -- Special system playlist for last session
         INSERT OR IGNORE INTO playlists (id, name, position)
             VALUES ('__last_session__', 'Last Session', -1);

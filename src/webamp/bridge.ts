@@ -12,7 +12,15 @@ import { initAudioDevicePanel, toggleAudioDevicePanel, restoreAudioDevice } from
 import { initScrobbleSettings, toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
 import { initYandexPanel, toggleYandexPanel } from "../yandex/YandexPanel";
 import { initGoampMenu } from "./goamp-menu";
-import { lastfmNowPlaying, lastfmScrobble, lastfmGetStatus } from "../scrobble/scrobble-service";
+import {
+  lastfmNowPlaying,
+  lastfmScrobble,
+  lastfmGetStatus,
+  listenbrainzNowPlaying,
+  listenbrainzScrobble,
+  listenbrainzGetStatus,
+  scrobbleFlushQueue,
+} from "../scrobble/scrobble-service";
 import type Webamp from "webamp";
 
 export function setupBridge(webamp: Webamp) {
@@ -314,6 +322,11 @@ let currentTrackArtist = "";
 let currentTrackTitle = "";
 
 function setupScrobbling(webamp: Webamp) {
+  // Periodic queue flush (every 30 seconds)
+  setInterval(() => {
+    scrobbleFlushQueue().catch(() => {});
+  }, 30000);
+
   webamp.onTrackDidChange(async (trackInfo) => {
     // Reset scrobble state
     if (scrobbleTimer) clearInterval(scrobbleTimer);
@@ -329,23 +342,40 @@ function setupScrobbling(webamp: Webamp) {
 
     if (!currentTrackArtist && !currentTrackTitle) return;
 
-    // Check if Last.fm is enabled
-    const enabled = localStorage.getItem("goamp_lastfm_enabled");
-    if (enabled !== "1") return;
+    const lastfmEnabled = localStorage.getItem("goamp_lastfm_enabled") === "1";
+    const lbEnabled = localStorage.getItem("goamp_lb_enabled") === "1";
 
-    try {
-      const status = await lastfmGetStatus();
-      if (!status) return;
-    } catch {
-      return;
+    if (!lastfmEnabled && !lbEnabled) return;
+
+    // Check which services are authenticated
+    let hasLastfm = false;
+    let hasLb = false;
+
+    if (lastfmEnabled) {
+      try {
+        hasLastfm = !!(await lastfmGetStatus());
+      } catch { /* ignore */ }
+    }
+    if (lbEnabled) {
+      try {
+        hasLb = !!(await listenbrainzGetStatus());
+      } catch { /* ignore */ }
     }
 
-    // Send Now Playing
-    lastfmNowPlaying(
-      currentTrackArtist || "Unknown",
-      currentTrackTitle,
-      currentTrackDuration > 0 ? Math.floor(currentTrackDuration) : undefined,
-    ).catch((e) => console.warn("[GOAMP] Now playing failed:", e));
+    if (!hasLastfm && !hasLb) return;
+
+    // Send Now Playing to both services
+    const artist = currentTrackArtist || "Unknown";
+    const dur = currentTrackDuration > 0 ? Math.floor(currentTrackDuration) : undefined;
+
+    if (hasLastfm) {
+      lastfmNowPlaying(artist, currentTrackTitle, dur)
+        .catch((e) => console.warn("[GOAMP] Last.fm now playing failed:", e));
+    }
+    if (hasLb) {
+      listenbrainzNowPlaying(artist, currentTrackTitle)
+        .catch((e) => console.warn("[GOAMP] ListenBrainz now playing failed:", e));
+    }
 
     // Start polling for scrobble threshold (50% or 4 min)
     scrobbleTimer = setInterval(() => {
@@ -366,11 +396,18 @@ function setupScrobbling(webamp: Webamp) {
       if (elapsed >= threshold) {
         currentTrackScrobbled = true;
         if (scrobbleTimer) clearInterval(scrobbleTimer);
-        lastfmScrobble(
-          currentTrackArtist || "Unknown",
-          currentTrackTitle,
-          currentTrackStart,
-        ).catch((e) => console.warn("[GOAMP] Scrobble failed:", e));
+
+        const scrobbleArtist = currentTrackArtist || "Unknown";
+        const scrobbleDur = currentTrackDuration > 0 ? Math.floor(currentTrackDuration) : undefined;
+
+        if (hasLastfm) {
+          lastfmScrobble(scrobbleArtist, currentTrackTitle, currentTrackStart, scrobbleDur)
+            .catch((e) => console.warn("[GOAMP] Last.fm scrobble failed (queued):", e));
+        }
+        if (hasLb) {
+          listenbrainzScrobble(scrobbleArtist, currentTrackTitle, currentTrackStart, scrobbleDur)
+            .catch((e) => console.warn("[GOAMP] ListenBrainz scrobble failed (queued):", e));
+        }
       }
     }, 5000);
   });
