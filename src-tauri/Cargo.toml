@@ -26,3 +26,5 @@ sentry = "0.42"
 rdev = "0.5.3"
 tauri-plugin-shell = "2"
 tokio = { version = "1", features = ["process"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }

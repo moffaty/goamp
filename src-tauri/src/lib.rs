@@ -1,6 +1,7 @@
 use tauri::Manager;
 
 mod commands;
+mod db;
 mod hook;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -22,8 +23,17 @@ pub fn run() {
             commands::files::read_metadata,
             commands::youtube::search_youtube,
             commands::youtube::extract_audio,
+            commands::playlists::create_playlist,
+            commands::playlists::list_playlists,
+            commands::playlists::get_playlist_tracks,
+            commands::playlists::add_track_to_playlist,
+            commands::playlists::remove_track_from_playlist,
+            commands::playlists::delete_playlist,
+            commands::playlists::save_session,
+            commands::playlists::load_session,
         ])
         .setup(|app| {
+            db::init(app).expect("failed to initialize database");
             let window = app.get_webview_window("main").unwrap();
             let _ = window.maximize();
             hook::start_global_mouse_stream(window);

@@ -39,37 +39,46 @@ fn cache_dir(app: &tauri::AppHandle) -> PathBuf {
     dir
 }
 
-/// Find yt-dlp binary: sidecar next to exe, then system PATH
-fn find_ytdlp(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    // Check next to the executable itself
+/// Directory for managed binaries (yt-dlp etc)
+fn bin_dir(app: &tauri::AppHandle) -> PathBuf {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::env::temp_dir().join("goamp"))
+        .join("bin");
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+fn ytdlp_filename() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "yt-dlp.exe"
+    } else {
+        "yt-dlp"
+    }
+}
+
+/// Find yt-dlp: next to exe → app_data/bin → system PATH
+fn find_ytdlp(app: &tauri::AppHandle) -> Option<PathBuf> {
+    let name = ytdlp_filename();
+
+    // Next to executable
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            let name = if cfg!(target_os = "windows") {
-                "yt-dlp.exe"
-            } else {
-                "yt-dlp"
-            };
             let p = dir.join(name);
             if p.exists() {
-                return Ok(p);
+                return Some(p);
             }
         }
     }
 
-    // Check resource dir (bundled builds)
-    if let Ok(exe_dir) = app.path().resource_dir() {
-        let name = if cfg!(target_os = "windows") {
-            "yt-dlp.exe"
-        } else {
-            "yt-dlp"
-        };
-        let p = exe_dir.join(name);
-        if p.exists() {
-            return Ok(p);
-        }
+    // In managed bin dir (auto-downloaded)
+    let p = bin_dir(app).join(name);
+    if p.exists() {
+        return Some(p);
     }
 
-    // Fall back to system PATH
+    // System PATH
     let check_cmd = if cfg!(target_os = "windows") {
         "where"
     } else {
@@ -77,21 +86,75 @@ fn find_ytdlp(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     };
     if let Ok(output) = std::process::Command::new(check_cmd).arg("yt-dlp").output() {
         if output.status.success() {
-            return Ok(PathBuf::from("yt-dlp"));
+            return Some(PathBuf::from("yt-dlp"));
         }
     }
 
-    Err(
-        "yt-dlp not found. Place yt-dlp binary next to goamp executable or install it system-wide."
-            .into(),
-    )
+    None
+}
+
+fn download_url() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+    } else if cfg!(target_os = "macos") {
+        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
+    } else {
+        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
+    }
+}
+
+/// Download yt-dlp from GitHub releases into app_data/bin/
+async fn download_ytdlp(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dest = bin_dir(app).join(ytdlp_filename());
+    let url = download_url();
+
+    eprintln!("[GOAMP] Downloading yt-dlp from {}", url);
+
+    let response = reqwest::get(url)
+        .await
+        .map_err(|e| format!("Failed to download yt-dlp: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "yt-dlp download failed: HTTP {}",
+            response.status()
+        ));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read yt-dlp download: {}", e))?;
+
+    fs::write(&dest, &bytes).map_err(|e| format!("Failed to save yt-dlp: {}", e))?;
+
+    // Make executable on unix
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&dest, fs::Permissions::from_mode(0o755));
+    }
+
+    eprintln!(
+        "[GOAMP] yt-dlp downloaded: {} ({} bytes)",
+        dest.display(),
+        bytes.len()
+    );
+    Ok(dest)
+}
+
+/// Get yt-dlp path, downloading if necessary
+async fn ensure_ytdlp(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    if let Some(path) = find_ytdlp(app) {
+        return Ok(path);
+    }
+    download_ytdlp(app).await
 }
 
 fn new_command(program: &PathBuf) -> tokio::process::Command {
     let mut cmd = tokio::process::Command::new(program);
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-    // Hide console window on Windows
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
@@ -103,7 +166,7 @@ fn new_command(program: &PathBuf) -> tokio::process::Command {
 }
 
 async fn run_ytdlp(app: &tauri::AppHandle, args: &[&str]) -> Result<std::process::Output, String> {
-    let ytdlp = find_ytdlp(app)?;
+    let ytdlp = ensure_ytdlp(app).await?;
     eprintln!("[GOAMP] yt-dlp: {} {:?}", ytdlp.display(), args);
 
     let output = new_command(&ytdlp)
@@ -270,7 +333,6 @@ pub async fn extract_audio(app: tauri::AppHandle, video_id: String) -> Result<St
             .collect();
         eprintln!("[GOAMP] files matching video_id in cache: {:?}", files);
 
-        // Return first match
         if let Some(name) = files.first() {
             let p = cache.join(name);
             return Ok(p.to_string_lossy().to_string());

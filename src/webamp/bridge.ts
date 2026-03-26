@@ -1,7 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { scanDirectory } from "../lib/tauri-ipc";
+import { scanDirectory, saveSession, loadSession } from "../lib/tauri-ipc";
 import { toWebampTracks } from "./tracks";
 import { track, trackError } from "../lib/analytics";
 import { initSearchOverlay, toggleSearchOverlay } from "../youtube/SearchOverlay";
@@ -11,19 +11,79 @@ export function setupBridge(webamp: Webamp) {
   setupKeyboard(webamp);
   setupTrackTracking(webamp);
   setupClose(webamp);
+  setupSessionRestore(webamp);
   initSearchOverlay(webamp);
 }
 
 function setupClose(webamp: Webamp) {
   const appWindow = getCurrentWindow();
 
-  webamp.onWillClose(() => {
+  const handleClose = async () => {
+    try {
+      await saveCurrentSession(webamp);
+    } catch (e) {
+      console.error("[GOAMP] Failed to save session:", e);
+    }
     appWindow.destroy();
+  };
+
+  webamp.onWillClose(() => {
+    handleClose();
   });
 
   webamp.onClose(() => {
-    appWindow.destroy();
+    handleClose();
   });
+}
+
+async function saveCurrentSession(webamp: Webamp) {
+  const store = (webamp as any).store;
+  if (!store) return;
+
+  const state = store.getState();
+  const tracks = state?.playlist?.tracks || {};
+  const order: string[] = state?.playlist?.trackOrder || [];
+
+  const trackInputs = order
+    .map((id: string) => tracks[id])
+    .filter(Boolean)
+    .map((t: any) => {
+      const url: string = t.url || "";
+      const isYoutube = url.includes("audio_cache");
+      return {
+        title: t.title || t.defaultName || "Unknown",
+        artist: t.artist || "",
+        duration: t.duration || 0,
+        source: isYoutube ? "youtube" : "local",
+        source_id: url,
+      };
+    });
+
+  if (trackInputs.length > 0) {
+    await saveSession(trackInputs);
+    console.log("[GOAMP] Session saved:", trackInputs.length, "tracks");
+  }
+}
+
+async function setupSessionRestore(webamp: Webamp) {
+  try {
+    const tracks = await loadSession();
+    if (tracks.length === 0) return;
+
+    const webampTracks = tracks.map((t) => ({
+      metaData: {
+        artist: t.artist || "Unknown Artist",
+        title: t.title || "Unknown Track",
+      },
+      url: t.source === "youtube" ? convertFileSrc(t.source_id) : t.source_id,
+      duration: t.duration,
+    }));
+
+    webamp.setTracksToPlay(webampTracks);
+    console.log("[GOAMP] Session restored:", tracks.length, "tracks");
+  } catch (e) {
+    console.error("[GOAMP] Failed to restore session:", e);
+  }
 }
 
 function setupTrackTracking(webamp: Webamp) {
