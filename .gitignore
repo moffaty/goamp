@@ -15,6 +15,9 @@ dist-ssr
 # Rust
 src-tauri/target/
 
+# yt-dlp sidecar binaries (downloaded at build time)
+src-tauri/binaries/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
