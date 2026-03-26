@@ -1,6 +1,5 @@
 /// Minimal inline MD5 implementation for API signatures (Last.fm, Yandex Music).
 /// Avoids pulling in an external crate for a single hash function.
-
 pub fn md5_hex(input: &str) -> String {
     format!("{:x}", md5_compute(input))
 }
