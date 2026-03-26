@@ -187,8 +187,10 @@ async fn run_ytdlp(app: &tauri::AppHandle, args: &[&str]) -> Result<std::process
 pub async fn search_youtube(
     app: tauri::AppHandle,
     query: String,
+    #[allow(unused_variables)] limit: Option<u32>,
 ) -> Result<Vec<YoutubeResult>, String> {
-    let search_query = format!("ytsearch20:{}", query);
+    let count = limit.unwrap_or(20).min(100);
+    let search_query = format!("ytsearch{}:{}", count, query);
     let output = run_ytdlp(
         &app,
         &[

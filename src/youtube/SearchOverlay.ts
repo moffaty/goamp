@@ -5,11 +5,20 @@ import {
   formatDuration,
   type YoutubeResult,
 } from "./youtube-service";
+import {
+  listPlaylists,
+  createPlaylist,
+  addTrackToPlaylist,
+  type TrackInput,
+} from "../lib/tauri-ipc";
 import { track, trackError } from "../lib/analytics";
 import type Webamp from "webamp";
 
 let overlay: HTMLElement | null = null;
 let webampRef: Webamp | null = null;
+let allResults: YoutubeResult[] = [];
+let currentQuery = "";
+const PAGE_SIZE = 20;
 
 export function initSearchOverlay(webamp: Webamp) {
   webampRef = webamp;
@@ -129,6 +138,7 @@ function openOverlay() {
   const lastQuery = localStorage.getItem("goamp_yt_last_query") || "";
   if (lastQuery) {
     input.value = lastQuery;
+    currentQuery = lastQuery; // restore for pagination
     // Restore cached results
     const cachedResults = localStorage.getItem("goamp_yt_last_results");
     if (cachedResults) {
@@ -172,7 +182,8 @@ function closeOverlay() {
 
 async function doSearch(query: string) {
   if (!query.trim()) return;
-  localStorage.setItem("goamp_yt_last_query", query.trim());
+  currentQuery = query.trim();
+  localStorage.setItem("goamp_yt_last_query", currentQuery);
 
   const status = document.getElementById("yt-search-status");
   const results = document.getElementById("yt-search-results");
@@ -180,23 +191,140 @@ async function doSearch(query: string) {
 
   status.innerHTML = `<span class="yt-loading">Searching</span>`;
   results.innerHTML = "";
+  allResults = [];
 
   try {
-    const items = await searchYoutube(query);
-    status.textContent = `${items.length} results found`;
+    const items = await searchYoutube(currentQuery, PAGE_SIZE);
+    allResults = items;
     localStorage.setItem("goamp_yt_last_results", JSON.stringify(items));
     track("youtube_search", {
-      query: query.slice(0, 50),
+      query: currentQuery.slice(0, 50),
       results: items.length,
     });
-    renderResults(items, results);
+    showPage(results, 0, "none");
   } catch (e) {
     status.textContent = `Error: ${e}`;
     trackError(e, { action: "youtube_search" });
   }
 }
 
-function renderResults(items: YoutubeResult[], container: HTMLElement) {
+async function ensureResultsForPage(page: number): Promise<boolean> {
+  const needed = (page + 1) * PAGE_SIZE;
+  if (allResults.length >= needed) return true;
+
+  const status = document.getElementById("yt-search-status");
+  if (status) status.innerHTML = `<span class="yt-loading">Loading</span>`;
+
+  try {
+    const items = await searchYoutube(currentQuery, needed);
+    if (items.length <= allResults.length) return false; // no more results
+    allResults = items;
+    localStorage.setItem("goamp_yt_last_results", JSON.stringify(items));
+    return true;
+  } catch (e) {
+    if (status) status.textContent = `Error: ${e}`;
+    trackError(e, { action: "youtube_load_page" });
+    return false;
+  }
+}
+
+function showPage(container: HTMLElement, page: number, direction: "left" | "right" | "none") {
+  const status = document.getElementById("yt-search-status");
+  const start = page * PAGE_SIZE;
+  const pageItems = allResults.slice(start, start + PAGE_SIZE);
+  const totalPages = Math.ceil(allResults.length / PAGE_SIZE);
+  const hasMore = allResults.length >= (page + 1) * PAGE_SIZE; // might have next
+
+
+  // Animate out old content
+  if (direction !== "none") {
+    const slideOut = direction === "right" ? "yt-page-out-left" : "yt-page-out-right";
+    const slideIn = direction === "right" ? "yt-page-in-right" : "yt-page-in-left";
+    container.classList.add(slideOut);
+    setTimeout(() => {
+      container.classList.remove(slideOut);
+      renderPageContent(container, pageItems);
+      container.classList.add(slideIn);
+      setTimeout(() => container.classList.remove(slideIn), 200);
+    }, 150);
+  } else {
+    renderPageContent(container, pageItems);
+  }
+
+  if (status) {
+    const pageInfo = totalPages > 1 ? ` \u2022 Page ${page + 1}/${totalPages}${hasMore ? "+" : ""}` : "";
+    status.textContent = `${allResults.length} results${pageInfo}`;
+  }
+
+  // Update pagination controls
+  updatePagination(container, page, hasMore);
+}
+
+function updatePagination(container: HTMLElement, page: number, hasMore: boolean) {
+  document.getElementById("yt-pagination")?.remove();
+
+  const totalLoaded = Math.ceil(allResults.length / PAGE_SIZE);
+  if (totalLoaded <= 1 && !hasMore) return; // single page, no controls
+
+  const c = getSkinColors();
+  const nav = document.createElement("div");
+  nav.id = "yt-pagination";
+  nav.className = "yt-pagination";
+  nav.style.borderColor = c.fg;
+
+  // Prev button
+  if (page > 0) {
+    const prev = document.createElement("div");
+    prev.className = "yt-page-btn";
+    prev.style.color = c.accent;
+    prev.textContent = "\u25c0";
+    prev.addEventListener("click", () => {
+      showPage(container, page - 1, "left");
+    });
+    nav.appendChild(prev);
+  }
+
+  // Page number buttons
+  for (let i = 0; i < totalLoaded; i++) {
+    const btn = document.createElement("div");
+    btn.className = "yt-page-num" + (i === page ? " yt-page-num-active" : "");
+    btn.style.color = i === page ? c.accent : c.text;
+    btn.textContent = `${i + 1}`;
+    if (i !== page) {
+      btn.addEventListener("click", () => {
+        const direction = i > page ? "right" : "left";
+        showPage(container, i, direction);
+      });
+    }
+    nav.appendChild(btn);
+  }
+
+  // Next button (loads more if needed)
+  if (hasMore) {
+    const next = document.createElement("div");
+    next.className = "yt-page-btn";
+    next.style.color = c.accent;
+    next.textContent = "\u25b6";
+    next.addEventListener("click", async () => {
+      const ok = await ensureResultsForPage(page + 1);
+      if (ok) {
+        showPage(container, page + 1, "right");
+      } else {
+        const status = document.getElementById("yt-search-status");
+        if (status) status.textContent = "No more results";
+      }
+    });
+    nav.appendChild(next);
+  }
+
+  // Insert pagination before the results container (after header)
+  const header = container.closest(".yt-search-container")?.querySelector(".yt-search-header");
+  if (header && header.parentElement) {
+    header.parentElement.insertBefore(nav, container);
+  }
+}
+
+function renderPageContent(container: HTMLElement, items: YoutubeResult[]) {
   container.innerHTML = "";
   const c = getSkinColors();
 
@@ -223,13 +351,20 @@ function renderResults(items: YoutubeResult[], container: HTMLElement) {
   }
 }
 
+/** Compat wrapper for cached results restore */
+function renderResults(items: YoutubeResult[], container: HTMLElement) {
+  allResults = items;
+  showPage(container, 0, "none");
+}
+
 function showContextMenu(
   e: MouseEvent,
   item: YoutubeResult,
   c: ReturnType<typeof getSkinColors>
 ) {
-  // Remove existing context menu
+  // Remove existing context menu & submenu
   document.getElementById("yt-ctx-menu")?.remove();
+  document.getElementById("yt-ctx-submenu")?.remove();
 
   const menu = document.createElement("div");
   menu.id = "yt-ctx-menu";
@@ -241,41 +376,181 @@ function showContextMenu(
     min-width:160px;
   `;
 
-  const actions = [
-    { label: "\u25b6 Play now", action: () => playNow(item) },
-    { label: "\u2795 Add to playlist", action: () => addToPlaylist(item) },
-  ];
+  // Play now
+  const playRow = createMenuItem("\u25b6 Play now", c, () => {
+    closeCtxMenu();
+    playNow(item);
+  });
+  menu.appendChild(playRow);
 
-  for (const { label, action } of actions) {
-    const row = document.createElement("div");
-    row.textContent = label;
-    row.style.cssText = `
-      padding:4px 10px; cursor:pointer; color:${c.text};
-      white-space:nowrap;
-    `;
-    row.addEventListener("mouseenter", () => {
-      row.style.background = `rgba(255,255,255,0.1)`;
-    });
-    row.addEventListener("mouseleave", () => {
-      row.style.background = "none";
-    });
-    row.addEventListener("click", () => {
-      menu.remove();
-      action();
-    });
-    menu.appendChild(row);
-  }
+  // Add to current (Webamp) playlist
+  const addCurrentRow = createMenuItem("\u2795 Add to queue", c, () => {
+    closeCtxMenu();
+    addToWebampQueue(item);
+  });
+  menu.appendChild(addCurrentRow);
+
+  // Add to playlist → submenu with delayed close
+  let submenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const cancelSubmenuClose = () => {
+    if (submenuCloseTimer) {
+      clearTimeout(submenuCloseTimer);
+      submenuCloseTimer = null;
+    }
+  };
+
+  const scheduleSubmenuClose = () => {
+    cancelSubmenuClose();
+    submenuCloseTimer = setTimeout(() => {
+      const sub = document.getElementById("yt-ctx-submenu");
+      if (sub && !sub.matches(":hover")) sub.remove();
+    }, 300);
+  };
+
+  const addToPlRow = createMenuItem("\u{1f4c1} Add to playlist \u25b8", c, () => {});
+  addToPlRow.addEventListener("mouseenter", () => {
+    cancelSubmenuClose();
+    showPlaylistSubmenu(addToPlRow, item, c, cancelSubmenuClose, scheduleSubmenuClose);
+  });
+  addToPlRow.addEventListener("mouseleave", () => {
+    scheduleSubmenuClose();
+  });
+  menu.appendChild(addToPlRow);
 
   document.body.appendChild(menu);
 
-  // Close on click outside
-  const closeMenu = (ev: MouseEvent) => {
-    if (!menu.contains(ev.target as Node)) {
-      menu.remove();
-      document.removeEventListener("click", closeMenu);
+  const closeCtxMenu = () => {
+    menu.remove();
+    document.getElementById("yt-ctx-submenu")?.remove();
+    document.removeEventListener("click", onOutsideClick);
+  };
+
+  const onOutsideClick = (ev: MouseEvent) => {
+    const sub = document.getElementById("yt-ctx-submenu");
+    if (!menu.contains(ev.target as Node) && !(sub && sub.contains(ev.target as Node))) {
+      closeCtxMenu();
     }
   };
-  setTimeout(() => document.addEventListener("click", closeMenu), 0);
+  setTimeout(() => document.addEventListener("click", onOutsideClick), 0);
+}
+
+function createMenuItem(
+  label: string,
+  c: ReturnType<typeof getSkinColors>,
+  onClick: () => void
+): HTMLDivElement {
+  const row = document.createElement("div");
+  row.textContent = label;
+  row.style.cssText = `
+    padding:4px 10px; cursor:pointer; color:${c.text};
+    white-space:nowrap;
+  `;
+  row.addEventListener("mouseenter", () => {
+    row.style.background = "rgba(255,255,255,0.1)";
+  });
+  row.addEventListener("mouseleave", () => {
+    row.style.background = "none";
+  });
+  row.addEventListener("click", onClick);
+  return row;
+}
+
+async function showPlaylistSubmenu(
+  anchor: HTMLElement,
+  item: YoutubeResult,
+  c: ReturnType<typeof getSkinColors>,
+  cancelClose: () => void,
+  scheduleClose: () => void,
+) {
+  document.getElementById("yt-ctx-submenu")?.remove();
+
+  const sub = document.createElement("div");
+  sub.id = "yt-ctx-submenu";
+
+  const rect = anchor.getBoundingClientRect();
+  sub.style.cssText = `
+    position:fixed; left:${rect.right - 2}px; top:${rect.top}px;
+    background:${c.bg}; border:1px solid ${c.fg};
+    z-index:10002; font-family:inherit; font-size:11px;
+    box-shadow:2px 2px 0 rgba(0,0,0,0.4);
+    min-width:140px; max-height:200px; overflow-y:auto;
+    scrollbar-width:thin;
+  `;
+
+  // "New playlist..." option
+  const newRow = createMenuItem("\u2795 New playlist...", c, async () => {
+    const name = prompt("Playlist name:");
+    if (!name?.trim()) return;
+    try {
+      const pl = await createPlaylist(name.trim());
+      await downloadAndAddToPlaylist(item, pl.id);
+    } catch (e) {
+      trackError(e, { action: "ctx_new_playlist" });
+    }
+    document.getElementById("yt-ctx-menu")?.remove();
+    sub.remove();
+  });
+  sub.appendChild(newRow);
+
+  // Separator
+  const sep = document.createElement("div");
+  sep.style.cssText = `height:1px;background:${c.fg};margin:2px 0`;
+  sub.appendChild(sep);
+
+  // Load playlists
+  try {
+    const playlists = await listPlaylists();
+    if (playlists.length === 0) {
+      const empty = document.createElement("div");
+      empty.textContent = "No playlists";
+      empty.style.cssText = `padding:4px 10px;color:${c.fg};font-style:italic`;
+      sub.appendChild(empty);
+    } else {
+      for (const pl of playlists) {
+        const plRow = createMenuItem(`${pl.name} (${pl.track_count})`, c, async () => {
+          await downloadAndAddToPlaylist(item, pl.id);
+          document.getElementById("yt-ctx-menu")?.remove();
+          sub.remove();
+        });
+        sub.appendChild(plRow);
+      }
+    }
+  } catch {
+    const err = document.createElement("div");
+    err.textContent = "Error loading playlists";
+    err.style.cssText = `padding:4px 10px;color:red`;
+    sub.appendChild(err);
+  }
+
+  document.body.appendChild(sub);
+
+  // Keep submenu open when hovering, use shared timer
+  sub.addEventListener("mouseenter", () => cancelClose());
+  sub.addEventListener("mouseleave", () => scheduleClose());
+}
+
+async function downloadAndAddToPlaylist(item: YoutubeResult, playlistId: string) {
+  const status = document.getElementById("yt-search-status");
+  if (status) status.innerHTML = `<span class="yt-loading">Downloading</span> ${escapeHtml(item.title)}`;
+
+  try {
+    const filePath = await extractAudio(item.id);
+    const trackInput: TrackInput = {
+      title: item.title,
+      artist: item.channel,
+      duration: item.duration,
+      source: "youtube",
+      source_id: filePath,
+    };
+    await addTrackToPlaylist(playlistId, trackInput);
+
+    if (status) status.textContent = `Added to playlist: ${item.title}`;
+    track("youtube_add_to_saved_playlist", { video_id: item.id });
+  } catch (e) {
+    if (status) status.textContent = `Error: ${e}`;
+    trackError(e, { action: "add_to_playlist", video_id: item.id });
+  }
 }
 
 function playNow(item: YoutubeResult) {
@@ -283,7 +558,7 @@ function playNow(item: YoutubeResult) {
   playYoutubeTrack(item, row || document.createElement("div"));
 }
 
-async function addToPlaylist(item: YoutubeResult) {
+async function addToWebampQueue(item: YoutubeResult) {
   const status = document.getElementById("yt-search-status");
   if (status) status.innerHTML = `<span class="yt-loading">Downloading</span> ${escapeHtml(item.title)}`;
 
@@ -390,6 +665,22 @@ function injectStyles(c: ReturnType<typeof getSkinColors>) {
       25% { content: "."; }
       50% { content: ".."; }
       75% { content: "..."; }
+    }
+    @keyframes yt-page-slide-in-right {
+      from { opacity: 0; transform: translateX(30px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes yt-page-slide-in-left {
+      from { opacity: 0; transform: translateX(-30px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes yt-page-slide-out-left {
+      from { opacity: 1; transform: translateX(0); }
+      to { opacity: 0; transform: translateX(-30px); }
+    }
+    @keyframes yt-page-slide-out-right {
+      from { opacity: 1; transform: translateX(0); }
+      to { opacity: 0; transform: translateX(30px); }
     }
 
     #yt-search-overlay {
@@ -527,6 +818,47 @@ function injectStyles(c: ReturnType<typeof getSkinColors>) {
       font-size: 10px;
       flex-shrink: 0;
       font-variant-numeric: tabular-nums;
+    }
+
+    .yt-search-results.yt-page-out-left {
+      animation: yt-page-slide-out-left 0.15s ease-in forwards;
+    }
+    .yt-search-results.yt-page-out-right {
+      animation: yt-page-slide-out-right 0.15s ease-in forwards;
+    }
+    .yt-search-results.yt-page-in-right {
+      animation: yt-page-slide-in-right 0.2s ease-out;
+    }
+    .yt-search-results.yt-page-in-left {
+      animation: yt-page-slide-in-left 0.2s ease-out;
+    }
+
+    .yt-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 8px;
+      gap: 4px;
+      border-bottom: 1px solid;
+    }
+    .yt-page-btn {
+      padding: 2px 8px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .yt-page-btn:hover { background: rgba(255,255,255,0.08); }
+    .yt-page-num {
+      padding: 2px 6px;
+      cursor: pointer;
+      font-size: 10px;
+      min-width: 16px;
+      text-align: center;
+    }
+    .yt-page-num:hover { background: rgba(255,255,255,0.08); }
+    .yt-page-num-active {
+      cursor: default;
+      font-weight: bold;
+      border-bottom: 1px solid currentColor;
     }
 
     .yt-search-status {

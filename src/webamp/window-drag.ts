@@ -56,9 +56,15 @@ function isAppContent(el: HTMLElement): boolean {
   const ytOverlay = document.getElementById("yt-search-overlay");
   if (ytOverlay && ytOverlay.contains(el)) return true;
 
-  // YouTube context menu (right-click on search results)
+  // Playlist panel overlay
+  const plOverlay = document.getElementById("playlist-panel-overlay");
+  if (plOverlay && plOverlay.contains(el)) return true;
+
+  // YouTube context menu + playlist submenu
   const ytCtxMenu = document.getElementById("yt-ctx-menu");
   if (ytCtxMenu && ytCtxMenu.contains(el)) return true;
+  const ytCtxSub = document.getElementById("yt-ctx-submenu");
+  if (ytCtxSub && ytCtxSub.contains(el)) return true;
 
   // Fullscreen visualizer (canvas in gen-window, or any fullscreen element)
   if (el.tagName === "CANVAS" || el.closest(".gen-window")) return true;
@@ -67,7 +73,7 @@ function isAppContent(el: HTMLElement): boolean {
   if (document.fullscreenElement && document.fullscreenElement.contains(el)) return true;
 
   // Any overlay/popup with z-index (catch-all for dynamic elements)
-  if (el.closest(".goamp-overlay") || el.closest("[id$='-overlay']") || el.closest("[id$='-menu']")) return true;
+  if (el.closest(".goamp-overlay") || el.closest("[id$='-overlay']") || el.closest("[id$='-menu']") || el.closest("[id$='-submenu']")) return true;
 
   return false;
 }

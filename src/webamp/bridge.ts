@@ -1,10 +1,11 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { scanDirectory, saveSession, loadSession } from "../lib/tauri-ipc";
+import { scanDirectory, saveSession, loadSession, getPlaylistTracks } from "../lib/tauri-ipc";
 import { toWebampTracks } from "./tracks";
 import { track, trackError } from "../lib/analytics";
 import { initSearchOverlay, toggleSearchOverlay } from "../youtube/SearchOverlay";
+import { initPlaylistPanel, togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import type Webamp from "webamp";
 
 export function setupBridge(webamp: Webamp) {
@@ -13,6 +14,7 @@ export function setupBridge(webamp: Webamp) {
   setupClose(webamp);
   setupSessionRestore(webamp);
   initSearchOverlay(webamp);
+  initPlaylistPanel(webamp);
 }
 
 function setupClose(webamp: Webamp) {
@@ -67,6 +69,26 @@ async function saveCurrentSession(webamp: Webamp) {
 
 async function setupSessionRestore(webamp: Webamp) {
   try {
+    // Try last selected playlist first
+    const lastPlaylistId = localStorage.getItem("goamp_last_playlist_id");
+    if (lastPlaylistId) {
+      const tracks = await getPlaylistTracks(lastPlaylistId);
+      if (tracks.length > 0) {
+        const webampTracks = tracks.map((t) => ({
+          metaData: {
+            artist: t.artist || "Unknown Artist",
+            title: t.title || "Unknown Track",
+          },
+          url: convertFileSrc(t.source_id),
+          duration: t.duration,
+        }));
+        webamp.setTracksToPlay(webampTracks);
+        console.log("[GOAMP] Playlist restored:", tracks.length, "tracks");
+        return;
+      }
+    }
+
+    // Fallback to last session
     const tracks = await loadSession();
     if (tracks.length === 0) return;
 
@@ -145,6 +167,11 @@ function setupKeyboard(webamp: Webamp) {
         });
         store.dispatch({ type: "TOGGLE_PRESET_OVERLAY" });
       }
+    }
+    // Ctrl+P — playlist panel
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyP") {
+      e.preventDefault();
+      togglePlaylistPanel();
     }
     // Ctrl+S — load skin
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyS") {

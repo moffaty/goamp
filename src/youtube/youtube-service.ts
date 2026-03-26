@@ -8,8 +8,8 @@ export interface YoutubeResult {
   thumbnail: string;
 }
 
-export async function searchYoutube(query: string): Promise<YoutubeResult[]> {
-  return invoke("search_youtube", { query });
+export async function searchYoutube(query: string, limit?: number): Promise<YoutubeResult[]> {
+  return invoke("search_youtube", { query, limit: limit ?? null });
 }
 
 export async function extractAudio(videoId: string): Promise<string> {
