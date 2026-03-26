@@ -1,0 +1,14 @@
+# Install mold or lld for faster linking:
+#   sudo apt install -y mold
+# Then uncomment:
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+[profile.dev]
+incremental = true
+opt-level = 0
+
+[profile.dev.package."*"]
+# Optimize deps (they rarely change, faster runtime + same compile time)
+opt-level = 2
