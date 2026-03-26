@@ -1,11 +1,14 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { scanDirectory, saveSession, loadSession, getPlaylistTracks } from "../lib/tauri-ipc";
 import { toWebampTracks } from "./tracks";
 import { track, trackError } from "../lib/analytics";
 import { initSearchOverlay, toggleSearchOverlay } from "../youtube/SearchOverlay";
 import { initPlaylistPanel, togglePlaylistPanel } from "../playlists/PlaylistPanel";
+import { initAudioDevicePanel, toggleAudioDevicePanel, restoreAudioDevice } from "../settings/AudioDevicePanel";
 import type Webamp from "webamp";
 
 export function setupBridge(webamp: Webamp) {
@@ -13,8 +16,11 @@ export function setupBridge(webamp: Webamp) {
   setupTrackTracking(webamp);
   setupClose(webamp);
   setupSessionRestore(webamp);
+  setupMediaActions(webamp);
   initSearchOverlay(webamp);
   initPlaylistPanel(webamp);
+  initAudioDevicePanel(webamp);
+  restoreAudioDevice();
 }
 
 function setupClose(webamp: Webamp) {
@@ -123,12 +129,58 @@ function setupTrackTracking(webamp: Webamp) {
 
     // Track with artist/title for future charts
     const meta = (trackInfo as any).metaData;
+    const artist = (meta?.artist || "Unknown").slice(0, 100);
+    const title = (meta?.title || "Unknown").slice(0, 100);
+
     if (meta?.artist || meta?.title) {
-      track("track_info", {
-        artist: (meta.artist || "Unknown").slice(0, 100),
-        title: (meta.title || "Unknown").slice(0, 100),
-        source,
-      });
+      track("track_info", { artist, title, source });
+    }
+
+    // Update tray tooltip + MPRIS/OS media metadata
+    const tooltip = `${artist} — ${title}`;
+    invoke("update_tray_tooltip", { text: tooltip }).catch(() => {});
+    invoke("update_media_metadata", { title, artist }).catch(() => {});
+    invoke("update_media_playback", { playing: true }).catch(() => {});
+  });
+}
+
+function setupMediaActions(webamp: Webamp) {
+  const webview = getCurrentWebviewWindow();
+  webview.listen<string>("media-action", ({ payload }) => {
+    const store = (webamp as any).store;
+    if (!store) return;
+
+    switch (payload) {
+      case "play":
+      case "play_pause": {
+        const state = store.getState();
+        const status = state?.media?.status;
+        if (status === "PLAYING") {
+          store.dispatch({ type: "PAUSE" });
+          invoke("update_media_playback", { playing: false }).catch(() => {});
+        } else {
+          store.dispatch({ type: "PLAY" });
+          invoke("update_media_playback", { playing: true }).catch(() => {});
+        }
+        break;
+      }
+      case "pause":
+        store.dispatch({ type: "PAUSE" });
+        invoke("update_media_playback", { playing: false }).catch(() => {});
+        break;
+      case "next":
+        store.dispatch({ type: "PLAY_TRACK", id: "NEXT" });
+        break;
+      case "prev":
+        store.dispatch({ type: "PLAY_TRACK", id: "PREV" });
+        break;
+      case "stop":
+        store.dispatch({ type: "STOP" });
+        invoke("update_media_playback", { playing: false }).catch(() => {});
+        break;
+      case "quit":
+        saveCurrentSession(webamp).catch(() => {});
+        break;
     }
   });
 }
@@ -177,6 +229,11 @@ function setupKeyboard(webamp: Webamp) {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyS") {
       e.preventDefault();
       await loadSkin(webamp);
+    }
+    // Ctrl+D — audio device selector
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyD") {
+      e.preventDefault();
+      toggleAudioDevicePanel();
     }
   });
 }
