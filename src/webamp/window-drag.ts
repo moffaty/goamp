@@ -60,6 +60,18 @@ function isAppContent(el: HTMLElement): boolean {
   const plOverlay = document.getElementById("playlist-panel-overlay");
   if (plOverlay && plOverlay.contains(el)) return true;
 
+  // Yandex panel
+  const yaPanel = document.getElementById("yandex-panel-overlay");
+  if (yaPanel && yaPanel.contains(el)) return true;
+
+  // Scrobble settings panel
+  const scrobblePanel = document.getElementById("scrobble-settings-overlay");
+  if (scrobblePanel && scrobblePanel.contains(el)) return true;
+
+  // GOAMP context menu
+  const goampMenu = document.getElementById("goamp-context-menu");
+  if (goampMenu && goampMenu.contains(el)) return true;
+
   // YouTube context menu + playlist submenu
   const ytCtxMenu = document.getElementById("yt-ctx-menu");
   if (ytCtxMenu && ytCtxMenu.contains(el)) return true;

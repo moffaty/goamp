@@ -19,23 +19,25 @@ interface MenuItem {
 export function initGoampMenu(webamp: Webamp) {
   webampRef = webamp;
 
+  // Use capture phase to intercept before Webamp's own context menu
   document.addEventListener("contextmenu", (e) => {
     const target = e.target as HTMLElement;
 
-    // Only show on Webamp elements (title bar, main window chrome)
+    // Only show on Webamp elements
     const webampEl = document.getElementById("webamp");
     if (!webampEl || !webampEl.contains(target)) return;
 
-    // Don't hijack Webamp's own context menus on playlist editor etc
-    // Only show on title bars, EQ, or the main player body
+    // Show on title bars and main window chrome
     const inTitleBar = !!target.closest(".title-bar");
     const inMainWindow = !!target.closest("#main-window");
     const inEq = !!target.closest("#equalizer-window");
     if (!inTitleBar && !inMainWindow && !inEq) return;
 
+    // Stop Webamp from handling this event
     e.preventDefault();
+    e.stopImmediatePropagation();
     showGoampMenu(e.clientX, e.clientY);
-  });
+  }, true);
 
   // Close on click outside
   document.addEventListener("mousedown", (e) => {
