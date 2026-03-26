@@ -125,10 +125,23 @@ function openOverlay() {
   const input = document.getElementById("yt-search-input") as HTMLInputElement;
   const closeBtn = document.getElementById("yt-search-close")!;
 
-  // Restore last search query
+  // Restore last search query and results
   const lastQuery = localStorage.getItem("goamp_yt_last_query") || "";
   if (lastQuery) {
     input.value = lastQuery;
+    // Restore cached results
+    const cachedResults = localStorage.getItem("goamp_yt_last_results");
+    if (cachedResults) {
+      try {
+        const items: YoutubeResult[] = JSON.parse(cachedResults);
+        const resultsContainer = document.getElementById("yt-search-results");
+        const statusEl = document.getElementById("yt-search-status");
+        if (resultsContainer && items.length > 0) {
+          renderResults(items, resultsContainer);
+          if (statusEl) statusEl.textContent = `${items.length} results (cached)`;
+        }
+      } catch {}
+    }
   }
 
   input.focus();
@@ -171,6 +184,7 @@ async function doSearch(query: string) {
   try {
     const items = await searchYoutube(query);
     status.textContent = `${items.length} results found`;
+    localStorage.setItem("goamp_yt_last_results", JSON.stringify(items));
     track("youtube_search", {
       query: query.slice(0, 50),
       results: items.length,
