@@ -70,17 +70,21 @@ fn find_ytdlp(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     }
 
     // Fall back to system PATH
-    let check_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
-    if let Ok(output) = std::process::Command::new(check_cmd)
-        .arg("yt-dlp")
-        .output()
-    {
+    let check_cmd = if cfg!(target_os = "windows") {
+        "where"
+    } else {
+        "which"
+    };
+    if let Ok(output) = std::process::Command::new(check_cmd).arg("yt-dlp").output() {
         if output.status.success() {
             return Ok(PathBuf::from("yt-dlp"));
         }
     }
 
-    Err("yt-dlp not found. Place yt-dlp binary next to goamp executable or install it system-wide.".into())
+    Err(
+        "yt-dlp not found. Place yt-dlp binary next to goamp executable or install it system-wide."
+            .into(),
+    )
 }
 
 fn new_command(program: &PathBuf) -> tokio::process::Command {
@@ -122,12 +126,15 @@ pub async fn search_youtube(
     query: String,
 ) -> Result<Vec<YoutubeResult>, String> {
     let search_query = format!("ytsearch20:{}", query);
-    let output = run_ytdlp(&app, &[
-        &search_query,
-        "--dump-json",
-        "--flat-playlist",
-        "--no-warnings",
-    ])
+    let output = run_ytdlp(
+        &app,
+        &[
+            &search_query,
+            "--dump-json",
+            "--flat-playlist",
+            "--no-warnings",
+        ],
+    )
     .await?;
 
     if !output.status.success() {
@@ -172,12 +179,13 @@ pub async fn search_youtube(
 }
 
 #[tauri::command]
-pub async fn extract_audio(
-    app: tauri::AppHandle,
-    video_id: String,
-) -> Result<String, String> {
+pub async fn extract_audio(app: tauri::AppHandle, video_id: String) -> Result<String, String> {
     let cache = cache_dir(&app);
-    eprintln!("[GOAMP] extract_audio: video_id={}, cache={}", video_id, cache.display());
+    eprintln!(
+        "[GOAMP] extract_audio: video_id={}, cache={}",
+        video_id,
+        cache.display()
+    );
 
     // Return cached file if exists (any format)
     for ext in &["opus", "m4a", "webm", "ogg", "mp3", "wav"] {
@@ -193,29 +201,43 @@ pub async fn extract_audio(
     let url = format!("https://www.youtube.com/watch?v={}", video_id);
 
     // Try with audio extraction (needs ffmpeg)
-    let output = run_ytdlp(&app, &[
-        "-x",
-        "--audio-format", "opus",
-        "--audio-quality", "5",
-        "-o", &out_template_str,
-        "--no-playlist",
-        "--no-warnings",
-        &url,
-    ])
+    let output = run_ytdlp(
+        &app,
+        &[
+            "-x",
+            "--audio-format",
+            "opus",
+            "--audio-quality",
+            "5",
+            "-o",
+            &out_template_str,
+            "--no-playlist",
+            "--no-warnings",
+            &url,
+        ],
+    )
     .await?;
 
     // If -x failed (no ffmpeg), try downloading best audio directly
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        eprintln!("[GOAMP] extract with -x failed, trying direct download: {}", stderr);
+        eprintln!(
+            "[GOAMP] extract with -x failed, trying direct download: {}",
+            stderr
+        );
 
-        let output2 = run_ytdlp(&app, &[
-            "-f", "bestaudio",
-            "-o", &out_template_str,
-            "--no-playlist",
-            "--no-warnings",
-            &url,
-        ])
+        let output2 = run_ytdlp(
+            &app,
+            &[
+                "-f",
+                "bestaudio",
+                "-o",
+                &out_template_str,
+                "--no-playlist",
+                "--no-warnings",
+                &url,
+            ],
+        )
         .await?;
 
         if !output2.status.success() {
@@ -239,7 +261,11 @@ pub async fn extract_audio(
             .filter_map(|e| e.ok())
             .filter_map(|e| {
                 let name = e.file_name().to_string_lossy().to_string();
-                if name.starts_with(&video_id) { Some(name) } else { None }
+                if name.starts_with(&video_id) {
+                    Some(name)
+                } else {
+                    None
+                }
             })
             .collect();
         eprintln!("[GOAMP] files matching video_id in cache: {:?}", files);
