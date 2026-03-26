@@ -85,7 +85,7 @@ function showGoampMenu(x: number, y: number) {
       action: () => toggleScrobbleSettings(),
       separator: true,
     },
-    { label: "Feature Flags", shortcut: "Ctrl+Shift+F", action: () => toggleFeatureFlagsPanel() },
+    { label: "Feature Flags", shortcut: "Ctrl+Shift+`", action: () => toggleFeatureFlagsPanel() },
   ];
 
   menu = document.createElement("div");

@@ -14,6 +14,7 @@ import { initYandexPanel, toggleYandexPanel } from "../yandex/YandexPanel";
 import { initGoampMenu } from "./goamp-menu";
 import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
 import { refreshFlagCache, isFeatureEnabled } from "../settings/feature-flags-service";
+import { checkForUpdates } from "../updater/UpdateNotification";
 import {
   lastfmNowPlaying,
   lastfmScrobble,
@@ -40,6 +41,8 @@ export function setupBridge(webamp: Webamp) {
   restoreAudioDevice();
   refreshFlagCache().catch(() => {});
   setupScrobbling(webamp);
+  // Check for updates 5 seconds after startup
+  setTimeout(() => checkForUpdates(), 5000);
 }
 
 function setupClose(webamp: Webamp) {
@@ -264,8 +267,8 @@ function setupKeyboard(webamp: Webamp) {
       e.preventDefault();
       toggleYandexPanel();
     }
-    // Ctrl+Shift+F — Feature Flags (hidden dev panel)
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyF") {
+    // Ctrl+Shift+` — Feature Flags (hidden dev panel)
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "Backquote") {
       e.preventDefault();
       toggleFeatureFlagsPanel();
     }
