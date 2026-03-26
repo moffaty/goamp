@@ -44,50 +44,10 @@ export function setupClickThrough() {
 }
 
 function isAppContent(el: HTMLElement): boolean {
-  // Webamp main container
-  const webampEl = document.getElementById("webamp");
-  if (webampEl && webampEl.contains(el)) return true;
-
-  // Webamp context menu (rendered in body, outside #webamp)
-  const contextMenu = document.getElementById("webamp-context-menu");
-  if (contextMenu && contextMenu.contains(el)) return true;
-
-  // YouTube search overlay
-  const ytOverlay = document.getElementById("yt-search-overlay");
-  if (ytOverlay && ytOverlay.contains(el)) return true;
-
-  // Playlist panel overlay
-  const plOverlay = document.getElementById("playlist-panel-overlay");
-  if (plOverlay && plOverlay.contains(el)) return true;
-
-  // Yandex panel
-  const yaPanel = document.getElementById("yandex-panel-overlay");
-  if (yaPanel && yaPanel.contains(el)) return true;
-
-  // Scrobble settings panel
-  const scrobblePanel = document.getElementById("scrobble-settings-overlay");
-  if (scrobblePanel && scrobblePanel.contains(el)) return true;
-
-  // GOAMP context menu
-  const goampMenu = document.getElementById("goamp-context-menu");
-  if (goampMenu && goampMenu.contains(el)) return true;
-
-  // YouTube context menu + playlist submenu
-  const ytCtxMenu = document.getElementById("yt-ctx-menu");
-  if (ytCtxMenu && ytCtxMenu.contains(el)) return true;
-  const ytCtxSub = document.getElementById("yt-ctx-submenu");
-  if (ytCtxSub && ytCtxSub.contains(el)) return true;
-
-  // Fullscreen visualizer (canvas in gen-window, or any fullscreen element)
-  if (el.tagName === "CANVAS" || el.closest(".gen-window")) return true;
-
-  // Any element in fullscreen mode
-  if (document.fullscreenElement && document.fullscreenElement.contains(el)) return true;
-
-  // Any overlay/popup with z-index (catch-all for dynamic elements)
-  if (el.closest(".goamp-overlay") || el.closest("[id$='-overlay']") || el.closest("[id$='-menu']") || el.closest("[id$='-submenu']")) return true;
-
-  return false;
+  // Generic rule: transparent background (body/html) = click-through.
+  // Any actual UI element (Webamp, overlays, menus, etc.) captures clicks.
+  if (el === document.body || el === document.documentElement) return false;
+  return true;
 }
 
 /**

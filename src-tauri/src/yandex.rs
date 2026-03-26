@@ -1,15 +1,16 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager};
+use yandex_music::model::playlist::PlaylistTracks;
+use yandex_music::YandexMusicClient;
 
 use crate::db::Db;
-use crate::md5::md5_hex;
 
-const YA_API: &str = "https://api.music.yandex.net:443";
 const YA_TOKEN_SETTING: &str = "yandex_token";
+const YA_REFRESH_TOKEN_SETTING: &str = "yandex_refresh_token";
 const YA_UID_SETTING: &str = "yandex_uid";
 const YA_OAUTH_CLIENT_ID: &str = "23cabbbdc6cd418abb4b39c32c41195d";
-const MD5_SALT: &str = "XGRlBW9FXlekgbPrRHuSiA";
+const YA_OAUTH_CLIENT_SECRET: &str = "53bc75238f0c4d08a118e51fe9203300";
 
 // --- Types ---
 
@@ -33,9 +34,9 @@ pub struct YandexStation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct YandexPlaylist {
-    pub kind: i64,
+    pub kind: u32,
     pub title: String,
-    pub track_count: i64,
+    pub track_count: u32,
     pub cover: String,
     pub owner: String,
 }
@@ -48,172 +49,32 @@ pub struct YandexAccount {
     pub has_plus: bool,
 }
 
-// --- Internal API response types ---
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeviceCodeResponse {
+    pub user_code: String,
+    pub verification_url: String,
+    pub interval: u64,
+    pub device_code: String,
+    pub expires_in: u64,
+}
+
+// --- OAuth Device Code Flow response types ---
 
 #[derive(Debug, Deserialize)]
-struct ApiResult<T> {
-    result: T,
+struct OAuthTokenResponse {
+    access_token: Option<String>,
+    refresh_token: Option<String>,
+    error: Option<String>,
+    error_description: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct AccountStatus {
-    account: AccountInfo,
-    plus: Option<PlusInfo>,
-}
-
-#[derive(Debug, Deserialize)]
-struct AccountInfo {
-    uid: i64,
-    login: Option<String>,
-    #[serde(rename = "displayName")]
-    display_name: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct PlusInfo {
-    #[serde(rename = "hasPlus")]
-    has_plus: Option<bool>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SearchResult {
-    tracks: Option<SearchTracks>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SearchTracks {
-    results: Vec<ApiTrack>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ApiTrack {
-    id: serde_json::Value,
-    title: Option<String>,
-    artists: Option<Vec<ApiArtist>>,
-    albums: Option<Vec<ApiAlbum>>,
-    #[serde(rename = "durationMs")]
-    duration_ms: Option<i64>,
-    #[serde(rename = "coverUri")]
-    cover_uri: Option<String>,
-    available: Option<bool>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ApiArtist {
-    name: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ApiAlbum {
-    title: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct DownloadInfoResult {
-    result: Vec<DownloadInfoEntry>,
-}
-
-#[derive(Debug, Deserialize)]
-struct DownloadInfoEntry {
-    codec: Option<String>,
-    #[serde(rename = "bitrateInKbps")]
-    bitrate_in_kbps: Option<i32>,
-    #[serde(rename = "downloadInfoUrl")]
-    download_info_url: String,
-    preview: Option<bool>,
-}
-
-#[derive(Debug, Deserialize)]
-struct DownloadFileInfo {
-    host: String,
-    path: String,
-    ts: String,
-    s: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct StationList {
-    result: Vec<StationEntry>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StationEntry {
-    station: StationInfo,
-}
-
-#[derive(Debug, Deserialize)]
-struct StationInfo {
-    id: StationId,
-    name: Option<String>,
-    icon: Option<StationIcon>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StationId {
-    #[serde(rename = "type")]
-    type_: String,
-    tag: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct StationIcon {
-    #[serde(rename = "imageUrl")]
-    image_url: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct StationTracksResult {
-    result: StationTracksData,
-}
-
-#[derive(Debug, Deserialize)]
-struct StationTracksData {
-    sequence: Vec<SequenceItem>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SequenceItem {
-    track: ApiTrack,
-}
-
-#[derive(Debug, Deserialize)]
-struct PlaylistListResult {
-    result: Vec<ApiPlaylistShort>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ApiPlaylistShort {
-    kind: i64,
-    title: Option<String>,
-    #[serde(rename = "trackCount")]
-    track_count: Option<i64>,
-    cover: Option<ApiCover>,
-    owner: Option<ApiOwner>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ApiCover {
-    uri: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ApiOwner {
-    login: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct PlaylistResult {
-    result: ApiPlaylistFull,
-}
-
-#[derive(Debug, Deserialize)]
-struct ApiPlaylistFull {
-    tracks: Option<Vec<PlaylistTrackEntry>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct PlaylistTrackEntry {
-    track: Option<ApiTrack>,
+struct DeviceCodeApiResponse {
+    device_code: String,
+    user_code: String,
+    verification_url: String,
+    interval: u64,
+    expires_in: u64,
 }
 
 // --- Helpers ---
@@ -234,37 +95,26 @@ fn set_setting(db: &Db, key: &str, value: &str) {
     );
 }
 
-fn ya_client(token: &str) -> Client {
-    let mut headers = reqwest::header::HeaderMap::new();
-    headers.insert("Authorization", format!("OAuth {}", token).parse().unwrap());
-    headers.insert("Accept-Language", "ru".parse().unwrap());
-    Client::builder()
-        .default_headers(headers)
-        .build()
-        .unwrap_or_else(|_| Client::new())
+fn make_client(token: &str) -> YandexMusicClient {
+    YandexMusicClient::builder(token).build().unwrap()
 }
 
-fn api_track_to_result(t: &ApiTrack) -> YandexTrack {
-    let id = match &t.id {
-        serde_json::Value::Number(n) => n.to_string(),
-        serde_json::Value::String(s) => s.clone(),
-        _ => String::new(),
-    };
+fn track_to_result(t: &yandex_music::model::track::Track) -> YandexTrack {
+    let id = t.id.clone();
+    let title = t.title.clone().unwrap_or_default();
     let artist = t
         .artists
-        .as_ref()
-        .and_then(|a| a.first())
+        .first()
         .and_then(|a| a.name.as_ref())
         .cloned()
         .unwrap_or_default();
     let album = t
         .albums
-        .as_ref()
-        .and_then(|a| a.first())
+        .first()
         .and_then(|a| a.title.as_ref())
         .cloned()
         .unwrap_or_default();
-    let duration = t.duration_ms.unwrap_or(0) as f64 / 1000.0;
+    let duration = t.duration.map(|d| d.as_secs_f64()).unwrap_or(0.0);
     let cover = t
         .cover_uri
         .as_ref()
@@ -272,7 +122,7 @@ fn api_track_to_result(t: &ApiTrack) -> YandexTrack {
         .unwrap_or_default();
     YandexTrack {
         id,
-        title: t.title.clone().unwrap_or_default(),
+        title,
         artist,
         album,
         duration,
@@ -281,9 +131,110 @@ fn api_track_to_result(t: &ApiTrack) -> YandexTrack {
     }
 }
 
-// --- Commands ---
+// --- Commands: OAuth Device Code Flow ---
 
-/// Save Yandex OAuth token
+#[tauri::command]
+pub async fn yandex_request_device_code() -> Result<DeviceCodeResponse, String> {
+    let client = Client::new();
+    let resp = client
+        .post("https://oauth.yandex.ru/device/code")
+        .form(&[
+            ("client_id", YA_OAUTH_CLIENT_ID),
+            ("device_name", "GOAMP Music Player"),
+        ])
+        .send()
+        .await
+        .map_err(|e| format!("device code request failed: {e}"))?;
+
+    let body = resp.text().await.map_err(|e| format!("read failed: {e}"))?;
+    let parsed: DeviceCodeApiResponse =
+        serde_json::from_str(&body).map_err(|e| format!("parse error: {e} body: {body}"))?;
+
+    Ok(DeviceCodeResponse {
+        user_code: parsed.user_code,
+        verification_url: parsed.verification_url,
+        interval: parsed.interval,
+        device_code: parsed.device_code,
+        expires_in: parsed.expires_in,
+    })
+}
+
+#[tauri::command]
+pub async fn yandex_poll_token(
+    app: tauri::AppHandle,
+    device_code: String,
+) -> Result<String, String> {
+    let client = Client::new();
+    let resp = client
+        .post("https://oauth.yandex.ru/token")
+        .form(&[
+            ("grant_type", "device_code"),
+            ("code", &device_code),
+            ("client_id", YA_OAUTH_CLIENT_ID),
+            ("client_secret", YA_OAUTH_CLIENT_SECRET),
+        ])
+        .send()
+        .await
+        .map_err(|e| format!("token request failed: {e}"))?;
+
+    let body = resp.text().await.map_err(|e| format!("read failed: {e}"))?;
+    let parsed: OAuthTokenResponse =
+        serde_json::from_str(&body).map_err(|e| format!("parse error: {e}"))?;
+
+    if let Some(error) = &parsed.error {
+        if error == "authorization_pending" {
+            return Err("pending".into());
+        }
+        let desc = parsed.error_description.as_deref().unwrap_or("");
+        return Err(format!("{}: {}", error, desc));
+    }
+
+    let token = parsed.access_token.ok_or("no access_token in response")?;
+
+    let db = app.state::<Db>();
+    set_setting(&db, YA_TOKEN_SETTING, &token);
+    if let Some(refresh) = &parsed.refresh_token {
+        set_setting(&db, YA_REFRESH_TOKEN_SETTING, refresh);
+    }
+
+    eprintln!("[GOAMP] Yandex OAuth token obtained via device code flow");
+    let _ = app.emit("yandex-auth-success", &token);
+
+    Ok("ok".into())
+}
+
+#[tauri::command]
+pub async fn yandex_refresh_token(app: tauri::AppHandle) -> Result<(), String> {
+    let db = app.state::<Db>();
+    let refresh = get_setting(&db, YA_REFRESH_TOKEN_SETTING).ok_or("no refresh token")?;
+
+    let client = Client::new();
+    let resp = client
+        .post("https://oauth.yandex.ru/token")
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", &refresh),
+            ("client_id", YA_OAUTH_CLIENT_ID),
+            ("client_secret", YA_OAUTH_CLIENT_SECRET),
+        ])
+        .send()
+        .await
+        .map_err(|e| format!("refresh failed: {e}"))?;
+
+    let body = resp.text().await.map_err(|e| format!("read failed: {e}"))?;
+    let parsed: OAuthTokenResponse =
+        serde_json::from_str(&body).map_err(|e| format!("parse error: {e}"))?;
+
+    let token = parsed.access_token.ok_or("no access_token")?;
+    set_setting(&db, YA_TOKEN_SETTING, &token);
+    if let Some(new_refresh) = &parsed.refresh_token {
+        set_setting(&db, YA_REFRESH_TOKEN_SETTING, new_refresh);
+    }
+
+    eprintln!("[GOAMP] Yandex token refreshed");
+    Ok(())
+}
+
 #[tauri::command]
 pub fn yandex_save_token(app: tauri::AppHandle, token: String) -> Result<(), String> {
     let db = app.state::<Db>();
@@ -291,56 +242,8 @@ pub fn yandex_save_token(app: tauri::AppHandle, token: String) -> Result<(), Str
     Ok(())
 }
 
-/// Open OAuth window and auto-capture token from redirect
-#[tauri::command]
-pub async fn yandex_oauth_login(app: tauri::AppHandle) -> Result<(), String> {
-    let oauth_url = format!(
-        "https://oauth.yandex.ru/authorize?response_type=token&client_id={}",
-        YA_OAUTH_CLIENT_ID
-    );
+// --- Commands: Account ---
 
-    let app_handle = app.clone();
-    let _win = WebviewWindowBuilder::new(
-        &app,
-        "yandex-auth",
-        WebviewUrl::External(oauth_url.parse().unwrap()),
-    )
-    .title("Yandex Music — Login")
-    .inner_size(600.0, 700.0)
-    .on_navigation(move |url| {
-        let url_str = url.to_string();
-        // Yandex redirects to https://music.yandex.ru/#access_token=TOKEN&...
-        if let Some(fragment) = url.fragment() {
-            if fragment.contains("access_token=") {
-                let token: String = fragment
-                    .split('&')
-                    .find(|p: &&str| p.starts_with("access_token="))
-                    .and_then(|p: &str| p.strip_prefix("access_token="))
-                    .unwrap_or("")
-                    .to_string();
-
-                if !token.is_empty() {
-                    let db = app_handle.state::<Db>();
-                    set_setting(&db, YA_TOKEN_SETTING, &token);
-                    eprintln!("[GOAMP] Yandex OAuth token captured");
-                    let _ = app_handle.emit("yandex-auth-success", &token);
-                    if let Some(w) = app_handle.get_webview_window("yandex-auth") {
-                        let _ = w.close();
-                    }
-                }
-                return false;
-            }
-        }
-        eprintln!("[GOAMP] Yandex auth navigating: {}", url_str);
-        true
-    })
-    .build()
-    .map_err(|e| format!("failed to create auth window: {e}"))?;
-
-    Ok(())
-}
-
-/// Check if Yandex is authenticated, return account info
 #[tauri::command]
 pub async fn yandex_get_status(app: tauri::AppHandle) -> Result<Option<YandexAccount>, String> {
     let db = app.state::<Db>();
@@ -349,30 +252,24 @@ pub async fn yandex_get_status(app: tauri::AppHandle) -> Result<Option<YandexAcc
         _ => return Ok(None),
     };
 
-    let client = ya_client(&token);
-    let resp = client
-        .get(format!("{}/account/status", YA_API))
-        .send()
+    let client = make_client(&token);
+    let status = client
+        .get_account_status()
         .await
-        .map_err(|e| format!("request failed: {e}"))?;
+        .map_err(|e| format!("account status failed: {e:?}"))?;
 
-    let body = resp.text().await.map_err(|e| format!("read failed: {e}"))?;
-    let parsed: ApiResult<AccountStatus> =
-        serde_json::from_str(&body).map_err(|e| format!("parse error: {e}"))?;
-
-    let uid = parsed.result.account.uid.to_string();
-    // Save UID for playlist/rotor operations
+    let account = status.account;
+    let uid = account.uid.map(|u| u.to_string()).unwrap_or_default();
     set_setting(&db, YA_UID_SETTING, &uid);
 
     Ok(Some(YandexAccount {
         uid,
-        login: parsed.result.account.login.unwrap_or_default(),
-        display_name: parsed.result.account.display_name.unwrap_or_default(),
-        has_plus: parsed.result.plus.and_then(|p| p.has_plus).unwrap_or(false),
+        login: account.login.unwrap_or_default(),
+        display_name: account.display_name.unwrap_or_default(),
+        has_plus: status.plus.has_plus,
     }))
 }
 
-/// Disconnect Yandex account
 #[tauri::command]
 pub fn yandex_logout(app: tauri::AppHandle) -> Result<(), String> {
     let db = app.state::<Db>();
@@ -381,7 +278,8 @@ pub fn yandex_logout(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Search tracks on Yandex Music
+// --- Commands: Search ---
+
 #[tauri::command]
 pub async fn yandex_search(
     app: tauri::AppHandle,
@@ -391,33 +289,24 @@ pub async fn yandex_search(
     let db = app.state::<Db>();
     let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
 
-    let client = ya_client(&token);
-    let resp = client
-        .get(format!("{}/search", YA_API))
-        .query(&[
-            ("text", query.as_str()),
-            ("type", "track"),
-            ("page", &page.unwrap_or(0).to_string()),
-            ("nococrrect", "false"),
-        ])
-        .send()
+    let client = make_client(&token);
+    let options =
+        yandex_music::api::search::get_search::SearchOptions::new(&query).page(page.unwrap_or(0));
+    let result = client
+        .search(&options)
         .await
-        .map_err(|e| format!("search failed: {e}"))?;
+        .map_err(|e| format!("search failed: {e:?}"))?;
 
-    let body = resp.text().await.map_err(|e| format!("read failed: {e}"))?;
-    let parsed: ApiResult<SearchResult> =
-        serde_json::from_str(&body).map_err(|e| format!("parse error: {e} body: {body}"))?;
-
-    let tracks = parsed
-        .result
+    let tracks = result
         .tracks
-        .map(|t| t.results.iter().map(api_track_to_result).collect())
+        .map(|t| t.results.iter().map(track_to_result).collect::<Vec<_>>())
         .unwrap_or_default();
 
     Ok(tracks)
 }
 
-/// Get direct MP3 URL for a Yandex Music track
+// --- Commands: Track URL ---
+
 #[tauri::command]
 pub async fn yandex_get_track_url(
     app: tauri::AppHandle,
@@ -426,97 +315,50 @@ pub async fn yandex_get_track_url(
     let db = app.state::<Db>();
     let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
 
-    let client = ya_client(&token);
-
-    // Step 1: Get download info
-    let resp = client
-        .get(format!("{}/tracks/{}/download-info", YA_API, track_id))
-        .send()
+    let client = make_client(&token);
+    let options = yandex_music::api::track::get_file_info::GetFileInfoOptions::new(&track_id);
+    let info = client
+        .get_file_info(&options)
         .await
-        .map_err(|e| format!("download-info failed: {e}"))?;
+        .map_err(|e| format!("file info failed: {e:?}"))?;
 
-    let body = resp.text().await.map_err(|e| format!("read failed: {e}"))?;
-    let info: DownloadInfoResult =
-        serde_json::from_str(&body).map_err(|e| format!("parse error: {e}"))?;
-
-    // Pick best MP3 entry (non-preview, highest bitrate)
-    let entry = info
-        .result
-        .iter()
-        .filter(|e| e.codec.as_deref() == Some("mp3") && !e.preview.unwrap_or(false))
-        .max_by_key(|e| e.bitrate_in_kbps.unwrap_or(0))
-        .or_else(|| info.result.first())
-        .ok_or("no download info available")?;
-
-    // Step 2: Get file info from downloadInfoUrl
-    let file_resp = client
-        .get(&entry.download_info_url)
-        .query(&[("format", "json")])
-        .send()
-        .await
-        .map_err(|e| format!("file info failed: {e}"))?;
-
-    let file_body = file_resp
-        .text()
-        .await
-        .map_err(|e| format!("read failed: {e}"))?;
-    let file_info: DownloadFileInfo =
-        serde_json::from_str(&file_body).map_err(|e| format!("parse error: {e}"))?;
-
-    // Step 3: Construct signed URL
-    let sign_input = format!("{}{}{}", MD5_SALT, &file_info.path[1..], file_info.s);
-    let hash = md5_hex(&sign_input);
-    let url = format!(
-        "https://{}/get-mp3/{}/{}{}",
-        file_info.host, hash, file_info.ts, file_info.path
-    );
-
+    let url = info.url;
     eprintln!("[GOAMP] Yandex track URL: {} (track {})", url, track_id);
     Ok(url)
 }
 
-/// List radio stations (genre stations + user stations)
+// --- Commands: Radio ---
+
 #[tauri::command]
 pub async fn yandex_list_stations(app: tauri::AppHandle) -> Result<Vec<YandexStation>, String> {
     let db = app.state::<Db>();
     let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
 
-    let client = ya_client(&token);
-    let resp = client
-        .get(format!("{}/rotor/stations/list", YA_API))
-        .query(&[("language", "ru")])
-        .send()
+    let client = make_client(&token);
+    let options =
+        yandex_music::api::rotor::get_all_stations::GetAllStationsOptions::default().language("ru");
+    let stations = client
+        .get_all_stations(&options)
         .await
-        .map_err(|e| format!("stations failed: {e}"))?;
+        .map_err(|e| format!("stations failed: {e:?}"))?;
 
-    let body = resp.text().await.map_err(|e| format!("read failed: {e}"))?;
-    let parsed: StationList =
-        serde_json::from_str(&body).map_err(|e| format!("parse error: {e}"))?;
-
-    let stations = parsed
-        .result
+    let result = stations
         .iter()
         .map(|s| {
-            let id = format!("{}:{}", s.station.id.type_, s.station.id.tag);
-            let icon = s
-                .station
-                .icon
-                .as_ref()
-                .and_then(|i| i.image_url.as_ref())
-                .map(|u| format!("https://{}", u.replace("%%", "100x100")))
-                .unwrap_or_default();
-            YandexStation {
-                id,
-                name: s.station.name.clone().unwrap_or_default(),
-                icon,
-            }
+            let station = &s.station;
+            let id = format!("{}:{}", station.id.item_type, station.id.tag);
+            let name = station.name.clone();
+            let icon = format!(
+                "https://{}",
+                station.icon.image_url.replace("%%", "100x100")
+            );
+            YandexStation { id, name, icon }
         })
         .collect();
 
-    Ok(stations)
+    Ok(result)
 }
 
-/// Get tracks from a radio station (My Wave = "user:onyourwave")
 #[tauri::command]
 pub async fn yandex_station_tracks(
     app: tauri::AppHandle,
@@ -526,138 +368,112 @@ pub async fn yandex_station_tracks(
     let db = app.state::<Db>();
     let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
 
-    let client = ya_client(&token);
+    let client = make_client(&token);
 
-    // If first request, send radioStarted feedback
-    if last_track_id.is_none() {
-        let _ = client
-            .post(format!("{}/rotor/station/{}/feedback", YA_API, station_id))
-            .query(&[("batch-id", "")])
-            .json(&serde_json::json!({
-                "type": "radioStarted",
-                "from": "goamp",
-                "timestamp": chrono_timestamp()
-            }))
-            .send()
-            .await;
+    let mut options =
+        yandex_music::api::rotor::get_station_tracks::GetStationTracksOptions::new(&station_id);
+    if let Some(ref last) = last_track_id {
+        options = options.queue(last);
     }
 
-    // Fetch tracks batch
-    let url = format!("{}/rotor/station/{}/tracks", YA_API, station_id);
-    let queue = last_track_id.unwrap_or_default();
-    let resp = client
-        .get(&url)
-        .query(&[("settings2", "true"), ("queue", &queue)])
-        .send()
+    let result = client
+        .get_station_tracks(&options)
         .await
-        .map_err(|e| format!("station tracks failed: {e}"))?;
+        .map_err(|e| format!("station tracks failed: {e:?}"))?;
 
-    let body = resp.text().await.map_err(|e| format!("read failed: {e}"))?;
-    let parsed: StationTracksResult =
-        serde_json::from_str(&body).map_err(|e| format!("parse error: {e} body: {body}"))?;
-
-    let tracks = parsed
-        .result
+    let tracks = result
         .sequence
         .iter()
-        .map(|s| api_track_to_result(&s.track))
+        .map(|s| track_to_result(&s.track))
         .filter(|t| t.available)
         .collect();
 
     Ok(tracks)
 }
 
-/// List user's playlists on Yandex Music
+// --- Commands: Playlists ---
+
 #[tauri::command]
 pub async fn yandex_list_playlists(app: tauri::AppHandle) -> Result<Vec<YandexPlaylist>, String> {
     let db = app.state::<Db>();
     let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
     let uid = get_setting(&db, YA_UID_SETTING).ok_or("uid not found, re-authenticate")?;
 
-    let client = ya_client(&token);
-    let resp = client
-        .get(format!("{}/users/{}/playlists/list", YA_API, uid))
-        .send()
+    let client = make_client(&token);
+    let uid_num: u64 = uid.parse().unwrap_or(0);
+    let options =
+        yandex_music::api::playlist::get_all_playlists::GetAllPlaylistsOptions::new(uid_num);
+    let playlists = client
+        .get_all_playlists(&options)
         .await
-        .map_err(|e| format!("playlists failed: {e}"))?;
+        .map_err(|e| format!("playlists failed: {e:?}"))?;
 
-    let body = resp.text().await.map_err(|e| format!("read failed: {e}"))?;
-    let parsed: PlaylistListResult =
-        serde_json::from_str(&body).map_err(|e| format!("parse error: {e}"))?;
-
-    let playlists = parsed
-        .result
+    let result = playlists
         .iter()
         .map(|p| {
             let cover = p
                 .cover
+                .uri
                 .as_ref()
-                .and_then(|c| c.uri.as_ref())
                 .map(|u| format!("https://{}", u.replace("%%", "200x200")))
                 .unwrap_or_default();
             YandexPlaylist {
                 kind: p.kind,
-                title: p.title.clone().unwrap_or_default(),
-                track_count: p.track_count.unwrap_or(0),
+                title: p.title.clone(),
+                track_count: p.track_count,
                 cover,
-                owner: p
-                    .owner
-                    .as_ref()
-                    .and_then(|o| o.login.as_ref())
-                    .cloned()
-                    .unwrap_or(uid.clone()),
+                owner: p.owner.login.clone(),
             }
         })
         .collect();
 
-    Ok(playlists)
+    Ok(result)
 }
 
-/// Get tracks from a Yandex Music playlist
 #[tauri::command]
 pub async fn yandex_get_playlist_tracks(
     app: tauri::AppHandle,
     owner: String,
-    kind: i64,
+    kind: u32,
 ) -> Result<Vec<YandexTrack>, String> {
     let db = app.state::<Db>();
     let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
 
-    let client = ya_client(&token);
-    let resp = client
-        .get(format!("{}/users/{}/playlists/{}", YA_API, owner, kind))
-        .send()
+    let client = make_client(&token);
+    let owner_num: u64 = owner.parse().unwrap_or(0);
+    let options =
+        yandex_music::api::playlist::get_playlist::GetPlaylistOptions::new(owner_num, kind);
+    let playlist = client
+        .get_playlist(&options)
         .await
-        .map_err(|e| format!("playlist tracks failed: {e}"))?;
+        .map_err(|e| format!("playlist failed: {e:?}"))?;
 
-    let body = resp.text().await.map_err(|e| format!("read failed: {e}"))?;
-    let parsed: PlaylistResult =
-        serde_json::from_str(&body).map_err(|e| format!("parse error: {e}"))?;
-
-    let tracks = parsed
-        .result
-        .tracks
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|e| e.track.as_ref().map(api_track_to_result))
-        .filter(|t| t.available)
-        .collect();
+    let tracks = match &playlist.tracks {
+        Some(PlaylistTracks::Full(tracks)) => tracks
+            .iter()
+            .map(track_to_result)
+            .filter(|t| t.available)
+            .collect(),
+        Some(PlaylistTracks::WithInfo(tracks)) => tracks
+            .iter()
+            .map(|t| track_to_result(&t.track))
+            .filter(|t| t.available)
+            .collect(),
+        _ => Vec::new(),
+    };
 
     Ok(tracks)
 }
 
-/// Import a Yandex playlist into GOAMP local playlists
 #[tauri::command]
 pub async fn yandex_import_playlist(
     app: tauri::AppHandle,
     owner: String,
-    kind: i64,
+    kind: u32,
     name: String,
 ) -> Result<String, String> {
-    // Get tracks from Yandex
     let tracks = yandex_get_playlist_tracks(app.clone(), owner, kind).await?;
 
-    // Create local playlist
     let db = app.state::<Db>();
     let playlist_id = uuid::Uuid::new_v4().to_string();
     {
@@ -692,14 +508,4 @@ pub async fn yandex_import_playlist(
         tracks.len()
     );
     Ok(playlist_id)
-}
-
-fn chrono_timestamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    // ISO 8601 approximate
-    format!("{}Z", secs)
 }

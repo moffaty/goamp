@@ -2,7 +2,8 @@ import {
   yandexSaveToken,
   yandexGetStatus,
   yandexLogout,
-  yandexOauthLogin,
+  yandexRequestDeviceCode,
+  yandexPollToken,
   yandexListStations,
   yandexStationTracks,
   yandexGetTrackUrl,
@@ -13,6 +14,7 @@ import {
   type YandexPlaylist,
   type YandexAccount,
 } from "./yandex-service";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type Webamp from "webamp";
 
@@ -100,6 +102,8 @@ function render() {
   }
 }
 
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
 function renderAuth(el: HTMLDivElement) {
   el.innerHTML = `
     <div style="margin-bottom:12px; color:#aaa;">
@@ -107,6 +111,12 @@ function renderAuth(el: HTMLDivElement) {
     </div>
     <div style="margin-bottom:10px;">
       <button id="ya-oauth-btn" style="padding:8px 12px; background:#fc0; border:none; color:#000; cursor:pointer; font-family:inherit; font-size:12px; border-radius:4px; width:100%; font-weight:bold;">Sign in with Yandex</button>
+    </div>
+    <div id="ya-device-code-area" style="display:none; margin-top:10px; padding:10px; background:#111; border:1px solid #444; border-radius:4px; text-align:center;">
+      <div style="color:#aaa; margin-bottom:6px;">Open the link and enter this code:</div>
+      <div id="ya-user-code" style="font-size:24px; color:#fc0; font-weight:bold; letter-spacing:4px; margin:8px 0;"></div>
+      <button id="ya-open-url" style="padding:5px 12px; background:#333; border:1px solid #555; color:#0f0; cursor:pointer; font-family:inherit; font-size:11px; border-radius:3px; margin-top:4px;">Open Yandex login page</button>
+      <div style="color:#666; margin-top:6px; font-size:10px;">Waiting for authorization...</div>
     </div>
     <details style="margin-top:8px;">
       <summary style="color:#666; cursor:pointer; font-size:10px;">Manual token entry</summary>
@@ -120,10 +130,45 @@ function renderAuth(el: HTMLDivElement) {
 
   el.querySelector("#ya-oauth-btn")!.addEventListener("click", async () => {
     const status = el.querySelector("#ya-auth-status") as HTMLDivElement;
-    status.textContent = "Opening login window...";
+    const codeArea = el.querySelector("#ya-device-code-area") as HTMLDivElement;
+    const codeEl = el.querySelector("#ya-user-code") as HTMLDivElement;
+    status.textContent = "Requesting code...";
     status.style.color = "#fc0";
     try {
-      await yandexOauthLogin();
+      const resp = await yandexRequestDeviceCode();
+      codeEl.textContent = resp.user_code;
+      codeArea.style.display = "block";
+      status.textContent = "";
+
+      // Open URL button
+      el.querySelector("#ya-open-url")!.addEventListener("click", () => {
+        openUrl(resp.verification_url);
+      });
+
+      // Auto-open the verification URL
+      openUrl(resp.verification_url);
+
+      // Poll for token
+      if (pollTimer) clearInterval(pollTimer);
+      const interval = Math.max(resp.interval, 2) * 1000;
+      pollTimer = setInterval(async () => {
+        try {
+          await yandexPollToken(resp.device_code);
+          // Success — stop polling
+          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+          refreshStatus();
+        } catch (e) {
+          const err = String(e);
+          if (!err.includes("pending")) {
+            // Real error — stop polling
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+            status.textContent = `Error: ${err}`;
+            status.style.color = "#f00";
+            codeArea.style.display = "none";
+          }
+          // "pending" — keep polling
+        }
+      }, interval);
     } catch (e) {
       status.textContent = `Error: ${e}`;
       status.style.color = "#f00";

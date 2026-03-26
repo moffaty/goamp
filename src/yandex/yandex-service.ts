@@ -39,8 +39,24 @@ export async function yandexGetStatus(): Promise<YandexAccount | null> {
   return invoke("yandex_get_status");
 }
 
-export async function yandexOauthLogin(): Promise<void> {
-  return invoke("yandex_oauth_login");
+export interface DeviceCodeResponse {
+  user_code: string;
+  verification_url: string;
+  interval: number;
+  device_code: string;
+  expires_in: number;
+}
+
+export async function yandexRequestDeviceCode(): Promise<DeviceCodeResponse> {
+  return invoke("yandex_request_device_code");
+}
+
+export async function yandexPollToken(deviceCode: string): Promise<string> {
+  return invoke("yandex_poll_token", { deviceCode });
+}
+
+export async function yandexRefreshToken(): Promise<void> {
+  return invoke("yandex_refresh_token");
 }
 
 export async function yandexLogout(): Promise<void> {
