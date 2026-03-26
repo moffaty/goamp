@@ -2,6 +2,7 @@ import {
   yandexSaveToken,
   yandexGetStatus,
   yandexLogout,
+  yandexOauthLogin,
   yandexListStations,
   yandexStationTracks,
   yandexGetTrackUrl,
@@ -12,7 +13,7 @@ import {
   type YandexPlaylist,
   type YandexAccount,
 } from "./yandex-service";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type Webamp from "webamp";
 
 let panel: HTMLDivElement | null = null;
@@ -28,6 +29,12 @@ let currentView: "auth" | "main" | "stations" | "playlist" = "auth";
 
 export function initYandexPanel(webamp: Webamp) {
   webampInstance = webamp;
+
+  // Listen for OAuth success from Tauri backend
+  const webview = getCurrentWebviewWindow();
+  webview.listen("yandex-auth-success", () => {
+    refreshStatus();
+  });
 }
 
 export function toggleYandexPanel() {
@@ -95,26 +102,32 @@ function render() {
 
 function renderAuth(el: HTMLDivElement) {
   el.innerHTML = `
-    <div style="margin-bottom:10px; color:#aaa;">
-      Enter your Yandex Music OAuth token to connect.
+    <div style="margin-bottom:12px; color:#aaa;">
+      Sign in with your Yandex account to access music, playlists, and radio.
     </div>
-    <div style="margin-bottom:6px; color:#666; font-size:10px;">
-      Get token: open Yandex OAuth page, authorize, copy access_token from redirect URL.
+    <div style="margin-bottom:10px;">
+      <button id="ya-oauth-btn" style="padding:8px 12px; background:#fc0; border:none; color:#000; cursor:pointer; font-family:inherit; font-size:12px; border-radius:4px; width:100%; font-weight:bold;">Sign in with Yandex</button>
     </div>
-    <div style="display:flex; gap:6px; margin-bottom:10px;">
-      <input id="ya-token-input" type="text" placeholder="OAuth token" style="flex:1; padding:4px 6px; background:#111; border:1px solid #444; color:#fc0; font-family:inherit; font-size:11px; border-radius:3px;" />
-      <button id="ya-connect-btn" style="padding:5px 12px; background:#333; border:1px solid #555; color:#fc0; cursor:pointer; font-family:inherit; font-size:11px; border-radius:3px;">Connect</button>
-    </div>
-    <div style="margin-bottom:8px;">
-      <button id="ya-oauth-btn" style="padding:5px 12px; background:#333; border:1px solid #555; color:#fc0; cursor:pointer; font-family:inherit; font-size:11px; border-radius:3px; width:100%;">Open Yandex OAuth Page</button>
-    </div>
-    <div id="ya-auth-status" style="color:#888;"></div>
+    <details style="margin-top:8px;">
+      <summary style="color:#666; cursor:pointer; font-size:10px;">Manual token entry</summary>
+      <div style="display:flex; gap:6px; margin-top:6px;">
+        <input id="ya-token-input" type="text" placeholder="OAuth token" style="flex:1; padding:4px 6px; background:#111; border:1px solid #444; color:#fc0; font-family:inherit; font-size:11px; border-radius:3px;" />
+        <button id="ya-connect-btn" style="padding:5px 12px; background:#333; border:1px solid #555; color:#fc0; cursor:pointer; font-family:inherit; font-size:11px; border-radius:3px;">Connect</button>
+      </div>
+    </details>
+    <div id="ya-auth-status" style="color:#888; margin-top:8px;"></div>
   `;
 
-  el.querySelector("#ya-oauth-btn")!.addEventListener("click", () => {
-    openUrl(
-      "https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d",
-    );
+  el.querySelector("#ya-oauth-btn")!.addEventListener("click", async () => {
+    const status = el.querySelector("#ya-auth-status") as HTMLDivElement;
+    status.textContent = "Opening login window...";
+    status.style.color = "#fc0";
+    try {
+      await yandexOauthLogin();
+    } catch (e) {
+      status.textContent = `Error: ${e}`;
+      status.style.color = "#f00";
+    }
   });
 
   el.querySelector("#ya-connect-btn")!.addEventListener("click", async () => {

@@ -1,6 +1,6 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tauri::Manager;
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::db::Db;
 use crate::md5::md5_hex;
@@ -8,6 +8,7 @@ use crate::md5::md5_hex;
 const YA_API: &str = "https://api.music.yandex.net:443";
 const YA_TOKEN_SETTING: &str = "yandex_token";
 const YA_UID_SETTING: &str = "yandex_uid";
+const YA_OAUTH_CLIENT_ID: &str = "23cabbbdc6cd418abb4b39c32c41195d";
 const MD5_SALT: &str = "XGRlBW9FXlekgbPrRHuSiA";
 
 // --- Types ---
@@ -287,6 +288,55 @@ fn api_track_to_result(t: &ApiTrack) -> YandexTrack {
 pub fn yandex_save_token(app: tauri::AppHandle, token: String) -> Result<(), String> {
     let db = app.state::<Db>();
     set_setting(&db, YA_TOKEN_SETTING, &token);
+    Ok(())
+}
+
+/// Open OAuth window and auto-capture token from redirect
+#[tauri::command]
+pub async fn yandex_oauth_login(app: tauri::AppHandle) -> Result<(), String> {
+    let oauth_url = format!(
+        "https://oauth.yandex.ru/authorize?response_type=token&client_id={}",
+        YA_OAUTH_CLIENT_ID
+    );
+
+    let app_handle = app.clone();
+    let _win = WebviewWindowBuilder::new(
+        &app,
+        "yandex-auth",
+        WebviewUrl::External(oauth_url.parse().unwrap()),
+    )
+    .title("Yandex Music — Login")
+    .inner_size(600.0, 700.0)
+    .on_navigation(move |url| {
+        let url_str = url.to_string();
+        // Yandex redirects to https://music.yandex.ru/#access_token=TOKEN&...
+        if let Some(fragment) = url.fragment() {
+            if fragment.contains("access_token=") {
+                let token: String = fragment
+                    .split('&')
+                    .find(|p: &&str| p.starts_with("access_token="))
+                    .and_then(|p: &str| p.strip_prefix("access_token="))
+                    .unwrap_or("")
+                    .to_string();
+
+                if !token.is_empty() {
+                    let db = app_handle.state::<Db>();
+                    set_setting(&db, YA_TOKEN_SETTING, &token);
+                    eprintln!("[GOAMP] Yandex OAuth token captured");
+                    let _ = app_handle.emit("yandex-auth-success", &token);
+                    if let Some(w) = app_handle.get_webview_window("yandex-auth") {
+                        let _ = w.close();
+                    }
+                }
+                return false;
+            }
+        }
+        eprintln!("[GOAMP] Yandex auth navigating: {}", url_str);
+        true
+    })
+    .build()
+    .map_err(|e| format!("failed to create auth window: {e}"))?;
+
     Ok(())
 }
 

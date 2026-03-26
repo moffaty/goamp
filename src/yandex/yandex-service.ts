@@ -39,6 +39,10 @@ export async function yandexGetStatus(): Promise<YandexAccount | null> {
   return invoke("yandex_get_status");
 }
 
+export async function yandexOauthLogin(): Promise<void> {
+  return invoke("yandex_oauth_login");
+}
+
 export async function yandexLogout(): Promise<void> {
   return invoke("yandex_logout");
 }

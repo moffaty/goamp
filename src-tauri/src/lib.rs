@@ -48,6 +48,7 @@ pub fn run() {
             scrobble::lastfm_save_settings,
             scrobble::lastfm_get_status,
             yandex::yandex_save_token,
+            yandex::yandex_oauth_login,
             yandex::yandex_get_status,
             yandex::yandex_logout,
             yandex::yandex_search,
