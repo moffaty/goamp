@@ -11,6 +11,8 @@ pub struct YoutubeResult {
     pub channel: String,
     pub duration: f64,
     pub thumbnail: String,
+    pub source: String,
+    pub webpage_url: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -22,6 +24,7 @@ struct YtDlpEntry {
     duration: Option<f64>,
     thumbnail: Option<String>,
     thumbnails: Option<Vec<YtDlpThumb>>,
+    webpage_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -187,10 +190,17 @@ async fn run_ytdlp(app: &tauri::AppHandle, args: &[&str]) -> Result<std::process
 pub async fn search_youtube(
     app: tauri::AppHandle,
     query: String,
-    #[allow(unused_variables)] limit: Option<u32>,
+    limit: Option<u32>,
+    source: Option<String>,
 ) -> Result<Vec<YoutubeResult>, String> {
     let count = limit.unwrap_or(20).min(100);
-    let search_query = format!("ytsearch{}:{}", count, query);
+    let src = source.as_deref().unwrap_or("youtube");
+
+    let search_query = match src {
+        "soundcloud" => format!("scsearch{}:{}", count, query),
+        _ => format!("ytsearch{}:{}", count, query),
+    };
+
     let output = run_ytdlp(
         &app,
         &[
@@ -220,6 +230,12 @@ pub async fn search_youtube(
                 .or(entry.uploader)
                 .unwrap_or_else(|| "Unknown".into());
             let duration = entry.duration.unwrap_or(0.0);
+
+            // Filter out SoundCloud 30-second previews
+            if src == "soundcloud" && duration <= 31.0 {
+                return None;
+            }
+
             let thumbnail = entry
                 .thumbnail
                 .or_else(|| {
@@ -230,17 +246,93 @@ pub async fn search_youtube(
                 })
                 .unwrap_or_default();
 
+            let webpage_url = entry.webpage_url.unwrap_or_default();
+
             Some(YoutubeResult {
                 id,
                 title,
                 channel,
                 duration,
                 thumbnail,
+                source: src.to_string(),
+                webpage_url,
             })
         })
         .collect();
 
     Ok(results)
+}
+
+/// Extract audio from any yt-dlp supported URL (YouTube, SoundCloud, etc)
+#[tauri::command]
+pub async fn extract_audio_url(app: tauri::AppHandle, url: String) -> Result<String, String> {
+    let cache = cache_dir(&app);
+    // Use URL hash as filename
+    let hash = format!("{:x}", fnv_hash(&url));
+    let out_template = cache.join(&hash);
+
+    // Check if already cached
+    for ext in &["opus", "m4a", "mp3", "webm", "ogg"] {
+        let path = out_template.with_extension(ext);
+        if path.exists() {
+            return Ok(path.to_string_lossy().to_string());
+        }
+    }
+
+    // Try with -x first
+    let out_arg = format!("{}.%(ext)s", out_template.display());
+    let output = run_ytdlp(
+        &app,
+        &[
+            &url,
+            "-x",
+            "--audio-format",
+            "opus",
+            "-o",
+            &out_arg,
+            "--no-warnings",
+        ],
+    )
+    .await?;
+
+    if output.status.success() {
+        if let Some(path) = find_cached_file(&out_template) {
+            return Ok(path);
+        }
+    }
+
+    // Fallback: download bestaudio without conversion
+    let output = run_ytdlp(
+        &app,
+        &[&url, "-f", "bestaudio", "-o", &out_arg, "--no-warnings"],
+    )
+    .await?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("download failed: {}", stderr));
+    }
+
+    find_cached_file(&out_template).ok_or_else(|| "file not found after download".into())
+}
+
+fn fnv_hash(input: &str) -> u64 {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in input.as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
+fn find_cached_file(base: &std::path::Path) -> Option<String> {
+    for ext in &["opus", "m4a", "mp3", "webm", "ogg", "wav"] {
+        let path = base.with_extension(ext);
+        if path.exists() {
+            return Some(path.to_string_lossy().to_string());
+        }
+    }
+    None
 }
 
 #[tauri::command]

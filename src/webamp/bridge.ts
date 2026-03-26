@@ -9,6 +9,8 @@ import { track, trackError } from "../lib/analytics";
 import { initSearchOverlay, toggleSearchOverlay } from "../youtube/SearchOverlay";
 import { initPlaylistPanel, togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { initAudioDevicePanel, toggleAudioDevicePanel, restoreAudioDevice } from "../settings/AudioDevicePanel";
+import { initScrobbleSettings, toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
+import { lastfmNowPlaying, lastfmScrobble, lastfmGetStatus } from "../scrobble/scrobble-service";
 import type Webamp from "webamp";
 
 export function setupBridge(webamp: Webamp) {
@@ -20,7 +22,9 @@ export function setupBridge(webamp: Webamp) {
   initSearchOverlay(webamp);
   initPlaylistPanel(webamp);
   initAudioDevicePanel(webamp);
+  initScrobbleSettings();
   restoreAudioDevice();
+  setupScrobbling(webamp);
 }
 
 function setupClose(webamp: Webamp) {
@@ -235,6 +239,11 @@ function setupKeyboard(webamp: Webamp) {
       e.preventDefault();
       toggleAudioDevicePanel();
     }
+    // Ctrl+Shift+L — Last.fm settings
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyL") {
+      e.preventDefault();
+      toggleScrobbleSettings();
+    }
   });
 }
 
@@ -286,6 +295,76 @@ export async function loadSkin(webamp: Webamp): Promise<void> {
   } catch (e) {
     trackError(e, { action: "load_skin" });
   }
+}
+
+let scrobbleTimer: ReturnType<typeof setInterval> | null = null;
+let currentTrackStart = 0;
+let currentTrackDuration = 0;
+let currentTrackScrobbled = false;
+let currentTrackArtist = "";
+let currentTrackTitle = "";
+
+function setupScrobbling(webamp: Webamp) {
+  webamp.onTrackDidChange(async (trackInfo) => {
+    // Reset scrobble state
+    if (scrobbleTimer) clearInterval(scrobbleTimer);
+    currentTrackScrobbled = false;
+    currentTrackStart = Math.floor(Date.now() / 1000);
+
+    if (!trackInfo) return;
+
+    const meta = (trackInfo as any).metaData;
+    currentTrackArtist = meta?.artist || "";
+    currentTrackTitle = meta?.title || trackInfo.url?.split("/").pop() || "";
+    currentTrackDuration = (trackInfo as any).duration || 0;
+
+    if (!currentTrackArtist && !currentTrackTitle) return;
+
+    // Check if Last.fm is enabled
+    const enabled = localStorage.getItem("goamp_lastfm_enabled");
+    if (enabled !== "1") return;
+
+    try {
+      const status = await lastfmGetStatus();
+      if (!status) return;
+    } catch {
+      return;
+    }
+
+    // Send Now Playing
+    lastfmNowPlaying(
+      currentTrackArtist || "Unknown",
+      currentTrackTitle,
+      currentTrackDuration > 0 ? Math.floor(currentTrackDuration) : undefined,
+    ).catch((e) => console.warn("[GOAMP] Now playing failed:", e));
+
+    // Start polling for scrobble threshold (50% or 4 min)
+    scrobbleTimer = setInterval(() => {
+      if (currentTrackScrobbled) {
+        if (scrobbleTimer) clearInterval(scrobbleTimer);
+        return;
+      }
+
+      const store = (webamp as any).store;
+      if (!store) return;
+      const state = store.getState();
+      if (state?.media?.status !== "PLAYING") return;
+
+      const elapsed = Math.floor(Date.now() / 1000) - currentTrackStart;
+      const halfDuration = currentTrackDuration > 0 ? currentTrackDuration / 2 : Infinity;
+      const threshold = Math.min(halfDuration, 240); // 50% or 4 min
+
+      if (elapsed >= threshold) {
+        currentTrackScrobbled = true;
+        if (scrobbleTimer) clearInterval(scrobbleTimer);
+        lastfmScrobble(
+          currentTrackArtist || "Unknown",
+          currentTrackTitle,
+          currentTrackStart,
+        ).catch((e) => console.warn("[GOAMP] Scrobble failed:", e));
+      }
+    }, 5000);
+  });
 }
 
 export async function openFiles(webamp: Webamp): Promise<void> {

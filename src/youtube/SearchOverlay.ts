@@ -2,8 +2,10 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   searchYoutube,
   extractAudio,
+  extractAudioUrl,
   formatDuration,
   type YoutubeResult,
+  type SearchSource,
 } from "./youtube-service";
 import {
   listPlaylists,
@@ -18,6 +20,7 @@ let overlay: HTMLElement | null = null;
 let webampRef: Webamp | null = null;
 let allResults: YoutubeResult[] = [];
 let currentQuery = "";
+let currentSource: SearchSource = "youtube";
 const PAGE_SIZE = 20;
 
 export function initSearchOverlay(webamp: Webamp) {
@@ -109,15 +112,25 @@ function openOverlay() {
 
   overlay = document.createElement("div");
   overlay.id = "yt-search-overlay";
+  // Restore last source
+  const savedSource = localStorage.getItem("goamp_search_source");
+  if (savedSource === "youtube" || savedSource === "soundcloud") {
+    currentSource = savedSource;
+  }
+
   overlay.innerHTML = `
     <div class="yt-search-container" style="background:${c.bg};border-color:${c.fg}">
+      <div class="yt-source-tabs" style="border-color:${c.fg}">
+        <div class="yt-source-tab${currentSource === "youtube" ? " yt-source-active" : ""}" data-source="youtube" style="color:${currentSource === "youtube" ? c.accent : c.text}">YouTube</div>
+        <div class="yt-source-tab${currentSource === "soundcloud" ? " yt-source-active" : ""}" data-source="soundcloud" style="color:${currentSource === "soundcloud" ? c.accent : c.text}">SoundCloud</div>
+      </div>
       <div class="yt-search-header" style="border-color:${c.fg}">
         <div class="yt-search-icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c.text}" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
         </div>
-        <input type="text" id="yt-search-input" placeholder="Search YouTube..." autocomplete="off"
+        <input type="text" id="yt-search-input" placeholder="Search ${currentSource === "soundcloud" ? "SoundCloud" : "YouTube"}..." autocomplete="off"
                style="background:${c.textBg};color:${c.text};border-color:${c.fg}" />
         <button id="yt-search-close" style="color:${c.text}">\u00d7</button>
       </div>
@@ -130,6 +143,33 @@ function openOverlay() {
 
   document.body.appendChild(overlay);
   injectStyles(c);
+
+  // Source tab handlers
+  overlay.querySelectorAll(".yt-source-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const src = (tab as HTMLElement).dataset.source as SearchSource;
+      if (src === currentSource) return;
+      currentSource = src;
+      localStorage.setItem("goamp_search_source", src);
+      // Update tab styles
+      overlay!.querySelectorAll(".yt-source-tab").forEach((t) => {
+        const el = t as HTMLElement;
+        const isActive = el.dataset.source === src;
+        el.classList.toggle("yt-source-active", isActive);
+        el.style.color = isActive ? c.accent : c.text;
+      });
+      // Update placeholder
+      const inp = document.getElementById("yt-search-input") as HTMLInputElement;
+      if (inp) inp.placeholder = `Search ${src === "soundcloud" ? "SoundCloud" : "YouTube"}...`;
+      // Clear results on source switch
+      allResults = [];
+      const results = document.getElementById("yt-search-results");
+      if (results) results.innerHTML = "";
+      document.getElementById("yt-pagination")?.remove();
+      const status = document.getElementById("yt-search-status");
+      if (status) status.textContent = "Press Enter to search";
+    });
+  });
 
   const input = document.getElementById("yt-search-input") as HTMLInputElement;
   const closeBtn = document.getElementById("yt-search-close")!;
@@ -194,7 +234,7 @@ async function doSearch(query: string) {
   allResults = [];
 
   try {
-    const items = await searchYoutube(currentQuery, PAGE_SIZE);
+    const items = await searchYoutube(currentQuery, PAGE_SIZE, currentSource);
     allResults = items;
     localStorage.setItem("goamp_yt_last_results", JSON.stringify(items));
     track("youtube_search", {
@@ -216,7 +256,7 @@ async function ensureResultsForPage(page: number): Promise<boolean> {
   if (status) status.innerHTML = `<span class="yt-loading">Loading</span>`;
 
   try {
-    const items = await searchYoutube(currentQuery, needed);
+    const items = await searchYoutube(currentQuery, needed, currentSource);
     if (items.length <= allResults.length) return false; // no more results
     allResults = items;
     localStorage.setItem("goamp_yt_last_results", JSON.stringify(items));
@@ -535,7 +575,7 @@ async function downloadAndAddToPlaylist(item: YoutubeResult, playlistId: string)
   if (status) status.innerHTML = `<span class="yt-loading">Downloading</span> ${escapeHtml(item.title)}`;
 
   try {
-    const filePath = await extractAudio(item.id);
+    const filePath = await extractForItem(item);
     const trackInput: TrackInput = {
       title: item.title,
       artist: item.channel,
@@ -553,6 +593,14 @@ async function downloadAndAddToPlaylist(item: YoutubeResult, playlistId: string)
   }
 }
 
+/** Extract audio file path — uses video_id for YouTube, webpage_url for other sources */
+async function extractForItem(item: YoutubeResult): Promise<string> {
+  if (item.source === "youtube" || !item.webpage_url) {
+    return extractAudio(item.id);
+  }
+  return extractAudioUrl(item.webpage_url);
+}
+
 function playNow(item: YoutubeResult) {
   const row = document.querySelector(".yt-result-row") as HTMLElement;
   playYoutubeTrack(item, row || document.createElement("div"));
@@ -563,7 +611,7 @@ async function addToWebampQueue(item: YoutubeResult) {
   if (status) status.innerHTML = `<span class="yt-loading">Downloading</span> ${escapeHtml(item.title)}`;
 
   try {
-    const filePath = await extractAudio(item.id);
+    const filePath = await extractForItem(item);
     const url = convertFileSrc(filePath);
 
     if (webampRef) {
@@ -597,7 +645,7 @@ async function playYoutubeTrack(item: YoutubeResult, row: HTMLElement) {
   if (status) status.innerHTML = `<span class="yt-loading">Downloading</span> ${escapeHtml(item.title)}`;
 
   try {
-    const filePath = await extractAudio(item.id);
+    const filePath = await extractForItem(item);
     const url = convertFileSrc(filePath);
 
     if (webampRef) {
@@ -696,6 +744,26 @@ function injectStyles(c: ReturnType<typeof getSkinColors>) {
     }
     #yt-search-overlay.yt-closing {
       animation: yt-slide-out 0.15s ease-in forwards;
+    }
+
+    .yt-source-tabs {
+      display: flex;
+      border-bottom: 1px solid;
+    }
+    .yt-source-tab {
+      flex: 1;
+      padding: 5px 8px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: background 0.1s;
+    }
+    .yt-source-tab:hover { background: rgba(255,255,255,0.06); }
+    .yt-source-tab.yt-source-active {
+      font-weight: bold;
+      border-bottom: 2px solid currentColor;
     }
 
     .yt-search-container {

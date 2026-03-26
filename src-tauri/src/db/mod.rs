@@ -48,6 +48,11 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist
             ON playlist_tracks(playlist_id, position);
 
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
         -- Special system playlist for last session
         INSERT OR IGNORE INTO playlists (id, name, position)
             VALUES ('__last_session__', 'Last Session', -1);

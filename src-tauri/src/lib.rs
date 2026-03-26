@@ -4,6 +4,7 @@ mod commands;
 mod db;
 mod hook;
 mod media_keys;
+mod scrobble;
 mod tray;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -26,6 +27,7 @@ pub fn run() {
             commands::files::read_metadata,
             commands::youtube::search_youtube,
             commands::youtube::extract_audio,
+            commands::youtube::extract_audio_url,
             commands::playlists::create_playlist,
             commands::playlists::list_playlists,
             commands::playlists::get_playlist_tracks,
@@ -37,6 +39,12 @@ pub fn run() {
             tray::update_tray_tooltip,
             media_keys::update_media_metadata,
             media_keys::update_media_playback,
+            scrobble::lastfm_get_auth_url,
+            scrobble::lastfm_auth,
+            scrobble::lastfm_now_playing,
+            scrobble::lastfm_scrobble,
+            scrobble::lastfm_save_settings,
+            scrobble::lastfm_get_status,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");
