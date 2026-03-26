@@ -1,3 +1,4 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   lastfmSaveSettings,
   lastfmGetAuthUrl,
@@ -85,7 +86,7 @@ function createPanel() {
   panel.querySelector("#scrobble-auth")!.addEventListener("click", async () => {
     try {
       const url = await lastfmGetAuthUrl();
-      window.open(url, "_blank");
+      openUrl(url);
       panel!.querySelector<HTMLDivElement>("#scrobble-auth-flow")!.style.display = "block";
       setStatus("Authorize in browser, then paste token below", "#ff0");
     } catch (e) {

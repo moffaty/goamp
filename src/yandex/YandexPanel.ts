@@ -12,6 +12,7 @@ import {
   type YandexPlaylist,
   type YandexAccount,
 } from "./yandex-service";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type Webamp from "webamp";
 
 let panel: HTMLDivElement | null = null;
@@ -111,9 +112,8 @@ function renderAuth(el: HTMLDivElement) {
   `;
 
   el.querySelector("#ya-oauth-btn")!.addEventListener("click", () => {
-    window.open(
+    openUrl(
       "https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d",
-      "_blank",
     );
   });
 
