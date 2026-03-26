@@ -342,31 +342,109 @@ function renderStations(el: HTMLDivElement) {
   });
 }
 
+// ─── Lazy loading / auto-reload state ───
+const BATCH_SIZE = 20;
+let activeStationId: string | null = null;
+let activeStationLastTrackId: string | undefined = undefined;
+let stationLoadingMore = false;
+let playlistPendingTracks: { id: string; artist: string; title: string; duration: number }[] = [];
+let playlistLoadingMore = false;
+let trackChangeUnsub: (() => void) | null = null;
+
+async function resolveTrackUrls(
+  tracks: { id: string; artist: string; title: string; duration: number }[],
+) {
+  return Promise.all(
+    tracks.map(async (t) => {
+      const url = await yandexGetTrackUrl(t.id);
+      return {
+        metaData: { artist: t.artist || "Unknown", title: t.title },
+        url,
+        duration: t.duration,
+      };
+    }),
+  );
+}
+
+function setupAutoLoad() {
+  if (trackChangeUnsub || !webampInstance) return;
+
+  trackChangeUnsub = webampInstance.onTrackDidChange(() => {
+    const store = (webampInstance as any)?.store;
+    if (!store) return;
+    const state = store.getState();
+    const order: string[] = state?.playlist?.trackOrder || [];
+    const currentIndex = order.indexOf(state?.playlist?.currentTrack);
+    const remaining = order.length - currentIndex - 1;
+
+    // Load more when 3 or fewer tracks remain
+    if (remaining <= 3) {
+      if (activeStationId && !stationLoadingMore) {
+        loadMoreStationTracks();
+      } else if (playlistPendingTracks.length > 0 && !playlistLoadingMore) {
+        loadMorePlaylistTracks();
+      }
+    }
+  });
+}
+
+async function loadMoreStationTracks() {
+  if (!webampInstance || !activeStationId || stationLoadingMore) return;
+  stationLoadingMore = true;
+
+  try {
+    const tracks = await yandexStationTracks(activeStationId, activeStationLastTrackId);
+    if (tracks.length === 0) {
+      stationLoadingMore = false;
+      return;
+    }
+    activeStationLastTrackId = tracks[tracks.length - 1].id;
+
+    const webampTracks = await resolveTrackUrls(tracks);
+    (webampInstance as any).appendTracks(webampTracks);
+    console.log(`[GOAMP] Appended ${tracks.length} station tracks`);
+  } catch (e) {
+    console.error("[GOAMP] Station auto-load failed:", e);
+  }
+  stationLoadingMore = false;
+}
+
+async function loadMorePlaylistTracks() {
+  if (!webampInstance || playlistPendingTracks.length === 0 || playlistLoadingMore) return;
+  playlistLoadingMore = true;
+
+  try {
+    const batch = playlistPendingTracks.splice(0, BATCH_SIZE);
+    const webampTracks = await resolveTrackUrls(batch);
+    (webampInstance as any).appendTracks(webampTracks);
+    console.log(`[GOAMP] Appended ${batch.length} playlist tracks (${playlistPendingTracks.length} remaining)`);
+  } catch (e) {
+    console.error("[GOAMP] Playlist auto-load failed:", e);
+  }
+  playlistLoadingMore = false;
+}
+
 async function playStation(stationId: string, name: string) {
   if (!webampInstance) return;
 
   try {
+    // Reset state
+    activeStationId = stationId;
+    activeStationLastTrackId = undefined;
+    playlistPendingTracks = [];
+
     const tracks = await yandexStationTracks(stationId, undefined);
     if (tracks.length === 0) {
       console.warn("[GOAMP] No tracks from station:", stationId);
       return;
     }
+    activeStationLastTrackId = tracks[tracks.length - 1].id;
 
-    const webampTracks = await Promise.all(
-      tracks.map(async (t) => {
-        const url = await yandexGetTrackUrl(t.id);
-        return {
-          metaData: { artist: t.artist || "Unknown", title: t.title },
-          url,
-          duration: t.duration,
-        };
-      }),
-    );
-
+    const webampTracks = await resolveTrackUrls(tracks);
     webampInstance.setTracksToPlay(webampTracks);
-    console.log(`[GOAMP] Playing station "${name}": ${tracks.length} tracks`);
+    setupAutoLoad();
+    console.log(`[GOAMP] Playing station "${name}": ${tracks.length} tracks (auto-reload on)`);
 
-    // Close panel after starting playback
     if (visible) toggleYandexPanel();
   } catch (e) {
     console.error("[GOAMP] Station play failed:", e);
@@ -377,22 +455,20 @@ async function playYandexPlaylist(pl: YandexPlaylist) {
   if (!webampInstance) return;
 
   try {
-    const tracks = await yandexGetPlaylistTracks(pl.owner, pl.kind);
-    if (tracks.length === 0) return;
+    // Reset state
+    activeStationId = null;
 
-    const webampTracks = await Promise.all(
-      tracks.slice(0, 50).map(async (t) => {
-        const url = await yandexGetTrackUrl(t.id);
-        return {
-          metaData: { artist: t.artist || "Unknown", title: t.title },
-          url,
-          duration: t.duration,
-        };
-      }),
-    );
+    const allTracks = await yandexGetPlaylistTracks(pl.owner, pl.kind);
+    if (allTracks.length === 0) return;
 
+    // Load first batch, queue the rest
+    const firstBatch = allTracks.slice(0, BATCH_SIZE);
+    playlistPendingTracks = allTracks.slice(BATCH_SIZE);
+
+    const webampTracks = await resolveTrackUrls(firstBatch);
     webampInstance.setTracksToPlay(webampTracks);
-    console.log(`[GOAMP] Playing Yandex playlist "${pl.title}": ${webampTracks.length} tracks`);
+    setupAutoLoad();
+    console.log(`[GOAMP] Playing Yandex playlist "${pl.title}": ${firstBatch.length} loaded, ${playlistPendingTracks.length} queued`);
 
     if (visible) toggleYandexPanel();
   } catch (e) {
