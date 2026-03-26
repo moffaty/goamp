@@ -12,6 +12,8 @@ import { initAudioDevicePanel, toggleAudioDevicePanel, restoreAudioDevice } from
 import { initScrobbleSettings, toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
 import { initYandexPanel, toggleYandexPanel } from "../yandex/YandexPanel";
 import { initGoampMenu } from "./goamp-menu";
+import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
+import { refreshFlagCache, isFeatureEnabled } from "../settings/feature-flags-service";
 import {
   lastfmNowPlaying,
   lastfmScrobble,
@@ -36,6 +38,7 @@ export function setupBridge(webamp: Webamp) {
   initYandexPanel(webamp);
   initGoampMenu(webamp);
   restoreAudioDevice();
+  refreshFlagCache().catch(() => {});
   setupScrobbling(webamp);
 }
 
@@ -261,6 +264,11 @@ function setupKeyboard(webamp: Webamp) {
       e.preventDefault();
       toggleYandexPanel();
     }
+    // Ctrl+Shift+F — Feature Flags (hidden dev panel)
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyF") {
+      e.preventDefault();
+      toggleFeatureFlagsPanel();
+    }
   });
 }
 
@@ -342,8 +350,11 @@ function setupScrobbling(webamp: Webamp) {
 
     if (!currentTrackArtist && !currentTrackTitle) return;
 
-    const lastfmEnabled = localStorage.getItem("goamp_lastfm_enabled") === "1";
-    const lbEnabled = localStorage.getItem("goamp_lb_enabled") === "1";
+    const autoScrobble = isFeatureEnabled("auto_scrobble");
+    if (!autoScrobble) return;
+
+    const lastfmEnabled = localStorage.getItem("goamp_lastfm_enabled") === "1" && isFeatureEnabled("lastfm_scrobble");
+    const lbEnabled = localStorage.getItem("goamp_lb_enabled") === "1" && isFeatureEnabled("listenbrainz_scrobble");
 
     if (!lastfmEnabled && !lbEnabled) return;
 

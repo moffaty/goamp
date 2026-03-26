@@ -69,6 +69,24 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         CREATE INDEX IF NOT EXISTS idx_scrobble_queue_status
             ON scrobble_queue(status, service);
 
+        CREATE TABLE IF NOT EXISTS feature_flags (
+            key TEXT PRIMARY KEY,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            description TEXT NOT NULL DEFAULT ''
+        );
+
+        -- Default feature flags
+        INSERT OR IGNORE INTO feature_flags (key, enabled, description) VALUES
+            ('youtube_search', 1, 'YouTube search and playback'),
+            ('soundcloud_search', 1, 'SoundCloud search'),
+            ('yandex_music', 1, 'Yandex Music integration'),
+            ('lastfm_scrobble', 1, 'Last.fm scrobbling'),
+            ('listenbrainz_scrobble', 1, 'ListenBrainz scrobbling'),
+            ('visualizer', 1, 'Butterchurn visualizer'),
+            ('media_keys', 1, 'System media keys / MPRIS'),
+            ('system_tray', 1, 'System tray icon'),
+            ('auto_scrobble', 1, 'Auto-scrobble after 50% or 4 min');
+
         -- Special system playlist for last session
         INSERT OR IGNORE INTO playlists (id, name, position)
             VALUES ('__last_session__', 'Last Session', -1);

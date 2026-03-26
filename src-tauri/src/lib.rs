@@ -2,6 +2,7 @@ use tauri::Manager;
 
 mod commands;
 mod db;
+mod feature_flags;
 mod hook;
 mod md5;
 mod media_keys;
@@ -67,6 +68,9 @@ pub fn run() {
             yandex::yandex_list_playlists,
             yandex::yandex_get_playlist_tracks,
             yandex::yandex_import_playlist,
+            feature_flags::feature_flags_list,
+            feature_flags::feature_flags_set,
+            feature_flags::feature_flag_get,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");

@@ -2,6 +2,7 @@ import { toggleSearchOverlay } from "../youtube/SearchOverlay";
 import { togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { toggleAudioDevicePanel } from "../settings/AudioDevicePanel";
 import { toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
+import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
 import { toggleYandexPanel } from "../yandex/YandexPanel";
 import { openFolder, openFiles, loadSkin } from "./bridge";
 import type Webamp from "webamp";
@@ -78,7 +79,13 @@ function showGoampMenu(x: number, y: number) {
       separator: true,
     },
     { label: "Audio Devices", shortcut: "Ctrl+D", action: () => toggleAudioDevicePanel() },
-    { label: "Last.fm", shortcut: "Ctrl+Shift+L", action: () => toggleScrobbleSettings() },
+    {
+      label: "Scrobbling",
+      shortcut: "Ctrl+Shift+L",
+      action: () => toggleScrobbleSettings(),
+      separator: true,
+    },
+    { label: "Feature Flags", shortcut: "Ctrl+Shift+F", action: () => toggleFeatureFlagsPanel() },
   ];
 
   menu = document.createElement("div");
