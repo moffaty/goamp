@@ -34,7 +34,7 @@ pub fn setup(app: &AppHandle) {
     let mut controls = match controls {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("[GOAMP] Failed to create media controls: {e}");
+            eprintln!("[GOAMP] Failed to create media controls: {e:?}");
             return;
         }
     };
@@ -54,7 +54,7 @@ pub fn setup(app: &AppHandle) {
     });
 
     if let Err(e) = attach_result {
-        eprintln!("[GOAMP] Failed to attach media controls: {e}");
+        eprintln!("[GOAMP] Failed to attach media controls: {e:?}");
         return;
     }
 
