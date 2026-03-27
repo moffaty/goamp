@@ -269,24 +269,8 @@ function setupKeyboard(webamp: Webamp) {
       e.preventDefault();
       toggleSearchOverlay();
     }
-    // L — toggle preset overlay (only when not typing in an input)
     const active = document.activeElement;
     const isTyping = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
-    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === "KeyL" && !isTyping) {
-      const store = (webamp as any).store;
-      if (store) {
-        const state = store.getState();
-        const presets = state?.milkdrop?.presets || [];
-        console.log("[GOAMP] Milkdrop presets loaded:", presets.length);
-        console.log("[GOAMP] Milkdrop state:", {
-          presets: presets.length,
-          currentPresetIndex: state?.milkdrop?.currentPresetIndex,
-          butterchurn: !!state?.milkdrop?.butterchurn,
-          presetOverlayOpen: state?.milkdrop?.presetOverlayOpen,
-        });
-        store.dispatch({ type: "TOGGLE_PRESET_OVERLAY" });
-      }
-    }
     // Ctrl+P — playlist panel
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyP") {
       e.preventDefault();

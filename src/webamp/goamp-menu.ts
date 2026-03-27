@@ -25,15 +25,9 @@ export function initGoampMenu(webamp: Webamp) {
   document.addEventListener("contextmenu", (e) => {
     const target = e.target as HTMLElement;
 
-    // Only show on Webamp elements
+    // Show on any Webamp element — intercept all to prevent native Webamp menus
     const webampEl = document.getElementById("webamp");
     if (!webampEl || !webampEl.contains(target)) return;
-
-    // Show on title bars and main window chrome
-    const inTitleBar = !!target.closest(".title-bar");
-    const inMainWindow = !!target.closest("#main-window");
-    const inEq = !!target.closest("#equalizer-window");
-    if (!inTitleBar && !inMainWindow && !inEq) return;
 
     // Stop Webamp from handling this event
     e.preventDefault();
