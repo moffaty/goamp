@@ -1,5 +1,7 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 use tauri::{Emitter, Manager};
 use yandex_music::model::playlist::PlaylistTracks;
 use yandex_music::YandexMusicClient;
@@ -487,7 +489,7 @@ pub async fn yandex_import_playlist(
         for (i, track) in tracks.iter().enumerate() {
             let track_row_id = uuid::Uuid::new_v4().to_string();
             conn.execute(
-                "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id, album, cover) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 rusqlite::params![
                     track_row_id,
                     playlist_id,
@@ -497,6 +499,8 @@ pub async fn yandex_import_playlist(
                     track.duration,
                     "yandex",
                     track.id,
+                    track.album,
+                    track.cover,
                 ],
             ).map_err(|e| format!("insert track failed: {e}"))?;
         }
@@ -508,4 +512,217 @@ pub async fn yandex_import_playlist(
         tracks.len()
     );
     Ok(playlist_id)
+}
+
+// --- Commands: Download ---
+
+fn yandex_cache_dir(app: &tauri::AppHandle) -> PathBuf {
+    let base = app
+        .path()
+        .app_cache_dir()
+        .unwrap_or_else(|_| std::env::temp_dir().join("goamp"));
+    let dir = base.join("yandex_cache");
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+#[tauri::command]
+pub async fn yandex_download_track(
+    app: tauri::AppHandle,
+    track_id: String,
+    title: String,
+    artist: String,
+) -> Result<String, String> {
+    let db = app.state::<Db>();
+    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+
+    let cache_dir = yandex_cache_dir(&app);
+    let safe_name = format!(
+        "{} - {}",
+        artist.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_"),
+        title.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_")
+    );
+    let dest = cache_dir.join(format!("{}_{}.mp3", safe_name, track_id));
+
+    // Check if already cached
+    if dest.exists() {
+        eprintln!("[GOAMP] Yandex track already cached: {}", dest.display());
+        return Ok(dest.to_string_lossy().to_string());
+    }
+
+    // Get stream URL
+    let client = make_client(&token);
+    let options = yandex_music::api::track::get_file_info::GetFileInfoOptions::new(&track_id);
+    let info = client
+        .get_file_info(&options)
+        .await
+        .map_err(|e| format!("file info failed: {e:?}"))?;
+
+    // Download the file
+    let http = Client::new();
+    let resp = http
+        .get(&info.url)
+        .send()
+        .await
+        .map_err(|e| format!("download failed: {e}"))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("download HTTP {}", resp.status()));
+    }
+
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| format!("read failed: {e}"))?;
+
+    fs::write(&dest, &bytes).map_err(|e| format!("save failed: {e}"))?;
+
+    eprintln!(
+        "[GOAMP] Downloaded Yandex track: {} ({} bytes)",
+        dest.display(),
+        bytes.len()
+    );
+    Ok(dest.to_string_lossy().to_string())
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct DownloadProgress {
+    pub track_id: String,
+    pub index: usize,
+    pub total: usize,
+    pub status: String, // "downloading", "done", "error"
+    pub path: Option<String>,
+}
+
+#[tauri::command]
+pub async fn yandex_download_playlist(
+    app: tauri::AppHandle,
+    owner: String,
+    kind: u32,
+) -> Result<Vec<String>, String> {
+    let tracks = yandex_get_playlist_tracks(app.clone(), owner, kind).await?;
+    let total = tracks.len();
+    let mut paths = Vec::new();
+
+    for (i, track) in tracks.iter().enumerate() {
+        let _ = app.emit(
+            "yandex-download-progress",
+            DownloadProgress {
+                track_id: track.id.clone(),
+                index: i,
+                total,
+                status: "downloading".into(),
+                path: None,
+            },
+        );
+
+        match yandex_download_track(
+            app.clone(),
+            track.id.clone(),
+            track.title.clone(),
+            track.artist.clone(),
+        )
+        .await
+        {
+            Ok(path) => {
+                let _ = app.emit(
+                    "yandex-download-progress",
+                    DownloadProgress {
+                        track_id: track.id.clone(),
+                        index: i,
+                        total,
+                        status: "done".into(),
+                        path: Some(path.clone()),
+                    },
+                );
+                paths.push(path);
+            }
+            Err(e) => {
+                let _ = app.emit(
+                    "yandex-download-progress",
+                    DownloadProgress {
+                        track_id: track.id.clone(),
+                        index: i,
+                        total,
+                        status: "error".into(),
+                        path: None,
+                    },
+                );
+                eprintln!("[GOAMP] Download failed for {}: {}", track.id, e);
+            }
+        }
+    }
+
+    eprintln!(
+        "[GOAMP] Downloaded {}/{} tracks from playlist",
+        paths.len(),
+        total
+    );
+    Ok(paths)
+}
+
+// --- Commands: Liked Tracks ---
+
+#[tauri::command]
+pub async fn yandex_get_liked_tracks(app: tauri::AppHandle) -> Result<Vec<YandexTrack>, String> {
+    let db = app.state::<Db>();
+    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+    let uid = get_setting(&db, YA_UID_SETTING).ok_or("uid not found")?;
+    let uid_num: u64 = uid.parse().unwrap_or(0);
+
+    let client = make_client(&token);
+    let options = yandex_music::api::track::get_liked_tracks::GetLikedTracksOptions::new(uid_num);
+    let liked = client
+        .get_liked_tracks(&options)
+        .await
+        .map_err(|e| format!("liked tracks failed: {e:?}"))?;
+
+    // liked returns track IDs, need to fetch full track info
+    let track_ids: Vec<String> = liked.tracks.iter().map(|t| t.id.clone()).collect();
+
+    if track_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Batch fetch tracks (up to 100 at a time)
+    let mut all_tracks = Vec::new();
+    for chunk in track_ids.chunks(100) {
+        let ids: Vec<&str> = chunk.iter().map(|s: &String| s.as_str()).collect();
+        let options = yandex_music::api::track::get_tracks::GetTracksOptions::new(ids);
+        let tracks = client
+            .get_tracks(&options)
+            .await
+            .map_err(|e| format!("get tracks failed: {e:?}"))?;
+
+        all_tracks.extend(tracks.iter().map(track_to_result).filter(|t| t.available));
+    }
+
+    Ok(all_tracks)
+}
+
+// --- Commands: Batch URL resolve ---
+
+#[tauri::command]
+pub async fn yandex_get_track_urls(
+    app: tauri::AppHandle,
+    track_ids: Vec<String>,
+) -> Result<Vec<String>, String> {
+    let db = app.state::<Db>();
+    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+
+    let client = make_client(&token);
+    let mut urls = Vec::with_capacity(track_ids.len());
+
+    for id in &track_ids {
+        let options = yandex_music::api::track::get_file_info::GetFileInfoOptions::new(id);
+        match client.get_file_info(&options).await {
+            Ok(info) => urls.push(info.url),
+            Err(e) => {
+                eprintln!("[GOAMP] Failed to get URL for track {}: {e:?}", id);
+                urls.push(String::new());
+            }
+        }
+    }
+
+    Ok(urls)
 }

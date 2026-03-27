@@ -189,10 +189,14 @@ pub async fn lastfm_scrobble(
     let sk = get_setting(&db, LASTFM_SESSION_SETTING).ok_or("not authenticated")?;
 
     let ts_str = timestamp.to_string();
+    let dur_str = duration.map(|d| d.to_string());
 
     let mut params = BTreeMap::new();
     params.insert("api_key", api_key.as_str());
     params.insert("artist[0]", artist.as_str());
+    if let Some(ref d) = dur_str {
+        params.insert("duration[0]", d.as_str());
+    }
     params.insert("method", "track.scrobble");
     params.insert("sk", sk.as_str());
     params.insert("timestamp[0]", ts_str.as_str());
@@ -201,20 +205,20 @@ pub async fn lastfm_scrobble(
     let sig = api_sig(&params, &secret);
 
     let client = Client::new();
-    let result = client
-        .post(LASTFM_API_URL)
-        .form(&[
-            ("method", "track.scrobble"),
-            ("api_key", &api_key),
-            ("artist[0]", &artist),
-            ("track[0]", &title),
-            ("timestamp[0]", &ts_str),
-            ("sk", &sk),
-            ("api_sig", &sig),
-            ("format", "json"),
-        ])
-        .send()
-        .await;
+    let mut form = vec![
+        ("method", "track.scrobble".to_string()),
+        ("api_key", api_key.clone()),
+        ("artist[0]", artist.clone()),
+        ("track[0]", title.clone()),
+        ("timestamp[0]", ts_str.clone()),
+        ("sk", sk.clone()),
+        ("api_sig", sig.clone()),
+        ("format", "json".to_string()),
+    ];
+    if let Some(ref d) = dur_str {
+        form.push(("duration[0]", d.clone()));
+    }
+    let result = client.post(LASTFM_API_URL).form(&form).send().await;
 
     match result {
         Ok(resp) if resp.status().is_success() => Ok(()),
@@ -430,7 +434,7 @@ pub async fn scrobble_flush_queue(app: tauri::AppHandle) -> Result<u32, String> 
         let conn = db.0.lock().unwrap();
         let mut stmt = conn
             .prepare(
-                "SELECT id, artist, track, timestamp, service FROM scrobble_queue WHERE status = 'pending' ORDER BY id LIMIT 50",
+                "SELECT id, artist, track, timestamp, service FROM scrobble_queue WHERE status = 'pending' AND attempts < 10 ORDER BY id LIMIT 50",
             )
             .map_err(|e| format!("query failed: {e}"))?;
         let result = stmt
@@ -569,5 +573,118 @@ async fn flush_lb_item(
         Ok(())
     } else {
         Err("failed".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::test_db;
+
+    #[test]
+    fn test_api_sig_deterministic() {
+        let mut params = BTreeMap::new();
+        params.insert("api_key", "testkey");
+        params.insert("method", "track.scrobble");
+        params.insert("track[0]", "My Song");
+
+        let sig1 = api_sig(&params, "secret123");
+        let sig2 = api_sig(&params, "secret123");
+        assert_eq!(sig1, sig2);
+        assert_eq!(sig1.len(), 32); // MD5 hex is 32 chars
+    }
+
+    #[test]
+    fn test_api_sig_changes_with_params() {
+        let mut params1 = BTreeMap::new();
+        params1.insert("method", "a");
+        let sig1 = api_sig(&params1, "sec");
+
+        let mut params2 = BTreeMap::new();
+        params2.insert("method", "b");
+        let sig2 = api_sig(&params2, "sec");
+
+        assert_ne!(sig1, sig2);
+    }
+
+    #[test]
+    fn test_api_sig_changes_with_secret() {
+        let mut params = BTreeMap::new();
+        params.insert("method", "test");
+
+        let sig1 = api_sig(&params, "secret1");
+        let sig2 = api_sig(&params, "secret2");
+        assert_ne!(sig1, sig2);
+    }
+
+    #[test]
+    fn test_api_sig_sorted_params() {
+        let mut params1 = BTreeMap::new();
+        params1.insert("b", "2");
+        params1.insert("a", "1");
+
+        let mut params2 = BTreeMap::new();
+        params2.insert("a", "1");
+        params2.insert("b", "2");
+
+        assert_eq!(api_sig(&params1, "sec"), api_sig(&params2, "sec"));
+    }
+
+    #[test]
+    fn test_get_set_setting() {
+        let db = test_db();
+
+        assert!(get_setting(&db, "nonexistent").is_none());
+
+        set_setting(&db, "test_key", "test_value");
+        assert_eq!(get_setting(&db, "test_key"), Some("test_value".to_string()));
+
+        set_setting(&db, "test_key", "new_value");
+        assert_eq!(get_setting(&db, "test_key"), Some("new_value".to_string()));
+    }
+
+    #[test]
+    fn test_queue_add_and_count() {
+        let db = test_db();
+
+        assert_eq!(queue_count(&db), 0);
+
+        queue_add(&db, "Artist", "Track", 1000, 300, "lastfm");
+        assert_eq!(queue_count(&db), 1);
+
+        queue_add(&db, "Artist2", "Track2", 2000, 200, "listenbrainz");
+        assert_eq!(queue_count(&db), 2);
+    }
+
+    #[test]
+    fn test_queue_count_excludes_non_pending() {
+        let db = test_db();
+
+        queue_add(&db, "Artist", "Track", 1000, 300, "lastfm");
+        assert_eq!(queue_count(&db), 1);
+
+        let conn = db.0.lock().unwrap();
+        conn.execute(
+            "UPDATE scrobble_queue SET status = 'completed' WHERE artist = 'Artist'",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        assert_eq!(queue_count(&db), 0);
+    }
+
+    #[test]
+    fn test_scrobble_status_settings() {
+        let db = test_db();
+
+        assert!(get_setting(&db, LASTFM_SESSION_SETTING).is_none());
+        assert!(get_setting(&db, LB_TOKEN_SETTING).is_none());
+
+        set_setting(&db, LASTFM_SESSION_SETTING, "session_key");
+        assert!(get_setting(&db, LASTFM_SESSION_SETTING).is_some());
+
+        set_setting(&db, LB_TOKEN_SETTING, "lb_token");
+        assert!(get_setting(&db, LB_TOKEN_SETTING).is_some());
     }
 }

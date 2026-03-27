@@ -107,6 +107,29 @@ export async function yandexImportPlaylist(
   return invoke("yandex_import_playlist", { owner, kind, name });
 }
 
+export async function yandexDownloadTrack(
+  trackId: string,
+  title: string,
+  artist: string,
+): Promise<string> {
+  return invoke("yandex_download_track", { trackId, title, artist });
+}
+
+export async function yandexDownloadPlaylist(
+  owner: string,
+  kind: number,
+): Promise<string[]> {
+  return invoke("yandex_download_playlist", { owner, kind });
+}
+
+export async function yandexGetLikedTracks(): Promise<YandexTrack[]> {
+  return invoke("yandex_get_liked_tracks");
+}
+
+export async function yandexGetTrackUrls(trackIds: string[]): Promise<string[]> {
+  return invoke("yandex_get_track_urls", { trackIds });
+}
+
 export function formatDuration(secs: number): string {
   const m = Math.floor(secs / 60);
   const s = Math.floor(secs % 60);

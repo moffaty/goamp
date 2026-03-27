@@ -4,6 +4,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { scanDirectory, saveSession, loadSession, getPlaylistTracks } from "../lib/tauri-ipc";
+import { yandexGetTrackUrl } from "../yandex/yandex-service";
 import { toWebampTracks } from "./tracks";
 import { track, trackError } from "../lib/analytics";
 import { initSearchOverlay, toggleSearchOverlay } from "../youtube/SearchOverlay";
@@ -13,6 +14,7 @@ import { initScrobbleSettings, toggleScrobbleSettings } from "../scrobble/Scrobb
 import { initYandexPanel, toggleYandexPanel } from "../yandex/YandexPanel";
 import { initGoampMenu } from "./goamp-menu";
 import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
+import { initVisualizerPanel, toggleVisualizerPanel } from "./VisualizerPanel";
 import { refreshFlagCache, isFeatureEnabled } from "../settings/feature-flags-service";
 import { checkForUpdates } from "../updater/UpdateNotification";
 import {
@@ -37,6 +39,7 @@ export function setupBridge(webamp: Webamp) {
   initAudioDevicePanel(webamp);
   initScrobbleSettings();
   initYandexPanel(webamp);
+  initVisualizerPanel(webamp);
   initGoampMenu(webamp);
   restoreAudioDevice();
   refreshFlagCache().catch(() => {});
@@ -80,12 +83,15 @@ async function saveCurrentSession(webamp: Webamp) {
     .map((t: any) => {
       const url: string = t.url || "";
       const isYoutube = url.includes("audio_cache");
+      // Yandex tracks have #ya:{track_id} fragment
+      const yaMatch = url.match(/#ya:(\d+)$/);
+      const isYandex = !!yaMatch;
       return {
         title: t.title || t.defaultName || "Unknown",
         artist: t.artist || "",
         duration: t.duration || 0,
-        source: isYoutube ? "youtube" : "local",
-        source_id: url,
+        source: isYandex ? "yandex" : isYoutube ? "youtube" : "local",
+        source_id: isYandex ? yaMatch![1] : url,
       };
     });
 
@@ -102,17 +108,37 @@ async function setupSessionRestore(webamp: Webamp) {
     if (lastPlaylistId) {
       const tracks = await getPlaylistTracks(lastPlaylistId);
       if (tracks.length > 0) {
-        const webampTracks = tracks.map((t) => ({
-          metaData: {
-            artist: t.artist || "Unknown Artist",
-            title: t.title || "Unknown Track",
-          },
-          url: convertFileSrc(t.source_id),
-          duration: t.duration,
-        }));
-        webamp.setTracksToPlay(webampTracks);
-        console.log("[GOAMP] Playlist restored:", tracks.length, "tracks");
-        return;
+        const webampTracks = await Promise.all(
+          tracks.map(async (t) => {
+            let url: string;
+            if (t.source === "yandex") {
+              try {
+                const streamUrl = await yandexGetTrackUrl(t.source_id);
+                url = `${streamUrl}#ya:${t.source_id}`;
+              } catch {
+                url = "";
+              }
+            } else if (t.source === "youtube") {
+              url = convertFileSrc(t.source_id);
+            } else {
+              url = convertFileSrc(t.source_id);
+            }
+            return {
+              metaData: {
+                artist: t.artist || "Unknown Artist",
+                title: t.title || "Unknown Track",
+              },
+              url,
+              duration: t.duration,
+            };
+          }),
+        );
+        const validTracks = webampTracks.filter((t) => t.url);
+        if (validTracks.length > 0) {
+          webamp.setTracksToPlay(validTracks);
+          console.log("[GOAMP] Playlist restored:", validTracks.length, "tracks");
+          return;
+        }
       }
     }
 
@@ -120,16 +146,37 @@ async function setupSessionRestore(webamp: Webamp) {
     const tracks = await loadSession();
     if (tracks.length === 0) return;
 
-    const webampTracks = tracks.map((t) => ({
-      metaData: {
-        artist: t.artist || "Unknown Artist",
-        title: t.title || "Unknown Track",
-      },
-      url: t.source === "youtube" ? convertFileSrc(t.source_id) : t.source_id,
-      duration: t.duration,
-    }));
+    const webampTracks = await Promise.all(
+      tracks.map(async (t) => {
+        let url: string;
+        if (t.source === "yandex") {
+          try {
+            const streamUrl = await yandexGetTrackUrl(t.source_id);
+            url = `${streamUrl}#ya:${t.source_id}`;
+          } catch {
+            url = ""; // Skip failed — will be silent
+          }
+        } else if (t.source === "youtube") {
+          url = convertFileSrc(t.source_id);
+        } else {
+          url = t.source_id;
+        }
+        return {
+          metaData: {
+            artist: t.artist || "Unknown Artist",
+            title: t.title || "Unknown Track",
+          },
+          url,
+          duration: t.duration,
+        };
+      }),
+    );
 
-    webamp.setTracksToPlay(webampTracks);
+    // Filter out tracks with empty URLs (failed Yandex resolves)
+    const validTracks = webampTracks.filter((t) => t.url);
+    if (validTracks.length === 0) return;
+
+    webamp.setTracksToPlay(validTracks);
     console.log("[GOAMP] Session restored:", tracks.length, "tracks");
   } catch (e) {
     console.error("[GOAMP] Failed to restore session:", e);
@@ -266,6 +313,11 @@ function setupKeyboard(webamp: Webamp) {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyM") {
       e.preventDefault();
       toggleYandexPanel();
+    }
+    // Ctrl+V — Visualizer presets panel
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyV") {
+      e.preventDefault();
+      toggleVisualizerPanel();
     }
     // Ctrl+Shift+` — Feature Flags (hidden dev panel)
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "Backquote") {

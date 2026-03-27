@@ -33,7 +33,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY5MTc1Q0M5M0Q2QTMyNzUKUldSMU1tbzl5VndYK2ZqT0d4M0ZTclpEUEhHWUhIODcvbUpZV2pRUzUvWFpGQkdxcU00aGdSWGEK",
       "endpoints": [
         "https://github.com/nicify/goamp/releases/latest/download/latest.json"
       ]

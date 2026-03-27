@@ -33,6 +33,10 @@ export interface PlaylistTrack {
   duration: number;
   source: string;
   source_id: string;
+  album: string;
+  original_title: string;
+  original_artist: string;
+  cover: string;
 }
 
 export interface TrackInput {
@@ -41,6 +45,10 @@ export interface TrackInput {
   duration: number;
   source: string;
   source_id: string;
+  album?: string;
+  original_title?: string;
+  original_artist?: string;
+  cover?: string;
 }
 
 export async function createPlaylist(name: string): Promise<Playlist> {
@@ -80,4 +88,12 @@ export async function saveSession(tracks: TrackInput[]): Promise<void> {
 
 export async function loadSession(): Promise<PlaylistTrack[]> {
   return invoke("load_session");
+}
+
+export async function renameTrack(
+  trackId: string,
+  title?: string,
+  artist?: string,
+): Promise<void> {
+  return invoke("rename_track", { trackId, title: title ?? null, artist: artist ?? null });
 }

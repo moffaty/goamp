@@ -10,8 +10,11 @@ import {
   yandexListPlaylists,
   yandexGetPlaylistTracks,
   yandexImportPlaylist,
+  yandexDownloadPlaylist,
+  yandexGetLikedTracks,
   type YandexStation,
   type YandexPlaylist,
+  type YandexTrack,
   type YandexAccount,
 } from "./yandex-service";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -26,7 +29,8 @@ let webampInstance: Webamp | null = null;
 let account: YandexAccount | null = null;
 let stations: YandexStation[] = [];
 let playlists: YandexPlaylist[] = [];
-let currentView: "auth" | "main" | "stations" | "playlist" = "auth";
+let currentView: "auth" | "main" | "stations" | "playlist" | "liked" = "auth";
+let likedTracks: YandexTrack[] = [];
 
 
 export function initYandexPanel(webamp: Webamp) {
@@ -43,7 +47,15 @@ export function toggleYandexPanel() {
   if (!panel) createPanel();
   visible = !visible;
   panel!.style.display = visible ? "flex" : "none";
-  if (visible) refreshStatus();
+  if (visible) {
+    refreshStatus();
+  } else {
+    // Clean up polling timer when panel is hidden
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
 }
 
 function createPanel() {
@@ -96,6 +108,9 @@ function render() {
       break;
     case "stations":
       renderStations(content);
+      break;
+    case "liked":
+      renderLiked(content);
       break;
     case "playlist":
       break;
@@ -209,11 +224,14 @@ function renderMain(el: HTMLDivElement) {
       <button id="ya-logout" style="padding:3px 8px; background:#333; border:1px solid #555; color:#888; cursor:pointer; font-family:inherit; font-size:10px; border-radius:3px;">Logout</button>
     </div>
     <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">
-      <button class="ya-action-btn" data-action="wave" style="flex:1; min-width:120px; padding:8px; background:#2a2a4a; border:1px solid #555; color:#fc0; cursor:pointer; font-family:inherit; font-size:12px; border-radius:4px; font-weight:bold;">
+      <button class="ya-action-btn" data-action="wave" style="flex:1; min-width:100px; padding:8px; background:#2a2a4a; border:1px solid #555; color:#fc0; cursor:pointer; font-family:inherit; font-size:12px; border-radius:4px; font-weight:bold;">
         Moя Волна
       </button>
-      <button class="ya-action-btn" data-action="stations" style="flex:1; min-width:120px; padding:8px; background:#2a2a4a; border:1px solid #555; color:#0f0; cursor:pointer; font-family:inherit; font-size:12px; border-radius:4px;">
+      <button class="ya-action-btn" data-action="stations" style="flex:1; min-width:100px; padding:8px; background:#2a2a4a; border:1px solid #555; color:#0f0; cursor:pointer; font-family:inherit; font-size:12px; border-radius:4px;">
         Радио / Жанры
+      </button>
+      <button class="ya-action-btn" data-action="liked" style="flex:1; min-width:100px; padding:8px; background:#2a2a4a; border:1px solid #555; color:#f55; cursor:pointer; font-family:inherit; font-size:12px; border-radius:4px;">
+        ♥ Мне нравится
       </button>
     </div>
     <div style="border-top:1px solid #333; padding-top:10px; margin-top:4px;">
@@ -245,6 +263,18 @@ function renderMain(el: HTMLDivElement) {
     }
   });
 
+  el.querySelector('[data-action="liked"]')!.addEventListener("click", async () => {
+    currentView = "liked";
+    likedTracks = [];
+    render();
+    try {
+      likedTracks = await yandexGetLikedTracks();
+      renderLiked(el);
+    } catch (e) {
+      el.innerHTML += `<div style="color:#f00;">Error: ${e}</div>`;
+    }
+  });
+
   // Load playlists
   loadPlaylists(el);
 }
@@ -267,6 +297,7 @@ async function loadPlaylists(el: HTMLDivElement) {
           <div style="display:flex; gap:4px;">
             <button class="ya-pl-play" data-idx="${i}" style="padding:2px 6px; background:#333; border:1px solid #555; color:#0f0; cursor:pointer; font-size:10px; border-radius:2px;">Play</button>
             <button class="ya-pl-import" data-idx="${i}" style="padding:2px 6px; background:#333; border:1px solid #555; color:#fc0; cursor:pointer; font-size:10px; border-radius:2px;">Import</button>
+            <button class="ya-pl-download" data-idx="${i}" style="padding:2px 6px; background:#333; border:1px solid #555; color:#88f; cursor:pointer; font-size:10px; border-radius:2px;">↓</button>
           </div>
         </div>
       `,
@@ -295,6 +326,24 @@ async function loadPlaylists(el: HTMLDivElement) {
           (btn as HTMLElement).textContent = "Err";
           (btn as HTMLElement).style.color = "#f00";
           console.error("[GOAMP] Import failed:", err);
+        }
+      });
+    });
+
+    list.querySelectorAll(".ya-pl-download").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const idx = parseInt((btn as HTMLElement).dataset.idx || "0");
+        const pl = playlists[idx];
+        try {
+          (btn as HTMLElement).textContent = "...";
+          const paths = await yandexDownloadPlaylist(pl.owner, pl.kind);
+          (btn as HTMLElement).textContent = `${paths.length}✓`;
+          (btn as HTMLElement).style.color = "#0f0";
+        } catch (err) {
+          (btn as HTMLElement).textContent = "Err";
+          (btn as HTMLElement).style.color = "#f00";
+          console.error("[GOAMP] Download failed:", err);
         }
       });
     });
@@ -342,6 +391,102 @@ function renderStations(el: HTMLDivElement) {
   });
 }
 
+function renderLiked(el: HTMLDivElement) {
+  el.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <span style="color:#f55; font-weight:bold;">♥ Мне нравится (${likedTracks.length})</span>
+      <div style="display:flex; gap:4px;">
+        <button id="ya-liked-play-all" style="padding:3px 8px; background:#333; border:1px solid #555; color:#0f0; cursor:pointer; font-size:10px; border-radius:3px;">Play All</button>
+        <button id="ya-back-main2" style="padding:3px 8px; background:#333; border:1px solid #555; color:#888; cursor:pointer; font-size:10px; border-radius:3px;">Back</button>
+      </div>
+    </div>
+    <div id="ya-liked-list" style="max-height:60vh; overflow-y:auto;">
+      ${likedTracks.length === 0 ? '<div style="color:#888;">Loading...</div>' : likedTracks
+        .map(
+          (t, i) => `
+        <div class="ya-liked-item" data-idx="${i}" style="display:flex; justify-content:space-between; align-items:center; padding:3px 6px; border-bottom:1px solid #222;">
+          <div style="flex:1; min-width:0;">
+            <span style="color:#0f0;">${escapeHtml(t.title)}</span>
+            <span style="color:#666;"> — ${escapeHtml(t.artist)}</span>
+          </div>
+          <div style="display:flex; gap:3px; flex-shrink:0;">
+            <button class="ya-liked-play" data-idx="${i}" style="padding:1px 5px; background:#333; border:1px solid #555; color:#0f0; cursor:pointer; font-size:9px; border-radius:2px;">▶</button>
+            <button class="ya-liked-add" data-idx="${i}" style="padding:1px 5px; background:#333; border:1px solid #555; color:#fc0; cursor:pointer; font-size:9px; border-radius:2px;">+</button>
+          </div>
+        </div>
+      `,
+        )
+        .join("")}
+    </div>
+  `;
+
+  el.querySelector("#ya-back-main2")!.addEventListener("click", () => {
+    currentView = "main";
+    render();
+  });
+
+  el.querySelector("#ya-liked-play-all")!.addEventListener("click", async () => {
+    if (likedTracks.length === 0) return;
+    cleanupAutoLoad();
+    const firstBatch = likedTracks.slice(0, BATCH_SIZE);
+    playlistPendingTracks = likedTracks.slice(BATCH_SIZE);
+    const webampTracks = await resolveTrackUrls(firstBatch);
+    webampInstance?.setTracksToPlay(webampTracks);
+    setupAutoLoad();
+    console.log(`[GOAMP] Playing liked: ${firstBatch.length} loaded, ${playlistPendingTracks.length} queued`);
+    if (visible) toggleYandexPanel();
+  });
+
+  // Play single track (replaces playlist)
+  el.querySelectorAll(".ya-liked-play").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const idx = parseInt((btn as HTMLElement).dataset.idx || "0");
+      const t = likedTracks[idx];
+      try {
+        const url = await yandexGetTrackUrl(t.id);
+        webampInstance?.setTracksToPlay([{
+          metaData: { artist: t.artist || "Unknown", title: t.title },
+          url: `${url}#ya:${t.id}`,
+          duration: t.duration,
+        }]);
+        if (visible) toggleYandexPanel();
+      } catch (err) {
+        console.error("[GOAMP] Play liked track failed:", err);
+      }
+    });
+  });
+
+  // Add single track to current playlist (append)
+  el.querySelectorAll(".ya-liked-add").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const idx = parseInt((btn as HTMLElement).dataset.idx || "0");
+      const t = likedTracks[idx];
+      try {
+        (btn as HTMLElement).textContent = "...";
+        const webampTracks = await resolveTrackUrls([t]);
+        if (typeof (webampInstance as any)?.appendTracks === "function") {
+          (webampInstance as any).appendTracks(webampTracks);
+        } else {
+          const store = (webampInstance as any)?.store;
+          if (store) {
+            for (const wt of webampTracks) {
+              store.dispatch({ type: "ADD_TRACK_FROM_URL", url: wt.url, defaultName: wt.metaData?.title || "Unknown", duration: wt.duration });
+            }
+          }
+        }
+        (btn as HTMLElement).textContent = "✓";
+        (btn as HTMLElement).style.color = "#0f0";
+      } catch (err) {
+        (btn as HTMLElement).textContent = "!";
+        (btn as HTMLElement).style.color = "#f00";
+        console.error("[GOAMP] Add liked track failed:", err);
+      }
+    });
+  });
+}
+
 // ─── Lazy loading / auto-reload state ───
 const BATCH_SIZE = 20;
 let activeStationId: string | null = null;
@@ -359,11 +504,21 @@ async function resolveTrackUrls(
       const url = await yandexGetTrackUrl(t.id);
       return {
         metaData: { artist: t.artist || "Unknown", title: t.title },
-        url,
+        // Append #ya:{id} fragment so session save can extract the track ID
+        url: `${url}#ya:${t.id}`,
         duration: t.duration,
       };
     }),
   );
+}
+
+function cleanupAutoLoad() {
+  if (trackChangeUnsub) {
+    trackChangeUnsub();
+    trackChangeUnsub = null;
+  }
+  activeStationId = null;
+  playlistPendingTracks = [];
 }
 
 function setupAutoLoad() {
@@ -401,7 +556,17 @@ async function loadMoreStationTracks() {
     activeStationLastTrackId = tracks[tracks.length - 1].id;
 
     const webampTracks = await resolveTrackUrls(tracks);
-    (webampInstance as any).appendTracks(webampTracks);
+    if (typeof (webampInstance as any).appendTracks === "function") {
+      (webampInstance as any).appendTracks(webampTracks);
+    } else {
+      // Fallback: dispatch ADD_TRACK_FROM_URL actions
+      const store = (webampInstance as any).store;
+      if (store) {
+        for (const t of webampTracks) {
+          store.dispatch({ type: "ADD_TRACK_FROM_URL", url: t.url, defaultName: t.metaData?.title || "Unknown", duration: t.duration });
+        }
+      }
+    }
     console.log(`[GOAMP] Appended ${tracks.length} station tracks`);
   } catch (e) {
     console.error("[GOAMP] Station auto-load failed:", e);
@@ -416,7 +581,16 @@ async function loadMorePlaylistTracks() {
   try {
     const batch = playlistPendingTracks.splice(0, BATCH_SIZE);
     const webampTracks = await resolveTrackUrls(batch);
-    (webampInstance as any).appendTracks(webampTracks);
+    if (typeof (webampInstance as any).appendTracks === "function") {
+      (webampInstance as any).appendTracks(webampTracks);
+    } else {
+      const store = (webampInstance as any).store;
+      if (store) {
+        for (const t of webampTracks) {
+          store.dispatch({ type: "ADD_TRACK_FROM_URL", url: t.url, defaultName: t.metaData?.title || "Unknown", duration: t.duration });
+        }
+      }
+    }
     console.log(`[GOAMP] Appended ${batch.length} playlist tracks (${playlistPendingTracks.length} remaining)`);
   } catch (e) {
     console.error("[GOAMP] Playlist auto-load failed:", e);
@@ -428,10 +602,10 @@ async function playStation(stationId: string, name: string) {
   if (!webampInstance) return;
 
   try {
-    // Reset state
+    // Clean up previous auto-load before starting new source
+    cleanupAutoLoad();
     activeStationId = stationId;
     activeStationLastTrackId = undefined;
-    playlistPendingTracks = [];
 
     const tracks = await yandexStationTracks(stationId, undefined);
     if (tracks.length === 0) {
@@ -455,8 +629,8 @@ async function playYandexPlaylist(pl: YandexPlaylist) {
   if (!webampInstance) return;
 
   try {
-    // Reset state
-    activeStationId = null;
+    // Clean up previous auto-load before starting new source
+    cleanupAutoLoad();
 
     const allTracks = await yandexGetPlaylistTracks(pl.owner, pl.kind);
     if (allTracks.length === 0) return;

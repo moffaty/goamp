@@ -8,6 +8,31 @@ declare module "butterchurn-presets" {
   export default presets;
 }
 
+declare module "butterchurn-presets/lib/butterchurnPresets.min.js" {
+  const mod: any;
+  export default mod;
+}
+
+declare module "butterchurn-presets/lib/butterchurnPresetsExtra.min.js" {
+  const mod: any;
+  export default mod;
+}
+
+declare module "butterchurn-presets/lib/butterchurnPresetsExtra2.min.js" {
+  const mod: any;
+  export default mod;
+}
+
+declare module "butterchurn-presets/lib/butterchurnPresetsNonMinimal.min.js" {
+  const mod: any;
+  export default mod;
+}
+
+declare module "butterchurn-presets/lib/butterchurnPresetsMinimal.min.js" {
+  const mod: any;
+  export default mod;
+}
+
 declare module "webamp" {
   interface TrackInfo {
     metaData?: {

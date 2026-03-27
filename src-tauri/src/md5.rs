@@ -73,3 +73,26 @@ fn md5_compute(input: &str) -> u128 {
 
     u128::from_be_bytes(result)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_md5_empty() {
+        assert_eq!(md5_hex(""), "d41d8cd98f00b204e9800998ecf8427e");
+    }
+
+    #[test]
+    fn test_md5_hello() {
+        assert_eq!(md5_hex("hello"), "5d41402abc4b2a76b9719d911017c592");
+    }
+
+    #[test]
+    fn test_md5_longer_string() {
+        assert_eq!(
+            md5_hex("The quick brown fox jumps over the lazy dog"),
+            "9e107d9d372bb6826bd81d3542a419d6"
+        );
+    }
+}

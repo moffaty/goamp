@@ -6,9 +6,11 @@ import {
   getPlaylistTracks,
   addTrackToPlaylist,
   removeTrackFromPlaylist,
+  renameTrack,
   type PlaylistTrack,
   type TrackInput,
 } from "../lib/tauri-ipc";
+import { yandexGetTrackUrl } from "../yandex/yandex-service";
 import { track, trackError } from "../lib/analytics";
 import type Webamp from "webamp";
 
@@ -82,6 +84,19 @@ function escapeHtml(s: string): string {
   const div = document.createElement("div");
   div.textContent = s;
   return div.innerHTML;
+}
+
+function sourceLabel(source: string): { icon: string; color: string } {
+  switch (source) {
+    case "yandex":
+      return { icon: "Y", color: "#fc0" };
+    case "youtube":
+      return { icon: "▶", color: "#f00" };
+    case "soundcloud":
+      return { icon: "S", color: "#f50" };
+    default:
+      return { icon: "♪", color: "#888" };
+  }
 }
 
 function formatDuration(secs: number): string {
@@ -247,13 +262,15 @@ function getWebampTracks(): { title: string; artist: string; duration: number; u
 }
 
 function webampTrackToInput(t: { title: string; artist: string; duration: number; url: string }): TrackInput {
+  const yaMatch = t.url.match(/#ya:(\d+)$/);
+  const isYandex = !!yaMatch;
   const isYoutube = t.url.includes("audio_cache");
   return {
     title: t.title,
     artist: t.artist,
     duration: t.duration,
-    source: isYoutube ? "youtube" : "local",
-    source_id: t.url,
+    source: isYandex ? "yandex" : isYoutube ? "youtube" : "local",
+    source_id: isYandex ? yaMatch![1] : t.url,
   };
 }
 
@@ -341,22 +358,46 @@ async function renderTracks(playlistId: string, c: ReturnType<typeof getSkinColo
 
     for (let i = 0; i < tracks.length; i++) {
       const t = tracks[i];
+      const sourceBadge = sourceLabel(t.source);
+      const hasOriginal = t.original_title || t.original_artist;
+      const originalInfo = hasOriginal
+        ? `<span class="pl-track-original" style="color:${c.fg};font-size:9px;" title="Original: ${escapeHtml(t.original_artist || t.artist)} — ${escapeHtml(t.original_title || t.title)}"> (${escapeHtml(t.original_title || t.title)})</span>`
+        : "";
+      const albumInfo = t.album ? `<span class="pl-track-album" style="color:${c.fg};font-size:9px;"> [${escapeHtml(t.album)}]</span>` : "";
+
       const row = document.createElement("div");
       row.className = "pl-track-row";
       row.style.animationDelay = `${i * 20}ms`;
       row.innerHTML = `
         <span class="pl-track-num" style="color:${c.fg}">${i + 1}</span>
+        <span class="pl-source-badge" style="color:${sourceBadge.color};font-size:8px;width:14px;text-align:center;" title="${t.source}">${sourceBadge.icon}</span>
         <div class="pl-track-info">
-          <span class="pl-track-title" style="color:${c.text}">${escapeHtml(t.title)}</span>
+          <span class="pl-track-title" style="color:${c.text}">${escapeHtml(t.title)}${originalInfo}${albumInfo}</span>
           <span class="pl-track-artist" style="color:${c.accent}">${escapeHtml(t.artist)}</span>
         </div>
         <span class="pl-track-dur" style="color:${c.fg}">${formatDuration(t.duration)}</span>
+        <button class="pl-track-rename" style="color:${c.fg}" title="Rename">✎</button>
         <button class="pl-track-del" style="color:${c.fg}" title="Remove">\u00d7</button>
       `;
 
       row.addEventListener("click", (e) => {
-        if ((e.target as HTMLElement).classList.contains("pl-track-del")) return;
+        const target = e.target as HTMLElement;
+        if (target.classList.contains("pl-track-del") || target.classList.contains("pl-track-rename")) return;
         playSingleTrack(t);
+      });
+
+      row.querySelector(".pl-track-rename")!.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const newTitle = prompt("Track title:", t.title);
+        if (newTitle === null) return;
+        const newArtist = prompt("Artist:", t.artist);
+        if (newArtist === null) return;
+        try {
+          await renameTrack(t.id, newTitle || undefined, newArtist || undefined);
+          await renderTracks(playlistId, c);
+        } catch (err) {
+          trackError(err, { action: "rename_track" });
+        }
       });
 
       row.querySelector(".pl-track-del")!.addEventListener("click", async (e) => {
@@ -377,9 +418,20 @@ async function renderTracks(playlistId: string, c: ReturnType<typeof getSkinColo
   }
 }
 
-function trackToWebamp(t: PlaylistTrack) {
-  const url =
-    t.source === "local" ? convertFileSrc(t.source_id) : convertFileSrc(t.source_id);
+async function trackToWebamp(t: PlaylistTrack) {
+  let url: string;
+  if (t.source === "yandex") {
+    try {
+      const streamUrl = await yandexGetTrackUrl(t.source_id);
+      url = `${streamUrl}#ya:${t.source_id}`;
+    } catch {
+      url = "";
+    }
+  } else if (t.source === "youtube") {
+    url = convertFileSrc(t.source_id);
+  } else {
+    url = convertFileSrc(t.source_id);
+  }
   return {
     metaData: { artist: t.artist, title: t.title },
     url,
@@ -387,16 +439,21 @@ function trackToWebamp(t: PlaylistTrack) {
   };
 }
 
-function playPlaylist(tracks: PlaylistTrack[]) {
+async function playPlaylist(tracks: PlaylistTrack[]) {
   if (!webampRef || tracks.length === 0) return;
-  webampRef.setTracksToPlay(tracks.map(trackToWebamp));
-  track("playlist_play", { track_count: tracks.length });
+  const webampTracks = await Promise.all(tracks.map(trackToWebamp));
+  const valid = webampTracks.filter((t) => t.url);
+  if (valid.length === 0) return;
+  webampRef.setTracksToPlay(valid);
+  track("playlist_play", { track_count: valid.length });
   closePanel();
 }
 
-function playSingleTrack(t: PlaylistTrack) {
+async function playSingleTrack(t: PlaylistTrack) {
   if (!webampRef) return;
-  webampRef.setTracksToPlay([trackToWebamp(t)]);
+  const wt = await trackToWebamp(t);
+  if (!wt.url) return;
+  webampRef.setTracksToPlay([wt]);
   closePanel();
 }
 
@@ -582,13 +639,18 @@ function injectStyles(c: ReturnType<typeof getSkinColors>) {
       text-overflow: ellipsis;
     }
     .pl-track-dur { font-size: 10px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-    .pl-track-del {
+    .pl-track-rename, .pl-track-del {
       background: none; border: none;
       font-size: 13px; cursor: pointer;
       opacity: 0; transition: opacity 0.1s;
       padding: 0 2px;
     }
+    .pl-track-row:hover .pl-track-rename,
     .pl-track-row:hover .pl-track-del { opacity: 1; }
+    .pl-source-badge {
+      flex-shrink: 0;
+      font-weight: bold;
+    }
 
     .pl-action-bar {
       display: flex;

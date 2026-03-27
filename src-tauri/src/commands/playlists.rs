@@ -21,6 +21,10 @@ pub struct PlaylistTrack {
     pub duration: f64,
     pub source: String,
     pub source_id: String,
+    pub album: String,
+    pub original_title: String,
+    pub original_artist: String,
+    pub cover: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -30,6 +34,14 @@ pub struct TrackInput {
     pub duration: f64,
     pub source: String,
     pub source_id: String,
+    #[serde(default)]
+    pub album: String,
+    #[serde(default)]
+    pub original_title: String,
+    #[serde(default)]
+    pub original_artist: String,
+    #[serde(default)]
+    pub cover: String,
 }
 
 #[tauri::command]
@@ -102,7 +114,7 @@ pub fn get_playlist_tracks(
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, position, title, artist, duration, source, source_id
+            "SELECT id, position, title, artist, duration, source, source_id, album, original_title, original_artist, cover
              FROM playlist_tracks
              WHERE playlist_id = ?1
              ORDER BY position",
@@ -119,6 +131,10 @@ pub fn get_playlist_tracks(
                 duration: row.get(4)?,
                 source: row.get(5)?,
                 source_id: row.get(6)?,
+                album: row.get(7)?,
+                original_title: row.get(8)?,
+                original_artist: row.get(9)?,
+                cover: row.get(10)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -148,8 +164,8 @@ pub fn add_track_to_playlist(
     let position = max_pos + 1;
 
     conn.execute(
-        "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id, album, original_title, original_artist, cover)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
             id,
             playlist_id,
@@ -158,7 +174,11 @@ pub fn add_track_to_playlist(
             track.artist,
             track.duration,
             track.source,
-            track.source_id
+            track.source_id,
+            track.album,
+            track.original_title,
+            track.original_artist,
+            track.cover
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -178,6 +198,10 @@ pub fn add_track_to_playlist(
         duration: track.duration,
         source: track.source,
         source_id: track.source_id,
+        album: track.album,
+        original_title: track.original_title,
+        original_artist: track.original_artist,
+        cover: track.cover,
     })
 }
 
@@ -221,8 +245,8 @@ pub fn save_session(db: State<'_, Db>, tracks: Vec<TrackInput>) -> Result<(), St
     for (i, track) in tracks.iter().enumerate() {
         let id = uuid::Uuid::new_v4().to_string();
         conn.execute(
-            "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id)
-             VALUES (?1, '__last_session__', ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id, album, original_title, original_artist, cover)
+             VALUES (?1, '__last_session__', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 id,
                 i as i32,
@@ -230,7 +254,11 @@ pub fn save_session(db: State<'_, Db>, tracks: Vec<TrackInput>) -> Result<(), St
                 track.artist,
                 track.duration,
                 track.source,
-                track.source_id
+                track.source_id,
+                track.album,
+                track.original_title,
+                track.original_artist,
+                track.cover
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -242,4 +270,32 @@ pub fn save_session(db: State<'_, Db>, tracks: Vec<TrackInput>) -> Result<(), St
 #[tauri::command]
 pub fn load_session(db: State<'_, Db>) -> Result<Vec<PlaylistTrack>, String> {
     get_playlist_tracks(db, "__last_session__".to_string())
+}
+
+#[tauri::command]
+pub fn rename_track(
+    db: State<'_, Db>,
+    track_id: String,
+    title: Option<String>,
+    artist: Option<String>,
+) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+
+    // Save original values before first rename
+    if let Some(ref new_title) = title {
+        conn.execute(
+            "UPDATE playlist_tracks SET original_title = CASE WHEN original_title = '' THEN title ELSE original_title END, title = ?1 WHERE id = ?2",
+            params![new_title, track_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    if let Some(ref new_artist) = artist {
+        conn.execute(
+            "UPDATE playlist_tracks SET original_artist = CASE WHEN original_artist = '' THEN artist ELSE original_artist END, artist = ?1 WHERE id = ?2",
+            params![new_artist, track_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
 }

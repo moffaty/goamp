@@ -4,6 +4,7 @@ import { toggleAudioDevicePanel } from "../settings/AudioDevicePanel";
 import { toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
 import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
 import { toggleYandexPanel } from "../yandex/YandexPanel";
+import { toggleVisualizerPanel } from "./VisualizerPanel";
 import { openFolder, openFiles, loadSkin } from "./bridge";
 import type Webamp from "webamp";
 
@@ -61,6 +62,7 @@ function showGoampMenu(x: number, y: number) {
     { label: "Search", shortcut: "Ctrl+Y", action: () => toggleSearchOverlay() },
     { label: "Yandex Music", shortcut: "Ctrl+M", action: () => toggleYandexPanel() },
     { label: "Playlists", shortcut: "Ctrl+P", action: () => togglePlaylistPanel() },
+    { label: "Visualizer Presets", shortcut: "Ctrl+V", action: () => toggleVisualizerPanel() },
     {
       label: "Open Folder",
       shortcut: "Ctrl+O",
