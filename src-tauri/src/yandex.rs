@@ -526,6 +526,75 @@ fn yandex_cache_dir(app: &tauri::AppHandle) -> PathBuf {
     dir
 }
 
+/// Permanent download dir — app data dir, survives cache clears
+fn yandex_library_dir(app: &tauri::AppHandle) -> PathBuf {
+    let base = app
+        .path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::env::temp_dir().join("goamp"));
+    let dir = base.join("yandex_library");
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+fn safe_filename(s: &str) -> String {
+    s.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_")
+}
+
+/// Download a track to the permanent library folder. Returns the local file path.
+#[tauri::command]
+pub async fn yandex_download_to_library(
+    app: tauri::AppHandle,
+    track_id: String,
+    title: String,
+    artist: String,
+) -> Result<String, String> {
+    let db = app.state::<Db>();
+    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+
+    let dest = yandex_library_dir(&app).join(format!(
+        "{} - {}_{}.mp3",
+        safe_filename(&artist),
+        safe_filename(&title),
+        track_id
+    ));
+
+    if dest.exists() {
+        return Ok(dest.to_string_lossy().to_string());
+    }
+
+    let client = make_client(&token);
+    let options = yandex_music::api::track::get_file_info::GetFileInfoOptions::new(&track_id);
+    let info = client
+        .get_file_info(&options)
+        .await
+        .map_err(|e| format!("file info failed: {e:?}"))?;
+
+    let http = Client::new();
+    let resp = http
+        .get(&info.url)
+        .send()
+        .await
+        .map_err(|e| format!("download failed: {e}"))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| format!("read failed: {e}"))?;
+    fs::write(&dest, &bytes).map_err(|e| format!("save failed: {e}"))?;
+
+    eprintln!(
+        "[GOAMP] Downloaded to library: {} ({} bytes)",
+        dest.display(),
+        bytes.len()
+    );
+    Ok(dest.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 pub async fn yandex_download_track(
     app: tauri::AppHandle,
@@ -537,12 +606,12 @@ pub async fn yandex_download_track(
     let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
 
     let cache_dir = yandex_cache_dir(&app);
-    let safe_name = format!(
-        "{} - {}",
-        artist.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_"),
-        title.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_")
-    );
-    let dest = cache_dir.join(format!("{}_{}.mp3", safe_name, track_id));
+    let dest = cache_dir.join(format!(
+        "{} - {}_{}.mp3",
+        safe_filename(&artist),
+        safe_filename(&title),
+        track_id
+    ));
 
     // Check if already cached
     if dest.exists() {
