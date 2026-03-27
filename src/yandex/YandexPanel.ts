@@ -14,6 +14,7 @@ import {
   yandexGetLikedTracks,
   yandexOpenOAuthWindow,
   yandexLikeTrack,
+  yandexDownloadToLibrary,
   type YandexStation,
   type YandexPlaylist,
   type YandexTrack,
@@ -505,7 +506,8 @@ function renderLiked(el: HTMLDivElement) {
           </div>
           <div style="display:flex; gap:3px; flex-shrink:0;">
             <button class="ya-liked-play" data-idx="${i}" style="padding:1px 5px; background:#333; border:1px solid #555; color:#0f0; cursor:pointer; font-size:9px; border-radius:2px;">▶</button>
-            <button class="ya-liked-add" data-idx="${i}" style="padding:1px 5px; background:#333; border:1px solid #555; color:#fc0; cursor:pointer; font-size:9px; border-radius:2px;">+</button>
+            <button class="ya-liked-add" data-idx="${i}" style="padding:1px 5px; background:#333; border:1px solid #555; color:#fc0; cursor:pointer; font-size:9px; border-radius:2px;" title="Add to playlist (stream)">+</button>
+            <button class="ya-liked-dl" data-idx="${i}" style="padding:1px 5px; background:#333; border:1px solid #555; color:#88f; cursor:pointer; font-size:9px; border-radius:2px;" title="Download & save locally">↓</button>
             <button class="ya-unlike-btn" data-idx="${i}" style="padding:1px 5px; background:#333; border:1px solid #555; color:#f55; cursor:pointer; font-size:9px; border-radius:2px;" title="Unlike">♥</button>
           </div>
         </div>
@@ -567,6 +569,47 @@ function renderLiked(el: HTMLDivElement) {
         (btn as HTMLElement).textContent = "!";
         (btn as HTMLElement).style.color = "#f00";
         console.error("[GOAMP] Add to playlist failed:", err);
+      }
+    });
+  });
+
+  // Download track to local library
+  el.querySelectorAll(".ya-liked-dl").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const idx = parseInt((btn as HTMLElement).dataset.idx || "0");
+      const t = likedTracks[idx];
+      try {
+        (btn as HTMLElement).textContent = "…";
+        (btn as HTMLElement).style.color = "#aaa";
+        const filePath = await yandexDownloadToLibrary(t.id, t.title, t.artist);
+        // Add to GOAMP playlist with local source so it plays without Yandex
+        const playlists = await listPlaylists();
+        let playlistId: string;
+        const stored = localStorage.getItem("goamp_last_playlist_id");
+        const found = stored ? playlists.find((p) => p.id === stored) : null;
+        if (found) {
+          playlistId = found.id;
+        } else {
+          const existing = playlists.find((p) => p.name === "Yandex Liked");
+          playlistId = existing ? existing.id : (await createPlaylist("Yandex Liked")).id;
+          localStorage.setItem("goamp_last_playlist_id", playlistId);
+        }
+        await addTrackToPlaylist(playlistId, {
+          title: t.title,
+          artist: t.artist,
+          duration: t.duration,
+          source: "local",
+          source_id: filePath,
+          original_title: t.title,
+          original_artist: t.artist,
+        });
+        (btn as HTMLElement).textContent = "✓";
+        (btn as HTMLElement).style.color = "#0f0";
+      } catch (err) {
+        (btn as HTMLElement).textContent = "!";
+        (btn as HTMLElement).style.color = "#f00";
+        console.error("[GOAMP] Download failed:", err);
       }
     });
   });
