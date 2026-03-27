@@ -130,6 +130,14 @@ export async function yandexGetTrackUrls(trackIds: string[]): Promise<string[]> 
   return invoke("yandex_get_track_urls", { trackIds });
 }
 
+export async function yandexOpenOAuthWindow(): Promise<void> {
+  return invoke("yandex_open_oauth_window");
+}
+
+export async function yandexLikeTrack(trackId: string, like: boolean): Promise<void> {
+  return invoke("yandex_like_track", { trackId, like });
+}
+
 export function formatDuration(secs: number): string {
   const m = Math.floor(secs / 60);
   const s = Math.floor(secs % 60);

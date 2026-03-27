@@ -12,11 +12,18 @@ import {
   yandexImportPlaylist,
   yandexDownloadPlaylist,
   yandexGetLikedTracks,
+  yandexOpenOAuthWindow,
+  yandexLikeTrack,
   type YandexStation,
   type YandexPlaylist,
   type YandexTrack,
   type YandexAccount,
 } from "./yandex-service";
+import {
+  addTrackToPlaylist,
+  listPlaylists,
+  createPlaylist,
+} from "../lib/tauri-ipc";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type Webamp from "webamp";
@@ -127,23 +134,42 @@ function renderAuth(el: HTMLDivElement) {
     <div style="margin-bottom:10px;">
       <button id="ya-oauth-btn" style="padding:8px 12px; background:#fc0; border:none; color:#000; cursor:pointer; font-family:inherit; font-size:12px; border-radius:4px; width:100%; font-weight:bold;">Sign in with Yandex</button>
     </div>
-    <div id="ya-device-code-area" style="display:none; margin-top:10px; padding:10px; background:#111; border:1px solid #444; border-radius:4px; text-align:center;">
-      <div style="color:#aaa; margin-bottom:6px;">Open the link and enter this code:</div>
-      <div id="ya-user-code" style="font-size:24px; color:#fc0; font-weight:bold; letter-spacing:4px; margin:8px 0;"></div>
-      <button id="ya-open-url" style="padding:5px 12px; background:#333; border:1px solid #555; color:#0f0; cursor:pointer; font-family:inherit; font-size:11px; border-radius:3px; margin-top:4px;">Open Yandex login page</button>
-      <div style="color:#666; margin-top:6px; font-size:10px;">Waiting for authorization...</div>
-    </div>
-    <details style="margin-top:8px;">
-      <summary style="color:#666; cursor:pointer; font-size:10px;">Manual token entry</summary>
-      <div style="display:flex; gap:6px; margin-top:6px;">
-        <input id="ya-token-input" type="text" placeholder="OAuth token" style="flex:1; padding:4px 6px; background:#111; border:1px solid #444; color:#fc0; font-family:inherit; font-size:11px; border-radius:3px;" />
-        <button id="ya-connect-btn" style="padding:5px 12px; background:#333; border:1px solid #555; color:#fc0; cursor:pointer; font-family:inherit; font-size:11px; border-radius:3px;">Connect</button>
+    <div id="ya-auth-status" style="color:#888; margin-top:8px; text-align:center;"></div>
+    <details style="margin-top:12px;">
+      <summary style="color:#666; cursor:pointer; font-size:10px;">Device code / manual token</summary>
+      <div style="margin-top:8px;">
+        <button id="ya-device-btn" style="padding:5px 10px; background:#333; border:1px solid #555; color:#0f0; cursor:pointer; font-family:inherit; font-size:11px; border-radius:3px; width:100%; margin-bottom:6px;">Use device code flow</button>
+        <div id="ya-device-code-area" style="display:none; margin-top:8px; padding:8px; background:#111; border:1px solid #333; border-radius:4px; text-align:center;">
+          <div style="color:#aaa; margin-bottom:4px; font-size:10px;">Open the link and enter this code:</div>
+          <div id="ya-user-code" style="font-size:22px; color:#fc0; font-weight:bold; letter-spacing:4px; margin:6px 0;"></div>
+          <button id="ya-open-url" style="padding:4px 10px; background:#333; border:1px solid #555; color:#0f0; cursor:pointer; font-family:inherit; font-size:10px; border-radius:3px;">Open Yandex login page</button>
+          <div style="color:#666; margin-top:4px; font-size:9px;">Waiting for authorization...</div>
+        </div>
+        <div style="display:flex; gap:6px; margin-top:6px;">
+          <input id="ya-token-input" type="text" placeholder="OAuth token" style="flex:1; padding:4px 6px; background:#111; border:1px solid #444; color:#fc0; font-family:inherit; font-size:11px; border-radius:3px;" />
+          <button id="ya-connect-btn" style="padding:5px 10px; background:#333; border:1px solid #555; color:#fc0; cursor:pointer; font-family:inherit; font-size:11px; border-radius:3px;">Connect</button>
+        </div>
       </div>
     </details>
-    <div id="ya-auth-status" style="color:#888; margin-top:8px;"></div>
   `;
 
+  // Primary: WebView OAuth (automatic token extraction)
   el.querySelector("#ya-oauth-btn")!.addEventListener("click", async () => {
+    const status = el.querySelector("#ya-auth-status") as HTMLDivElement;
+    status.textContent = "Opening sign-in window...";
+    status.style.color = "#fc0";
+    try {
+      await yandexOpenOAuthWindow();
+      status.textContent = "Sign in to Yandex in the opened window";
+      status.style.color = "#aaa";
+    } catch (e) {
+      status.textContent = `Error: ${e}`;
+      status.style.color = "#f00";
+    }
+  });
+
+  // Fallback: device code
+  el.querySelector("#ya-device-btn")!.addEventListener("click", async () => {
     const status = el.querySelector("#ya-auth-status") as HTMLDivElement;
     const codeArea = el.querySelector("#ya-device-code-area") as HTMLDivElement;
     const codeEl = el.querySelector("#ya-user-code") as HTMLDivElement;
@@ -155,33 +181,26 @@ function renderAuth(el: HTMLDivElement) {
       codeArea.style.display = "block";
       status.textContent = "";
 
-      // Open URL button
       el.querySelector("#ya-open-url")!.addEventListener("click", () => {
         openUrl(resp.verification_url);
       });
-
-      // Auto-open the verification URL
       openUrl(resp.verification_url);
 
-      // Poll for token
       if (pollTimer) clearInterval(pollTimer);
       const interval = Math.max(resp.interval, 2) * 1000;
       pollTimer = setInterval(async () => {
         try {
           await yandexPollToken(resp.device_code);
-          // Success — stop polling
           if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
           refreshStatus();
         } catch (e) {
           const err = String(e);
           if (!err.includes("pending")) {
-            // Real error — stop polling
             if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
             status.textContent = `Error: ${err}`;
             status.style.color = "#f00";
             codeArea.style.display = "none";
           }
-          // "pending" — keep polling
         }
       }, interval);
     } catch (e) {
@@ -190,6 +209,7 @@ function renderAuth(el: HTMLDivElement) {
     }
   });
 
+  // Manual token
   el.querySelector("#ya-connect-btn")!.addEventListener("click", async () => {
     const input = el.querySelector("#ya-token-input") as HTMLInputElement;
     const token = input.value.trim();
@@ -275,6 +295,9 @@ function renderMain(el: HTMLDivElement) {
     }
   });
 
+  // Now playing: show like button if Yandex track
+  renderNowPlaying(el);
+
   // Load playlists
   loadPlaylists(el);
 }
@@ -353,6 +376,77 @@ async function loadPlaylists(el: HTMLDivElement) {
   }
 }
 
+async function addYandexTrackToGoampPlaylist(t: YandexTrack): Promise<void> {
+  // Use last selected GOAMP playlist, or create "Yandex Liked" if none
+  let playlistId = localStorage.getItem("goamp_last_playlist_id");
+  if (!playlistId) {
+    const all = await listPlaylists();
+    let target = all.find((p) => p.name === "Yandex Liked");
+    if (!target) {
+      target = await createPlaylist("Yandex Liked");
+    }
+    playlistId = target.id;
+    localStorage.setItem("goamp_last_playlist_id", playlistId);
+  }
+
+  await addTrackToPlaylist(playlistId, {
+    title: t.title,
+    artist: t.artist,
+    duration: t.duration,
+    source: "yandex",
+    source_id: t.id,
+    album: t.album,
+    cover: t.cover,
+  });
+}
+
+function renderNowPlaying(el: HTMLDivElement) {
+  const store = (webampInstance as any)?.store;
+  if (!store) return;
+  const state = store.getState();
+  const tracks = state?.playlist?.tracks || {};
+  const currentId = state?.playlist?.currentTrack;
+  const current = currentId ? tracks[currentId] : null;
+  if (!current) return;
+
+  const url: string = current.url || "";
+  const yaMatch = url.match(/#ya:(\d+)$/);
+  if (!yaMatch) return; // only show for Yandex tracks
+
+  const trackId = yaMatch[1];
+  const title = current.title || current.defaultName || "Unknown";
+  const artist = current.artist || "";
+
+  // Insert now-playing section before playlists border
+  const nowPlaying = document.createElement("div");
+  nowPlaying.style.cssText = "display:flex; align-items:center; gap:8px; padding:6px 0 10px; border-bottom:1px solid #333; margin-bottom:8px;";
+  nowPlaying.innerHTML = `
+    <div style="flex:1; min-width:0;">
+      <div style="color:#888; font-size:9px; text-transform:uppercase; letter-spacing:1px;">Now Playing</div>
+      <div style="color:#0f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(title)}</div>
+      <div style="color:#666; font-size:10px;">${escapeHtml(artist)}</div>
+    </div>
+    <button id="ya-like-now" data-id="${trackId}" style="padding:4px 8px; background:#333; border:1px solid #555; color:#f55; cursor:pointer; font-size:14px; border-radius:3px;" title="Like this track">♥</button>
+  `;
+  el.insertBefore(nowPlaying, el.querySelector('[style*="border-top"]') || el.firstChild);
+
+  el.querySelector("#ya-like-now")!.addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    btn.textContent = "...";
+    try {
+      await yandexLikeTrack(trackId, true);
+      btn.textContent = "♥";
+      btn.style.color = "#0f0";
+      btn.style.border = "1px solid #0f0";
+      btn.title = "Liked!";
+    } catch (err) {
+      btn.textContent = "♥";
+      btn.style.color = "#f55";
+      console.error("[GOAMP] Like failed:", err);
+    }
+  });
+}
+
 function renderStations(el: HTMLDivElement) {
   // Filter to genre stations for cleaner UI
   const genreStations = stations.filter(
@@ -412,6 +506,7 @@ function renderLiked(el: HTMLDivElement) {
           <div style="display:flex; gap:3px; flex-shrink:0;">
             <button class="ya-liked-play" data-idx="${i}" style="padding:1px 5px; background:#333; border:1px solid #555; color:#0f0; cursor:pointer; font-size:9px; border-radius:2px;">▶</button>
             <button class="ya-liked-add" data-idx="${i}" style="padding:1px 5px; background:#333; border:1px solid #555; color:#fc0; cursor:pointer; font-size:9px; border-radius:2px;">+</button>
+            <button class="ya-unlike-btn" data-idx="${i}" style="padding:1px 5px; background:#333; border:1px solid #555; color:#f55; cursor:pointer; font-size:9px; border-radius:2px;" title="Unlike">♥</button>
           </div>
         </div>
       `,
@@ -457,7 +552,7 @@ function renderLiked(el: HTMLDivElement) {
     });
   });
 
-  // Add single track to current playlist (append)
+  // Add single track to GOAMP playlist (saves to SQLite, no download)
   el.querySelectorAll(".ya-liked-add").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
@@ -465,23 +560,32 @@ function renderLiked(el: HTMLDivElement) {
       const t = likedTracks[idx];
       try {
         (btn as HTMLElement).textContent = "...";
-        const webampTracks = await resolveTrackUrls([t]);
-        if (typeof (webampInstance as any)?.appendTracks === "function") {
-          (webampInstance as any).appendTracks(webampTracks);
-        } else {
-          const store = (webampInstance as any)?.store;
-          if (store) {
-            for (const wt of webampTracks) {
-              store.dispatch({ type: "ADD_TRACK_FROM_URL", url: wt.url, defaultName: wt.metaData?.title || "Unknown", duration: wt.duration });
-            }
-          }
-        }
+        await addYandexTrackToGoampPlaylist(t);
         (btn as HTMLElement).textContent = "✓";
         (btn as HTMLElement).style.color = "#0f0";
       } catch (err) {
         (btn as HTMLElement).textContent = "!";
         (btn as HTMLElement).style.color = "#f00";
-        console.error("[GOAMP] Add liked track failed:", err);
+        console.error("[GOAMP] Add to playlist failed:", err);
+      }
+    });
+  });
+
+  // Unlike button
+  el.querySelectorAll(".ya-unlike-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const idx = parseInt((btn as HTMLElement).dataset.idx || "0");
+      const t = likedTracks[idx];
+      try {
+        (btn as HTMLElement).textContent = "...";
+        await yandexLikeTrack(t.id, false);
+        // Remove from list
+        likedTracks.splice(idx, 1);
+        renderLiked(el);
+      } catch (err) {
+        (btn as HTMLElement).textContent = "♥";
+        console.error("[GOAMP] Unlike failed:", err);
       }
     });
   });
@@ -618,6 +722,8 @@ async function playStation(stationId: string, name: string) {
     webampInstance.setTracksToPlay(webampTracks);
     setupAutoLoad();
     console.log(`[GOAMP] Playing station "${name}": ${tracks.length} tracks (auto-reload on)`);
+    // Pre-load next batch immediately so there are enough tracks in queue
+    loadMoreStationTracks();
 
     if (visible) toggleYandexPanel();
   } catch (e) {

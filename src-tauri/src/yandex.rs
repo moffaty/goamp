@@ -726,3 +726,98 @@ pub async fn yandex_get_track_urls(
 
     Ok(urls)
 }
+
+// --- Commands: OAuth WebView ---
+
+#[tauri::command]
+pub async fn yandex_open_oauth_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::WebviewWindowBuilder;
+
+    // Close existing oauth window if open
+    if let Some(existing) = app.get_webview_window("yandex-oauth") {
+        let _ = existing.close();
+    }
+
+    let url = format!(
+        "https://oauth.yandex.ru/authorize?response_type=token&client_id={}",
+        YA_OAUTH_CLIENT_ID
+    );
+    let parsed_url =
+        tauri::WebviewUrl::External(url.parse().map_err(|e: url::ParseError| e.to_string())?);
+
+    let app_clone = app.clone();
+    WebviewWindowBuilder::new(&app, "yandex-oauth", parsed_url)
+        .title("Sign in with Yandex — GOAMP")
+        .inner_size(520.0, 720.0)
+        .center()
+        .on_navigation(move |nav_url| {
+            let url_str = nav_url.as_str();
+            // Yandex implicit OAuth redirects to verification_code page with token in fragment
+            if url_str.contains("verification_code") || url_str.contains("access_token=") {
+                let fragment = nav_url.fragment().unwrap_or("").to_string();
+                let token = fragment.split('&').find_map(|part| {
+                    let mut kv = part.splitn(2, '=');
+                    if kv.next() == Some("access_token") {
+                        kv.next().map(|s| s.to_string())
+                    } else {
+                        None
+                    }
+                });
+                if let Some(token) = token {
+                    let app2 = app_clone.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let db = app2.state::<Db>();
+                        set_setting(&db, YA_TOKEN_SETTING, &token);
+                        let _ = app2.emit("yandex-auth-success", ());
+                        if let Some(win) = app2.get_webview_window("yandex-oauth") {
+                            let _ = win.close();
+                        }
+                    });
+                    return false; // prevent loading the verification_code page
+                }
+            }
+            true
+        })
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+// --- Commands: Like/Unlike tracks ---
+
+#[tauri::command]
+pub async fn yandex_like_track(
+    app: tauri::AppHandle,
+    track_id: String,
+    like: bool,
+) -> Result<(), String> {
+    let db = app.state::<Db>();
+    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+    let uid = get_setting(&db, YA_UID_SETTING).ok_or("uid not found")?;
+    let uid_num: u64 = uid.parse().unwrap_or(0);
+
+    let client = make_client(&token);
+
+    if like {
+        let options = yandex_music::api::track::add_liked_tracks::AddLikedTracksOptions::new(
+            uid_num,
+            [track_id],
+        );
+        client
+            .add_liked_tracks(&options)
+            .await
+            .map_err(|e| format!("like track failed: {e:?}"))?;
+    } else {
+        let options = yandex_music::api::track::remove_liked_tracks::RemoveLikedTracksOptions::new(
+            uid_num,
+            [track_id],
+        );
+        client
+            .remove_liked_tracks(&options)
+            .await
+            .map_err(|e| format!("unlike track failed: {e:?}"))?;
+    }
+
+    Ok(())
+}
