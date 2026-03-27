@@ -3,6 +3,7 @@ import {
   removeCustomPreset,
   listCustomPresets,
 } from "./butterchurn";
+import { escapeHtml } from "../lib/ui-utils";
 import type Webamp from "webamp";
 
 let panel: HTMLDivElement | null = null;
@@ -181,10 +182,6 @@ function reloadVisualizer() {
       }
     }
   }, 200);
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function escapeAttr(s: string): string {

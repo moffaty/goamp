@@ -101,6 +101,33 @@ async function saveCurrentSession(webamp: Webamp) {
   }
 }
 
+/** Resolve PlaylistTrack[] to Webamp track objects, handling source-specific URLs */
+async function resolvePlaylistTracks(
+  tracks: { source: string; source_id: string; artist: string; title: string; duration: number }[],
+) {
+  const resolved = await Promise.all(
+    tracks.map(async (t) => {
+      let url: string;
+      if (t.source === "yandex") {
+        try {
+          const streamUrl = await yandexGetTrackUrl(t.source_id);
+          url = `${streamUrl}#ya:${t.source_id}`;
+        } catch {
+          url = "";
+        }
+      } else {
+        url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
+      }
+      return {
+        metaData: { artist: t.artist || "Unknown Artist", title: t.title || "Unknown Track" },
+        url,
+        duration: t.duration,
+      };
+    }),
+  );
+  return resolved.filter((t) => t.url);
+}
+
 async function setupSessionRestore(webamp: Webamp) {
   try {
     // Try last selected playlist first
@@ -108,34 +135,10 @@ async function setupSessionRestore(webamp: Webamp) {
     if (lastPlaylistId) {
       const tracks = await getPlaylistTracks(lastPlaylistId);
       if (tracks.length > 0) {
-        const webampTracks = await Promise.all(
-          tracks.map(async (t) => {
-            let url: string;
-            if (t.source === "yandex") {
-              try {
-                const streamUrl = await yandexGetTrackUrl(t.source_id);
-                url = `${streamUrl}#ya:${t.source_id}`;
-              } catch {
-                url = "";
-              }
-            } else {
-              // source_id is saved as Tauri asset URL — use directly, don't double-wrap
-              url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
-            }
-            return {
-              metaData: {
-                artist: t.artist || "Unknown Artist",
-                title: t.title || "Unknown Track",
-              },
-              url,
-              duration: t.duration,
-            };
-          }),
-        );
-        const validTracks = webampTracks.filter((t) => t.url);
-        if (validTracks.length > 0) {
-          webamp.setTracksToPlay(validTracks);
-          console.log("[GOAMP] Playlist restored:", validTracks.length, "tracks");
+        const valid = await resolvePlaylistTracks(tracks);
+        if (valid.length > 0) {
+          webamp.setTracksToPlay(valid);
+          console.log("[GOAMP] Playlist restored:", valid.length, "tracks");
           return;
         }
       }
@@ -145,37 +148,11 @@ async function setupSessionRestore(webamp: Webamp) {
     const tracks = await loadSession();
     if (tracks.length === 0) return;
 
-    const webampTracks = await Promise.all(
-      tracks.map(async (t) => {
-        let url: string;
-        if (t.source === "yandex") {
-          try {
-            const streamUrl = await yandexGetTrackUrl(t.source_id);
-            url = `${streamUrl}#ya:${t.source_id}`;
-          } catch {
-            url = ""; // Skip failed — will be silent
-          }
-        } else {
-          // source_id is saved as Tauri asset URL — use directly, don't double-wrap
-          url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
-        }
-        return {
-          metaData: {
-            artist: t.artist || "Unknown Artist",
-            title: t.title || "Unknown Track",
-          },
-          url,
-          duration: t.duration,
-        };
-      }),
-    );
+    const valid = await resolvePlaylistTracks(tracks);
+    if (valid.length === 0) return;
 
-    // Filter out tracks with empty URLs (failed Yandex resolves)
-    const validTracks = webampTracks.filter((t) => t.url);
-    if (validTracks.length === 0) return;
-
-    webamp.setTracksToPlay(validTracks);
-    console.log("[GOAMP] Session restored:", tracks.length, "tracks");
+    webamp.setTracksToPlay(valid);
+    console.log("[GOAMP] Session restored:", valid.length, "tracks");
   } catch (e) {
     console.error("[GOAMP] Failed to restore session:", e);
   }

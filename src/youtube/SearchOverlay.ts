@@ -3,7 +3,6 @@ import {
   searchYoutube,
   extractAudio,
   extractAudioUrl,
-  formatDuration,
   type YoutubeResult,
   type SearchSource,
 } from "./youtube-service";
@@ -19,6 +18,7 @@ import {
   type TrackInput,
 } from "../lib/tauri-ipc";
 import { track, trackError } from "../lib/analytics";
+import { getSkinColors, escapeHtml, formatDuration } from "../lib/ui-utils";
 import type Webamp from "webamp";
 
 let overlay: HTMLElement | null = null;
@@ -40,80 +40,10 @@ export function toggleSearchOverlay() {
   }
 }
 
-/** Parse hex color to RGB */
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  return [
-    parseInt(h.slice(0, 2), 16) || 0,
-    parseInt(h.slice(2, 4), 16) || 0,
-    parseInt(h.slice(4, 6), 16) || 0,
-  ];
-}
-
-/** Relative luminance (WCAG) */
-function luminance(hex: string): number {
-  const [r, g, b] = hexToRgb(hex).map((c) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-/** Ensure text is readable on background — flip to white/black if contrast < 4.5:1 */
-function ensureContrast(textColor: string, bgColor: string): string {
-  const lText = luminance(textColor);
-  const lBg = luminance(bgColor);
-  const ratio =
-    (Math.max(lText, lBg) + 0.05) / (Math.min(lText, lBg) + 0.05);
-  if (ratio >= 4.5) return textColor;
-  // Pick white or black depending on bg brightness
-  return lBg > 0.4 ? "#000000" : "#ffffff";
-}
-
-/** Read skin colors from Webamp Redux store */
-function getSkinColors(): {
-  bg: string;
-  fg: string;
-  text: string;
-  accent: string;
-  textBg: string;
-} {
-  const defaults = {
-    bg: "#1d2439",
-    fg: "#2a3555",
-    text: "#00ff00",
-    accent: "#ffcc00",
-    textBg: "#0a0e1a",
-  };
-
-  if (!webampRef) return defaults;
-
-  try {
-    const state = (webampRef as any).store?.getState();
-    const colors: string[] = state?.display?.skinColors || [];
-    if (colors.length >= 5) {
-      const bg = colors[3] || defaults.bg;
-      const textBg = colors[1] || defaults.textBg;
-      const rawText = colors[0] || defaults.text;
-      const rawAccent = colors[18] || colors[2] || defaults.accent;
-
-      return {
-        bg,
-        fg: colors[4] || defaults.fg,
-        text: ensureContrast(rawText, bg),
-        accent: ensureContrast(rawAccent, bg),
-        textBg,
-      };
-    }
-  } catch {}
-
-  return defaults;
-}
-
 function openOverlay() {
   if (overlay) return;
 
-  const c = getSkinColors();
+  const c = getSkinColors(webampRef);
 
   overlay = document.createElement("div");
   overlay.id = "yt-search-overlay";
@@ -327,7 +257,7 @@ function updatePagination(container: HTMLElement, page: number, hasMore: boolean
   const totalLoaded = Math.ceil(allResults.length / PAGE_SIZE);
   if (totalLoaded <= 1 && !hasMore) return; // single page, no controls
 
-  const c = getSkinColors();
+  const c = getSkinColors(webampRef);
   const nav = document.createElement("div");
   nav.id = "yt-pagination";
   nav.className = "yt-pagination";
@@ -387,7 +317,7 @@ function updatePagination(container: HTMLElement, page: number, hasMore: boolean
 
 function renderPageContent(container: HTMLElement, items: YoutubeResult[]) {
   container.innerHTML = "";
-  const c = getSkinColors();
+  const c = getSkinColors(webampRef);
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -697,12 +627,6 @@ async function playYoutubeTrack(item: YoutubeResult, row: HTMLElement) {
     if (status) status.textContent = `Error: ${e}`;
     trackError(e, { action: "youtube_extract", video_id: item.id });
   }
-}
-
-function escapeHtml(s: string): string {
-  const div = document.createElement("div");
-  div.textContent = s;
-  return div.innerHTML;
 }
 
 function injectStyles(c: ReturnType<typeof getSkinColors>) {

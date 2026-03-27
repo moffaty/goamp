@@ -33,22 +33,6 @@ pub struct ScrobbleStatus {
     pub queue_count: u32,
 }
 
-fn get_setting(db: &Db, key: &str) -> Option<String> {
-    let conn = db.0.lock().unwrap();
-    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
-        row.get(0)
-    })
-    .ok()
-}
-
-fn set_setting(db: &Db, key: &str, value: &str) {
-    let conn = db.0.lock().unwrap();
-    let _ = conn.execute(
-        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-        [key, value],
-    );
-}
-
 fn api_sig(params: &BTreeMap<&str, &str>, secret: &str) -> String {
     let mut sig_input = String::new();
     for (k, v) in params {
@@ -84,7 +68,8 @@ fn queue_count(db: &Db) -> u32 {
 #[tauri::command]
 pub fn lastfm_get_auth_url(app: tauri::AppHandle) -> Result<String, String> {
     let db = app.state::<Db>();
-    let api_key = get_setting(&db, LASTFM_API_KEY_SETTING)
+    let api_key = db
+        .get_setting(LASTFM_API_KEY_SETTING)
         .ok_or("Last.fm API key not set. Go to Settings to configure.")?;
     Ok(format!("https://www.last.fm/api/auth/?api_key={}", api_key))
 }
@@ -92,8 +77,12 @@ pub fn lastfm_get_auth_url(app: tauri::AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub async fn lastfm_auth(app: tauri::AppHandle, token: String) -> Result<LastfmSession, String> {
     let db = app.state::<Db>();
-    let api_key = get_setting(&db, LASTFM_API_KEY_SETTING).ok_or("Last.fm API key not set")?;
-    let secret = get_setting(&db, LASTFM_SECRET_SETTING).ok_or("Last.fm secret not set")?;
+    let api_key = db
+        .get_setting(LASTFM_API_KEY_SETTING)
+        .ok_or("Last.fm API key not set")?;
+    let secret = db
+        .get_setting(LASTFM_SECRET_SETTING)
+        .ok_or("Last.fm secret not set")?;
 
     let mut params = BTreeMap::new();
     params.insert("api_key", api_key.as_str());
@@ -120,7 +109,7 @@ pub async fn lastfm_auth(app: tauri::AppHandle, token: String) -> Result<LastfmS
     let parsed: AuthSessionResponse =
         serde_json::from_str(&body).map_err(|e| format!("parse error: {e} body: {body}"))?;
 
-    set_setting(&db, LASTFM_SESSION_SETTING, &parsed.session.key);
+    db.set_setting(LASTFM_SESSION_SETTING, &parsed.session.key);
     eprintln!("[GOAMP] Last.fm authenticated as: {}", parsed.session.name);
     Ok(parsed.session)
 }
@@ -133,9 +122,11 @@ pub async fn lastfm_now_playing(
     duration: Option<u32>,
 ) -> Result<(), String> {
     let db = app.state::<Db>();
-    let api_key = get_setting(&db, LASTFM_API_KEY_SETTING).ok_or("no api key")?;
-    let secret = get_setting(&db, LASTFM_SECRET_SETTING).ok_or("no secret")?;
-    let sk = get_setting(&db, LASTFM_SESSION_SETTING).ok_or("not authenticated")?;
+    let api_key = db.get_setting(LASTFM_API_KEY_SETTING).ok_or("no api key")?;
+    let secret = db.get_setting(LASTFM_SECRET_SETTING).ok_or("no secret")?;
+    let sk = db
+        .get_setting(LASTFM_SESSION_SETTING)
+        .ok_or("not authenticated")?;
 
     let dur_str = duration.map(|d| d.to_string()).unwrap_or_default();
 
@@ -184,9 +175,11 @@ pub async fn lastfm_scrobble(
     duration: Option<u32>,
 ) -> Result<(), String> {
     let db = app.state::<Db>();
-    let api_key = get_setting(&db, LASTFM_API_KEY_SETTING).ok_or("no api key")?;
-    let secret = get_setting(&db, LASTFM_SECRET_SETTING).ok_or("no secret")?;
-    let sk = get_setting(&db, LASTFM_SESSION_SETTING).ok_or("not authenticated")?;
+    let api_key = db.get_setting(LASTFM_API_KEY_SETTING).ok_or("no api key")?;
+    let secret = db.get_setting(LASTFM_SECRET_SETTING).ok_or("no secret")?;
+    let sk = db
+        .get_setting(LASTFM_SESSION_SETTING)
+        .ok_or("not authenticated")?;
 
     let ts_str = timestamp.to_string();
     let dur_str = duration.map(|d| d.to_string());
@@ -257,15 +250,15 @@ pub fn lastfm_save_settings(
     secret: String,
 ) -> Result<(), String> {
     let db = app.state::<Db>();
-    set_setting(&db, LASTFM_API_KEY_SETTING, &api_key);
-    set_setting(&db, LASTFM_SECRET_SETTING, &secret);
+    db.set_setting(LASTFM_API_KEY_SETTING, &api_key);
+    db.set_setting(LASTFM_SECRET_SETTING, &secret);
     Ok(())
 }
 
 #[tauri::command]
 pub fn lastfm_get_status(app: tauri::AppHandle) -> Result<Option<String>, String> {
     let db = app.state::<Db>();
-    Ok(get_setting(&db, LASTFM_SESSION_SETTING))
+    Ok(db.get_setting(LASTFM_SESSION_SETTING))
 }
 
 // ─── ListenBrainz commands ───
@@ -301,8 +294,8 @@ pub async fn listenbrainz_save_token(
 
     let username = parsed.user_name.unwrap_or_default();
     let db = app.state::<Db>();
-    set_setting(&db, LB_TOKEN_SETTING, &token);
-    set_setting(&db, LB_USERNAME_SETTING, &username);
+    db.set_setting(LB_TOKEN_SETTING, &token);
+    db.set_setting(LB_USERNAME_SETTING, &username);
 
     eprintln!("[GOAMP] ListenBrainz authenticated as: {}", username);
     Ok(username)
@@ -311,7 +304,7 @@ pub async fn listenbrainz_save_token(
 #[tauri::command]
 pub fn listenbrainz_get_status(app: tauri::AppHandle) -> Result<Option<String>, String> {
     let db = app.state::<Db>();
-    Ok(get_setting(&db, LB_USERNAME_SETTING))
+    Ok(db.get_setting(LB_USERNAME_SETTING))
 }
 
 #[tauri::command]
@@ -329,7 +322,9 @@ pub async fn listenbrainz_now_playing(
     title: String,
 ) -> Result<(), String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, LB_TOKEN_SETTING).ok_or("not authenticated")?;
+    let token = db
+        .get_setting(LB_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
 
     let payload = serde_json::json!({
         "listen_type": "playing_now",
@@ -363,7 +358,9 @@ pub async fn listenbrainz_scrobble(
     duration: Option<u32>,
 ) -> Result<(), String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, LB_TOKEN_SETTING).ok_or("not authenticated")?;
+    let token = db
+        .get_setting(LB_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
 
     let payload = serde_json::json!({
         "listen_type": "single",
@@ -419,8 +416,8 @@ pub async fn listenbrainz_scrobble(
 pub fn scrobble_get_status(app: tauri::AppHandle) -> Result<ScrobbleStatus, String> {
     let db = app.state::<Db>();
     Ok(ScrobbleStatus {
-        lastfm: get_setting(&db, LASTFM_SESSION_SETTING).is_some(),
-        listenbrainz: get_setting(&db, LB_TOKEN_SETTING).is_some(),
+        lastfm: db.get_setting(LASTFM_SESSION_SETTING).is_some(),
+        listenbrainz: db.get_setting(LB_TOKEN_SETTING).is_some(),
         queue_count: queue_count(&db),
     })
 }
@@ -501,9 +498,11 @@ async fn flush_lastfm_item(
     track: &str,
     timestamp: u64,
 ) -> Result<(), String> {
-    let api_key = get_setting(db, LASTFM_API_KEY_SETTING).ok_or("no api key")?;
-    let secret = get_setting(db, LASTFM_SECRET_SETTING).ok_or("no secret")?;
-    let sk = get_setting(db, LASTFM_SESSION_SETTING).ok_or("not authenticated")?;
+    let api_key = db.get_setting(LASTFM_API_KEY_SETTING).ok_or("no api key")?;
+    let secret = db.get_setting(LASTFM_SECRET_SETTING).ok_or("no secret")?;
+    let sk = db
+        .get_setting(LASTFM_SESSION_SETTING)
+        .ok_or("not authenticated")?;
 
     let ts_str = timestamp.to_string();
 
@@ -547,7 +546,9 @@ async fn flush_lb_item(
     track: &str,
     timestamp: u64,
 ) -> Result<(), String> {
-    let token = get_setting(db, LB_TOKEN_SETTING).ok_or("not authenticated")?;
+    let token = db
+        .get_setting(LB_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
 
     let payload = serde_json::json!({
         "listen_type": "single",
@@ -634,13 +635,13 @@ mod tests {
     fn test_get_set_setting() {
         let db = test_db();
 
-        assert!(get_setting(&db, "nonexistent").is_none());
+        assert!(db.get_setting("nonexistent").is_none());
 
-        set_setting(&db, "test_key", "test_value");
-        assert_eq!(get_setting(&db, "test_key"), Some("test_value".to_string()));
+        db.set_setting("test_key", "test_value");
+        assert_eq!(db.get_setting("test_key"), Some("test_value".to_string()));
 
-        set_setting(&db, "test_key", "new_value");
-        assert_eq!(get_setting(&db, "test_key"), Some("new_value".to_string()));
+        db.set_setting("test_key", "new_value");
+        assert_eq!(db.get_setting("test_key"), Some("new_value".to_string()));
     }
 
     #[test]
@@ -678,13 +679,13 @@ mod tests {
     fn test_scrobble_status_settings() {
         let db = test_db();
 
-        assert!(get_setting(&db, LASTFM_SESSION_SETTING).is_none());
-        assert!(get_setting(&db, LB_TOKEN_SETTING).is_none());
+        assert!(db.get_setting(LASTFM_SESSION_SETTING).is_none());
+        assert!(db.get_setting(LB_TOKEN_SETTING).is_none());
 
-        set_setting(&db, LASTFM_SESSION_SETTING, "session_key");
-        assert!(get_setting(&db, LASTFM_SESSION_SETTING).is_some());
+        db.set_setting(LASTFM_SESSION_SETTING, "session_key");
+        assert!(db.get_setting(LASTFM_SESSION_SETTING).is_some());
 
-        set_setting(&db, LB_TOKEN_SETTING, "lb_token");
-        assert!(get_setting(&db, LB_TOKEN_SETTING).is_some());
+        db.set_setting(LB_TOKEN_SETTING, "lb_token");
+        assert!(db.get_setting(LB_TOKEN_SETTING).is_some());
     }
 }

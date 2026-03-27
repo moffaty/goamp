@@ -97,3 +97,11 @@ export async function renameTrack(
 ): Promise<void> {
   return invoke("rename_track", { trackId, title: title ?? null, artist: artist ?? null });
 }
+
+export async function updateTrackSource(
+  trackId: string,
+  source: string,
+  sourceId: string,
+): Promise<void> {
+  return invoke("update_track_source", { trackId, source, sourceId });
+}

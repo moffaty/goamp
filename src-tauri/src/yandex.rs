@@ -81,22 +81,6 @@ struct DeviceCodeApiResponse {
 
 // --- Helpers ---
 
-fn get_setting(db: &Db, key: &str) -> Option<String> {
-    let conn = db.0.lock().unwrap();
-    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
-        row.get(0)
-    })
-    .ok()
-}
-
-fn set_setting(db: &Db, key: &str, value: &str) {
-    let conn = db.0.lock().unwrap();
-    let _ = conn.execute(
-        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-        [key, value],
-    );
-}
-
 fn make_client(token: &str) -> YandexMusicClient {
     YandexMusicClient::builder(token).build().unwrap()
 }
@@ -194,9 +178,9 @@ pub async fn yandex_poll_token(
     let token = parsed.access_token.ok_or("no access_token in response")?;
 
     let db = app.state::<Db>();
-    set_setting(&db, YA_TOKEN_SETTING, &token);
+    db.set_setting(YA_TOKEN_SETTING, &token);
     if let Some(refresh) = &parsed.refresh_token {
-        set_setting(&db, YA_REFRESH_TOKEN_SETTING, refresh);
+        db.set_setting(YA_REFRESH_TOKEN_SETTING, refresh);
     }
 
     eprintln!("[GOAMP] Yandex OAuth token obtained via device code flow");
@@ -208,7 +192,9 @@ pub async fn yandex_poll_token(
 #[tauri::command]
 pub async fn yandex_refresh_token(app: tauri::AppHandle) -> Result<(), String> {
     let db = app.state::<Db>();
-    let refresh = get_setting(&db, YA_REFRESH_TOKEN_SETTING).ok_or("no refresh token")?;
+    let refresh = db
+        .get_setting(YA_REFRESH_TOKEN_SETTING)
+        .ok_or("no refresh token")?;
 
     let client = Client::new();
     let resp = client
@@ -228,9 +214,9 @@ pub async fn yandex_refresh_token(app: tauri::AppHandle) -> Result<(), String> {
         serde_json::from_str(&body).map_err(|e| format!("parse error: {e}"))?;
 
     let token = parsed.access_token.ok_or("no access_token")?;
-    set_setting(&db, YA_TOKEN_SETTING, &token);
+    db.set_setting(YA_TOKEN_SETTING, &token);
     if let Some(new_refresh) = &parsed.refresh_token {
-        set_setting(&db, YA_REFRESH_TOKEN_SETTING, new_refresh);
+        db.set_setting(YA_REFRESH_TOKEN_SETTING, new_refresh);
     }
 
     eprintln!("[GOAMP] Yandex token refreshed");
@@ -240,7 +226,7 @@ pub async fn yandex_refresh_token(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn yandex_save_token(app: tauri::AppHandle, token: String) -> Result<(), String> {
     let db = app.state::<Db>();
-    set_setting(&db, YA_TOKEN_SETTING, &token);
+    db.set_setting(YA_TOKEN_SETTING, &token);
     Ok(())
 }
 
@@ -249,7 +235,7 @@ pub fn yandex_save_token(app: tauri::AppHandle, token: String) -> Result<(), Str
 #[tauri::command]
 pub async fn yandex_get_status(app: tauri::AppHandle) -> Result<Option<YandexAccount>, String> {
     let db = app.state::<Db>();
-    let token = match get_setting(&db, YA_TOKEN_SETTING) {
+    let token = match db.get_setting(YA_TOKEN_SETTING) {
         Some(t) if !t.is_empty() => t,
         _ => return Ok(None),
     };
@@ -262,7 +248,7 @@ pub async fn yandex_get_status(app: tauri::AppHandle) -> Result<Option<YandexAcc
 
     let account = status.account;
     let uid = account.uid.map(|u| u.to_string()).unwrap_or_default();
-    set_setting(&db, YA_UID_SETTING, &uid);
+    db.set_setting(YA_UID_SETTING, &uid);
 
     Ok(Some(YandexAccount {
         uid,
@@ -289,7 +275,9 @@ pub async fn yandex_search(
     page: Option<u32>,
 ) -> Result<Vec<YandexTrack>, String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
 
     let client = make_client(&token);
     let options =
@@ -315,7 +303,9 @@ pub async fn yandex_get_track_url(
     track_id: String,
 ) -> Result<String, String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
 
     let client = make_client(&token);
     let options = yandex_music::api::track::get_file_info::GetFileInfoOptions::new(&track_id);
@@ -334,7 +324,9 @@ pub async fn yandex_get_track_url(
 #[tauri::command]
 pub async fn yandex_list_stations(app: tauri::AppHandle) -> Result<Vec<YandexStation>, String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
 
     let client = make_client(&token);
     let options =
@@ -368,7 +360,9 @@ pub async fn yandex_station_tracks(
     last_track_id: Option<String>,
 ) -> Result<Vec<YandexTrack>, String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
 
     let client = make_client(&token);
 
@@ -398,8 +392,12 @@ pub async fn yandex_station_tracks(
 #[tauri::command]
 pub async fn yandex_list_playlists(app: tauri::AppHandle) -> Result<Vec<YandexPlaylist>, String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
-    let uid = get_setting(&db, YA_UID_SETTING).ok_or("uid not found, re-authenticate")?;
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
+    let uid = db
+        .get_setting(YA_UID_SETTING)
+        .ok_or("uid not found, re-authenticate")?;
 
     let client = make_client(&token);
     let uid_num: u64 = uid.parse().unwrap_or(0);
@@ -439,7 +437,9 @@ pub async fn yandex_get_playlist_tracks(
     kind: u32,
 ) -> Result<Vec<YandexTrack>, String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
 
     let client = make_client(&token);
     let owner_num: u64 = owner.parse().unwrap_or(0);
@@ -550,7 +550,9 @@ pub async fn yandex_download_to_library(
     artist: String,
 ) -> Result<String, String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
 
     let dest = yandex_library_dir(&app).join(format!(
         "{} - {}_{}.mp3",
@@ -603,7 +605,9 @@ pub async fn yandex_download_track(
     artist: String,
 ) -> Result<String, String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
 
     let cache_dir = yandex_cache_dir(&app);
     let dest = cache_dir.join(format!(
@@ -735,8 +739,10 @@ pub async fn yandex_download_playlist(
 #[tauri::command]
 pub async fn yandex_get_liked_tracks(app: tauri::AppHandle) -> Result<Vec<YandexTrack>, String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
-    let uid = get_setting(&db, YA_UID_SETTING).ok_or("uid not found")?;
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
+    let uid = db.get_setting(YA_UID_SETTING).ok_or("uid not found")?;
     let uid_num: u64 = uid.parse().unwrap_or(0);
 
     let client = make_client(&token);
@@ -777,7 +783,9 @@ pub async fn yandex_get_track_urls(
     track_ids: Vec<String>,
 ) -> Result<Vec<String>, String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
 
     let client = make_client(&token);
     let mut urls = Vec::with_capacity(track_ids.len());
@@ -838,7 +846,7 @@ pub async fn yandex_open_oauth_window(app: tauri::AppHandle) -> Result<(), Strin
                     let app2 = app_clone.clone();
                     tauri::async_runtime::spawn(async move {
                         let db = app2.state::<Db>();
-                        set_setting(&db, YA_TOKEN_SETTING, &token);
+                        db.set_setting(YA_TOKEN_SETTING, &token);
                         let _ = app2.emit("yandex-auth-success", ());
                         if let Some(win) = app2.get_webview_window("yandex-oauth") {
                             let _ = win.close();
@@ -864,8 +872,10 @@ pub async fn yandex_like_track(
     like: bool,
 ) -> Result<(), String> {
     let db = app.state::<Db>();
-    let token = get_setting(&db, YA_TOKEN_SETTING).ok_or("not authenticated")?;
-    let uid = get_setting(&db, YA_UID_SETTING).ok_or("uid not found")?;
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
+    let uid = db.get_setting(YA_UID_SETTING).ok_or("uid not found")?;
     let uid_num: u64 = uid.parse().unwrap_or(0);
 
     let client = make_client(&token);

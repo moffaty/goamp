@@ -76,6 +76,8 @@ pub fn run() {
             yandex::yandex_get_track_urls,
             yandex::yandex_open_oauth_window,
             yandex::yandex_like_track,
+            yandex::yandex_download_to_library,
+            commands::playlists::update_track_source,
             feature_flags::feature_flags_list,
             feature_flags::feature_flags_set,
             feature_flags::feature_flag_get,

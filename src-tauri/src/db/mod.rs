@@ -5,6 +5,24 @@ use tauri::Manager;
 
 pub struct Db(pub Mutex<Connection>);
 
+impl Db {
+    pub fn get_setting(&self, key: &str) -> Option<String> {
+        let conn = self.0.lock().unwrap();
+        conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
+            row.get(0)
+        })
+        .ok()
+    }
+
+    pub fn set_setting(&self, key: &str, value: &str) {
+        let conn = self.0.lock().unwrap();
+        let _ = conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+            [key, value],
+        );
+    }
+}
+
 pub fn init(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let db_path = db_path(app);
     let conn = Connection::open(&db_path)?;

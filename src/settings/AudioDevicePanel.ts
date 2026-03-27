@@ -1,4 +1,5 @@
 import type Webamp from "webamp";
+import { getSkinColors, escapeHtml } from "../lib/ui-utils";
 
 let panel: HTMLElement | null = null;
 let webampRef: Webamp | null = null;
@@ -15,64 +16,9 @@ export function toggleAudioDevicePanel() {
   }
 }
 
-function getSkinColors() {
-  const defaults = {
-    bg: "#1d2439",
-    fg: "#2a3555",
-    text: "#00ff00",
-    accent: "#ffcc00",
-    textBg: "#0a0e1a",
-  };
-  if (!webampRef) return defaults;
-  try {
-    const state = (webampRef as any).store?.getState();
-    const colors: string[] = state?.display?.skinColors || [];
-    if (colors.length >= 5) {
-      const bg = colors[3] || defaults.bg;
-      const rawText = colors[0] || defaults.text;
-      const rawAccent = colors[18] || colors[2] || defaults.accent;
-      return {
-        bg,
-        fg: colors[4] || defaults.fg,
-        text: ensureContrast(rawText, bg),
-        accent: ensureContrast(rawAccent, bg),
-        textBg: colors[1] || defaults.textBg,
-      };
-    }
-  } catch {}
-  return defaults;
-}
-
-function luminance(hex: string): number {
-  const h = hex.replace("#", "");
-  const rgb = [
-    parseInt(h.slice(0, 2), 16) || 0,
-    parseInt(h.slice(2, 4), 16) || 0,
-    parseInt(h.slice(4, 6), 16) || 0,
-  ].map((c) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
-}
-
-function ensureContrast(text: string, bg: string): string {
-  const lT = luminance(text);
-  const lB = luminance(bg);
-  const ratio = (Math.max(lT, lB) + 0.05) / (Math.min(lT, lB) + 0.05);
-  if (ratio >= 4.5) return text;
-  return lB > 0.4 ? "#000000" : "#ffffff";
-}
-
-function escapeHtml(s: string): string {
-  const div = document.createElement("div");
-  div.textContent = s;
-  return div.innerHTML;
-}
-
 async function openPanel() {
   if (panel) return;
-  const c = getSkinColors();
+  const c = getSkinColors(webampRef);
 
   panel = document.createElement("div");
   panel.id = "audio-device-overlay";

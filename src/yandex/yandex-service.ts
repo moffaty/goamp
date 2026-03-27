@@ -138,8 +138,10 @@ export async function yandexLikeTrack(trackId: string, like: boolean): Promise<v
   return invoke("yandex_like_track", { trackId, like });
 }
 
-export function formatDuration(secs: number): string {
-  const m = Math.floor(secs / 60);
-  const s = Math.floor(secs % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
+export async function yandexDownloadToLibrary(
+  trackId: string,
+  title: string,
+  artist: string,
+): Promise<string> {
+  return invoke("yandex_download_to_library", { trackId, title, artist });
 }

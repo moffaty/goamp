@@ -4,6 +4,7 @@ import {
   refreshFlagCache,
   type FeatureFlag,
 } from "./feature-flags-service";
+import { escapeHtml } from "../lib/ui-utils";
 
 let panel: HTMLDivElement | null = null;
 let visible = false;
@@ -85,9 +86,3 @@ function renderFlags(el: HTMLDivElement, flags: FeatureFlag[]) {
   });
 }
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}

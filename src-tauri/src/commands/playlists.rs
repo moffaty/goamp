@@ -299,3 +299,21 @@ pub fn rename_track(
 
     Ok(())
 }
+
+/// Update source/source_id of a playlist track — used when converting a
+/// Yandex-streamed track to a locally downloaded file.
+#[tauri::command]
+pub fn update_track_source(
+    db: State<'_, Db>,
+    track_id: String,
+    source: String,
+    source_id: String,
+) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE playlist_tracks SET source = ?1, source_id = ?2 WHERE id = ?3",
+        params![source, source_id, track_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}

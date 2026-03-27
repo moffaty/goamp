@@ -25,6 +25,7 @@ import {
   listPlaylists,
   createPlaylist,
 } from "../lib/tauri-ipc";
+import { escapeHtml } from "../lib/ui-utils";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type Webamp from "webamp";
@@ -893,10 +894,3 @@ async function playYandexPlaylist(pl: YandexPlaylist) {
   }
 }
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
