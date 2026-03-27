@@ -742,7 +742,10 @@ pub async fn yandex_open_oauth_window(app: tauri::AppHandle) -> Result<(), Strin
         "https://oauth.yandex.ru/authorize?response_type=token&client_id={}",
         YA_OAUTH_CLIENT_ID
     );
-    let parsed_url = tauri::WebviewUrl::External(url.parse().map_err(|e| e.to_string())?);
+    let inner_url: reqwest::Url = url
+        .parse()
+        .map_err(|e: <reqwest::Url as std::str::FromStr>::Err| e.to_string())?;
+    let parsed_url = tauri::WebviewUrl::External(inner_url);
 
     let app_clone = app.clone();
     WebviewWindowBuilder::new(&app, "yandex-oauth", parsed_url)
