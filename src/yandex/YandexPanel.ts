@@ -41,6 +41,52 @@ let currentView: "auth" | "main" | "stations" | "playlist" | "liked" = "auth";
 let likedTracks: YandexTrack[] = [];
 
 
+/** Get current Yandex track ID from Webamp state, or null if not a Yandex track */
+export function getCurrentYandexTrackId(): { trackId: string; title: string; artist: string; duration: number } | null {
+  const store = (webampInstance as any)?.store;
+  if (!store) return null;
+  const state = store.getState();
+  const tracks = state?.playlist?.tracks || {};
+  const currentId = state?.playlist?.currentTrack;
+  const current = currentId ? tracks[currentId] : null;
+  if (!current) return null;
+
+  const url: string = current.url || "";
+  const yaMatch = url.match(/#ya:(\d+)$/);
+  if (!yaMatch) return null;
+
+  return {
+    trackId: yaMatch[1],
+    title: current.title || current.defaultName || "Unknown",
+    artist: current.artist || "",
+    duration: current.duration || 0,
+  };
+}
+
+/** Like/unlike current Yandex track from anywhere */
+export async function likeCurrentYandexTrack(): Promise<boolean> {
+  const info = getCurrentYandexTrackId();
+  if (!info) return false;
+  await yandexLikeTrack(info.trackId, true);
+  return true;
+}
+
+/** Add current Yandex track to GOAMP playlist from anywhere */
+export async function addCurrentTrackToPlaylist(): Promise<boolean> {
+  const info = getCurrentYandexTrackId();
+  if (!info) return false;
+  await addYandexTrackToGoampPlaylist({
+    id: info.trackId,
+    title: info.title,
+    artist: info.artist,
+    duration: info.duration,
+    album: "",
+    cover: "",
+    available: true,
+  });
+  return true;
+}
+
 export function initYandexPanel(webamp: Webamp) {
   webampInstance = webamp;
 
@@ -765,8 +811,10 @@ async function playStation(stationId: string, name: string) {
     webampInstance.setTracksToPlay(webampTracks);
     setupAutoLoad();
     console.log(`[GOAMP] Playing station "${name}": ${tracks.length} tracks (auto-reload on)`);
-    // Pre-load next batch immediately so there are enough tracks in queue
-    loadMoreStationTracks();
+    // Pre-load several batches so we have ~20+ tracks from the start
+    for (let i = 0; i < 3; i++) {
+      await loadMoreStationTracks();
+    }
 
     if (visible) toggleYandexPanel();
   } catch (e) {

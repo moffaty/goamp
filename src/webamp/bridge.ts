@@ -11,7 +11,7 @@ import { initSearchOverlay, toggleSearchOverlay } from "../youtube/SearchOverlay
 import { initPlaylistPanel, togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { initAudioDevicePanel, toggleAudioDevicePanel, restoreAudioDevice } from "../settings/AudioDevicePanel";
 import { initScrobbleSettings, toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
-import { initYandexPanel, toggleYandexPanel } from "../yandex/YandexPanel";
+import { initYandexPanel, toggleYandexPanel, likeCurrentYandexTrack, addCurrentTrackToPlaylist } from "../yandex/YandexPanel";
 import { initGoampMenu } from "./goamp-menu";
 import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
 import { initVisualizerPanel, toggleVisualizerPanel } from "./VisualizerPanel";
@@ -295,6 +295,16 @@ function setupKeyboard(webamp: Webamp) {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyM") {
       e.preventDefault();
       toggleYandexPanel();
+    }
+    // Ctrl+H — Like current Yandex track (Heart)
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyH") {
+      e.preventDefault();
+      likeCurrentYandexTrack().catch(() => {});
+    }
+    // Ctrl+Shift+A — Add current track to GOAMP playlist
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyA") {
+      e.preventDefault();
+      addCurrentTrackToPlaylist().catch(() => {});
     }
     // V — Visualizer presets panel (only when not typing)
     if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === "KeyV" && !isTyping) {
