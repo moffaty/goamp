@@ -3,7 +3,7 @@ import { togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { toggleAudioDevicePanel } from "../settings/AudioDevicePanel";
 import { toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
 import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
-import { toggleYandexPanel, getCurrentYandexTrackId, likeCurrentYandexTrack, addCurrentTrackToPlaylist } from "../yandex/YandexPanel";
+import { toggleYandexPanel, getCurrentYandexTrackId, likeCurrentYandexTrack, addCurrentTrackToPlaylist, downloadCurrentYandexTrack } from "../yandex/YandexPanel";
 import { toggleVisualizerPanel } from "./VisualizerPanel";
 import { openFolder, openFiles, loadSkin } from "./bridge";
 import type Webamp from "webamp";
@@ -65,6 +65,11 @@ function showGoampMenu(x: number, y: number) {
         label: "+ Add to Playlist",
         shortcut: "Ctrl+Shift+A",
         action: () => addCurrentTrackToPlaylist().catch((e) => console.error("[GOAMP] Add failed:", e)),
+      },
+      {
+        label: "↓ Download Locally",
+        shortcut: "Ctrl+Shift+D",
+        action: () => downloadCurrentYandexTrack().catch((e) => console.error("[GOAMP] Download failed:", e)),
         separator: true,
       },
     ] : []),

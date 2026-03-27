@@ -87,6 +87,35 @@ export async function addCurrentTrackToPlaylist(): Promise<boolean> {
   return true;
 }
 
+/** Download current Yandex track to local library + add to GOAMP playlist */
+export async function downloadCurrentYandexTrack(): Promise<boolean> {
+  const info = getCurrentYandexTrackId();
+  if (!info) return false;
+  const filePath = await yandexDownloadToLibrary(info.trackId, info.title, info.artist);
+  // Add to GOAMP playlist with local source
+  const all = await listPlaylists();
+  let playlistId: string;
+  const stored = localStorage.getItem("goamp_last_playlist_id");
+  const found = stored ? all.find((p) => p.id === stored) : null;
+  if (found) {
+    playlistId = found.id;
+  } else {
+    const existing = all.find((p) => p.name === "Yandex Liked");
+    playlistId = existing ? existing.id : (await createPlaylist("Yandex Liked")).id;
+    localStorage.setItem("goamp_last_playlist_id", playlistId);
+  }
+  await addTrackToPlaylist(playlistId, {
+    title: info.title,
+    artist: info.artist,
+    duration: info.duration,
+    source: "local",
+    source_id: filePath,
+    original_title: info.title,
+    original_artist: info.artist,
+  });
+  return true;
+}
+
 export function initYandexPanel(webamp: Webamp) {
   webampInstance = webamp;
 
@@ -688,6 +717,7 @@ let stationLoadingMore = false;
 let playlistPendingTracks: { id: string; artist: string; title: string; duration: number }[] = [];
 let playlistLoadingMore = false;
 let trackChangeUnsub: (() => void) | null = null;
+let autoLoadPollTimer: ReturnType<typeof setInterval> | null = null;
 
 async function resolveTrackUrls(
   tracks: { id: string; artist: string; title: string; duration: number }[],
@@ -710,30 +740,46 @@ function cleanupAutoLoad() {
     trackChangeUnsub();
     trackChangeUnsub = null;
   }
+  if (autoLoadPollTimer) {
+    clearInterval(autoLoadPollTimer);
+    autoLoadPollTimer = null;
+  }
   activeStationId = null;
   playlistPendingTracks = [];
+}
+
+function checkAndLoadMore() {
+  const store = (webampInstance as any)?.store;
+  if (!store) return;
+  const state = store.getState();
+  const order: string[] = state?.playlist?.trackOrder || [];
+  const currentIndex = order.indexOf(state?.playlist?.currentTrack);
+  const remaining = order.length - currentIndex - 1;
+
+  // Load more when 5 or fewer tracks remain after current position
+  if (remaining <= 5) {
+    if (activeStationId && !stationLoadingMore) {
+      loadMoreStationTracks();
+    } else if (playlistPendingTracks.length > 0 && !playlistLoadingMore) {
+      loadMorePlaylistTracks();
+    }
+  }
 }
 
 function setupAutoLoad() {
   if (trackChangeUnsub || !webampInstance) return;
 
+  // Trigger on track change (natural progression)
   trackChangeUnsub = webampInstance.onTrackDidChange(() => {
-    const store = (webampInstance as any)?.store;
-    if (!store) return;
-    const state = store.getState();
-    const order: string[] = state?.playlist?.trackOrder || [];
-    const currentIndex = order.indexOf(state?.playlist?.currentTrack);
-    const remaining = order.length - currentIndex - 1;
-
-    // Load more when 3 or fewer tracks remain
-    if (remaining <= 3) {
-      if (activeStationId && !stationLoadingMore) {
-        loadMoreStationTracks();
-      } else if (playlistPendingTracks.length > 0 && !playlistLoadingMore) {
-        loadMorePlaylistTracks();
-      }
-    }
+    checkAndLoadMore();
   });
+
+  // Also poll every 3s — catches user clicking/jumping to tracks near the end
+  if (!autoLoadPollTimer) {
+    autoLoadPollTimer = setInterval(() => {
+      checkAndLoadMore();
+    }, 3000);
+  }
 }
 
 async function loadMoreStationTracks() {

@@ -11,7 +11,7 @@ import { initSearchOverlay, toggleSearchOverlay } from "../youtube/SearchOverlay
 import { initPlaylistPanel, togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { initAudioDevicePanel, toggleAudioDevicePanel, restoreAudioDevice } from "../settings/AudioDevicePanel";
 import { initScrobbleSettings, toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
-import { initYandexPanel, toggleYandexPanel, likeCurrentYandexTrack, addCurrentTrackToPlaylist } from "../yandex/YandexPanel";
+import { initYandexPanel, toggleYandexPanel, likeCurrentYandexTrack, addCurrentTrackToPlaylist, downloadCurrentYandexTrack } from "../yandex/YandexPanel";
 import { initGoampMenu } from "./goamp-menu";
 import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
 import { initVisualizerPanel, toggleVisualizerPanel } from "./VisualizerPanel";
@@ -305,6 +305,11 @@ function setupKeyboard(webamp: Webamp) {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyA") {
       e.preventDefault();
       addCurrentTrackToPlaylist().catch(() => {});
+    }
+    // Ctrl+Shift+D — Download current Yandex track locally
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyD") {
+      e.preventDefault();
+      downloadCurrentYandexTrack().catch(() => {});
     }
     // V — Visualizer presets panel (only when not typing)
     if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === "KeyV" && !isTyping) {
