@@ -427,10 +427,9 @@ async function trackToWebamp(t: PlaylistTrack) {
     } catch {
       url = "";
     }
-  } else if (t.source === "youtube") {
-    url = convertFileSrc(t.source_id);
   } else {
-    url = convertFileSrc(t.source_id);
+    // source_id is saved as Tauri asset URL — use directly, don't double-wrap
+    url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
   }
   return {
     metaData: { artist: t.artist, title: t.title },

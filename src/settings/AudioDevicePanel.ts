@@ -122,6 +122,15 @@ async function renderDevices(c: ReturnType<typeof getSkinColors>) {
   if (!container) return;
 
   try {
+    // Must request audio permission first — without it, enumerateDevices()
+    // returns only "default" with empty labels and obfuscated IDs
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      // Permission denied or no mic — still try to enumerate (may get limited list)
+    }
+
     const devices = await navigator.mediaDevices.enumerateDevices();
     const outputs = devices.filter((d) => d.kind === "audiooutput");
     const currentId = localStorage.getItem("goamp_audio_device_id") || "default";

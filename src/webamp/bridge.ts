@@ -118,10 +118,9 @@ async function setupSessionRestore(webamp: Webamp) {
               } catch {
                 url = "";
               }
-            } else if (t.source === "youtube") {
-              url = convertFileSrc(t.source_id);
             } else {
-              url = convertFileSrc(t.source_id);
+              // source_id is saved as Tauri asset URL — use directly, don't double-wrap
+              url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
             }
             return {
               metaData: {
@@ -156,10 +155,9 @@ async function setupSessionRestore(webamp: Webamp) {
           } catch {
             url = ""; // Skip failed — will be silent
           }
-        } else if (t.source === "youtube") {
-          url = convertFileSrc(t.source_id);
         } else {
-          url = t.source_id;
+          // source_id is saved as Tauri asset URL — use directly, don't double-wrap
+          url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
         }
         return {
           metaData: {
@@ -314,8 +312,8 @@ function setupKeyboard(webamp: Webamp) {
       e.preventDefault();
       toggleYandexPanel();
     }
-    // Ctrl+V — Visualizer presets panel
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyV") {
+    // Ctrl+Shift+V — Visualizer presets panel
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyV") {
       e.preventDefault();
       toggleVisualizerPanel();
     }
