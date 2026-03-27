@@ -62,7 +62,7 @@ function showGoampMenu(x: number, y: number) {
     { label: "Search", shortcut: "Ctrl+Y", action: () => toggleSearchOverlay() },
     { label: "Yandex Music", shortcut: "Ctrl+M", action: () => toggleYandexPanel() },
     { label: "Playlists", shortcut: "Ctrl+P", action: () => togglePlaylistPanel() },
-    { label: "Visualizer Presets", shortcut: "Ctrl+Shift+V", action: () => toggleVisualizerPanel() },
+    { label: "Visualizer Presets", shortcut: "V", action: () => toggleVisualizerPanel() },
     {
       label: "Open Folder",
       shortcut: "Ctrl+O",

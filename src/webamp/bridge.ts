@@ -312,9 +312,8 @@ function setupKeyboard(webamp: Webamp) {
       e.preventDefault();
       toggleYandexPanel();
     }
-    // Ctrl+Shift+V — Visualizer presets panel
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyV") {
-      e.preventDefault();
+    // V — Visualizer presets panel (only when not typing)
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === "KeyV" && !isTyping) {
       toggleVisualizerPanel();
     }
     // Ctrl+Shift+` — Feature Flags (hidden dev panel)
