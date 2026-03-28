@@ -5,6 +5,7 @@ import { toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
 import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
 import { toggleYandexPanel, getCurrentYandexTrackId, likeCurrentYandexTrack, addCurrentTrackToPlaylist, downloadCurrentYandexTrack } from "../yandex/YandexPanel";
 import { toggleVisualizerPanel } from "./VisualizerPanel";
+import { toggleGenrePanel, toggleYouTubeSettings } from "../settings/GenrePanel";
 import { openFolder, openFiles, loadSkin } from "./bridge";
 import type Webamp from "webamp";
 
@@ -75,6 +76,7 @@ function showGoampMenu(x: number, y: number) {
     ] : []),
     { label: "Search", shortcut: "Ctrl+Y", action: () => toggleSearchOverlay() },
     { label: "Yandex Music", shortcut: "Ctrl+M", action: () => toggleYandexPanel() },
+    { label: "Genres", shortcut: "Ctrl+G", action: () => toggleGenrePanel() },
     { label: "Playlists", shortcut: "Ctrl+P", action: () => togglePlaylistPanel() },
     { label: "Visualizer Presets", shortcut: "V", action: () => toggleVisualizerPanel() },
     {
@@ -99,6 +101,11 @@ function showGoampMenu(x: number, y: number) {
       label: "Scrobbling",
       shortcut: "Ctrl+Shift+L",
       action: () => toggleScrobbleSettings(),
+    },
+    {
+      label: "YouTube Settings",
+      shortcut: "Ctrl+Shift+Y",
+      action: () => toggleYouTubeSettings(),
       separator: true,
     },
     { label: "Feature Flags", shortcut: "Ctrl+Shift+`", action: () => toggleFeatureFlagsPanel() },

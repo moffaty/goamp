@@ -5,6 +5,7 @@ export interface TrackMeta {
   title: string | null;
   artist: string | null;
   album: string | null;
+  genre: string | null;
   duration: number;
 }
 
@@ -37,6 +38,7 @@ export interface PlaylistTrack {
   original_title: string;
   original_artist: string;
   cover: string;
+  genre: string;
 }
 
 export interface TrackInput {
@@ -49,6 +51,7 @@ export interface TrackInput {
   original_title?: string;
   original_artist?: string;
   cover?: string;
+  genre?: string;
 }
 
 export async function createPlaylist(name: string): Promise<Playlist> {
@@ -104,4 +107,31 @@ export async function updateTrackSource(
   sourceId: string,
 ): Promise<void> {
   return invoke("update_track_source", { trackId, source, sourceId });
+}
+
+// Genre
+export async function listGenres(): Promise<string[]> {
+  return invoke("list_genres");
+}
+
+export async function getTracksByGenre(genre: string): Promise<PlaylistTrack[]> {
+  return invoke("get_tracks_by_genre", { genre });
+}
+
+// YouTube auth
+export async function youtubeSetCookies(path: string): Promise<void> {
+  return invoke("youtube_set_cookies", { path });
+}
+
+export async function youtubeGetCookies(): Promise<string | null> {
+  return invoke("youtube_get_cookies");
+}
+
+export async function youtubeClearCookies(): Promise<void> {
+  return invoke("youtube_clear_cookies");
+}
+
+// YouTube playlists
+export async function youtubeGetPlaylist(url: string): Promise<any[]> {
+  return invoke("youtube_get_playlist", { url });
 }

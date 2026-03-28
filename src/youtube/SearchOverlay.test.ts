@@ -89,8 +89,8 @@ describe("SearchOverlay", () => {
     const mod = await freshModule();
     const { searchYoutube } = await import("./youtube-service");
     vi.mocked(searchYoutube).mockResolvedValue([
-      { id: "v1", title: "Song A", channel: "Artist A", duration: 200, thumbnail: "t.jpg", source: "youtube", webpage_url: "" },
-      { id: "v2", title: "Song B", channel: "Artist B", duration: 300, thumbnail: "t2.jpg", source: "youtube", webpage_url: "" },
+      { id: "v1", title: "Song A", channel: "Artist A", duration: 200, thumbnail: "t.jpg", source: "youtube", webpage_url: "", genre: "" },
+      { id: "v2", title: "Song B", channel: "Artist B", duration: 300, thumbnail: "t2.jpg", source: "youtube", webpage_url: "", genre: "Rock" },
     ]);
 
     mod.initSearchOverlay({} as any);

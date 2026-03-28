@@ -89,6 +89,7 @@ export async function addCurrentTrackToPlaylist(): Promise<boolean> {
     album: "",
     cover: "",
     available: true,
+    genre: "",
   });
   return true;
 }
@@ -465,6 +466,7 @@ async function addYandexTrackToGoampPlaylist(t: YandexTrack): Promise<void> {
     source_id: t.id,
     album: t.album,
     cover: t.cover,
+    genre: t.genre,
   });
 }
 

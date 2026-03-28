@@ -10,6 +10,7 @@ export interface YoutubeResult {
   thumbnail: string;
   source: string;
   webpage_url: string;
+  genre: string;
 }
 
 export async function searchYoutube(
