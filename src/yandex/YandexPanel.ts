@@ -555,7 +555,8 @@ function renderStations(el: HTMLDivElement) {
 
   el.querySelectorAll(".ya-station-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const id = (btn as HTMLElement).dataset.id!;
+      const id = (btn as HTMLElement).dataset.id ?? "";
+      if (!id) return;
       const name = (btn as HTMLElement).textContent?.trim() || id;
       playStation(id, name);
     });

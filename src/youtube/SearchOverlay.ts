@@ -423,7 +423,7 @@ function showContextMenu(
       closeCtxMenu();
     }
   };
-  setTimeout(() => document.addEventListener("click", onOutsideClick), 0);
+  requestAnimationFrame(() => document.addEventListener("click", onOutsideClick));
 }
 
 function createMenuItem(
@@ -556,8 +556,8 @@ async function extractForItem(item: YoutubeResult): Promise<string> {
 }
 
 function playNow(item: YoutubeResult) {
-  const row = document.querySelector(".yt-result-row") as HTMLElement;
-  playYoutubeTrack(item, row || document.createElement("div"));
+  const row = document.querySelector(".yt-result-row") ?? document.createElement("div");
+  playYoutubeTrack(item, row as HTMLElement);
 }
 
 async function addToWebampQueue(item: YoutubeResult) {
