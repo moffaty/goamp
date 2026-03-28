@@ -11,7 +11,10 @@
     "build:win": "tauri build --target x86_64-pc-windows-msvc --runner cargo-xwin --no-bundle",
     "postinstall": "lefthook install",
     "lint": "tsc --noEmit",
-    "lint:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings"
+    "lint:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@aptabase/web": "^0.5.0",
@@ -30,9 +33,12 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "@vitest/coverage-v8": "^4.1.2",
+    "jsdom": "^29.0.1",
     "lefthook": "^2.1.4",
     "typescript": "~5.6.2",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vitest": "^4.1.2"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

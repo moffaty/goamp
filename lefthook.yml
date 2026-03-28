@@ -7,12 +7,17 @@ pre-commit:
     rust-fmt:
       glob: "*.rs"
       run: export PATH="$HOME/.cargo/bin:$PATH" && cargo fmt --manifest-path src-tauri/Cargo.toml --check
+    ts-test:
+      glob: "*.{ts,tsx}"
+      run: npx vitest run
 
 pre-push:
   parallel: true
   commands:
     ts-check:
       run: npx tsc --noEmit
+    ts-test:
+      run: npx vitest run
     rust-clippy:
       run: export PATH="$HOME/.cargo/bin:$PATH" && cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
     rust-fmt:
