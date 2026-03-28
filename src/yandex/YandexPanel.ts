@@ -15,6 +15,11 @@ import {
   yandexOpenOAuthWindow,
   yandexLikeTrack,
   yandexDownloadToLibrary,
+  yandexSimilarTracks,
+  yandexGetLyrics,
+  yandexDownloadLyrics,
+  yandexStationFeedback,
+  yandexGetTrackUrlsBatch,
   type YandexStation,
   type YandexPlaylist,
   type YandexTrack,
@@ -92,27 +97,11 @@ export async function addCurrentTrackToPlaylist(): Promise<boolean> {
 export async function downloadCurrentYandexTrack(): Promise<boolean> {
   const info = getCurrentYandexTrackId();
   if (!info) return false;
-  const filePath = await yandexDownloadToLibrary(info.trackId, info.title, info.artist);
-  // Add to GOAMP playlist with local source
-  const all = await listPlaylists();
-  let playlistId: string;
-  const stored = localStorage.getItem("goamp_last_playlist_id");
-  const found = stored ? all.find((p) => p.id === stored) : null;
-  if (found) {
-    playlistId = found.id;
-  } else {
-    const existing = all.find((p) => p.name === "Yandex Liked");
-    playlistId = existing ? existing.id : (await createPlaylist("Yandex Liked")).id;
-    localStorage.setItem("goamp_last_playlist_id", playlistId);
-  }
-  await addTrackToPlaylist(playlistId, {
+  await downloadAndSaveToPlaylist({
+    id: info.trackId,
     title: info.title,
     artist: info.artist,
     duration: info.duration,
-    source: "local",
-    source_id: filePath,
-    original_title: info.title,
-    original_artist: info.artist,
   });
   return true;
 }
@@ -453,19 +442,21 @@ async function loadPlaylists(el: HTMLDivElement) {
   }
 }
 
-async function addYandexTrackToGoampPlaylist(t: YandexTrack): Promise<void> {
-  // Use last selected GOAMP playlist, or create "Yandex Liked" if none
-  let playlistId = localStorage.getItem("goamp_last_playlist_id");
-  if (!playlistId) {
+async function getOrCreateTargetPlaylist(): Promise<string> {
+  const stored = localStorage.getItem("goamp_last_playlist_id");
+  if (stored) {
     const all = await listPlaylists();
-    let target = all.find((p) => p.name === "Yandex Liked");
-    if (!target) {
-      target = await createPlaylist("Yandex Liked");
-    }
-    playlistId = target.id;
-    localStorage.setItem("goamp_last_playlist_id", playlistId);
+    if (all.find((p) => p.id === stored)) return stored;
   }
+  const all = await listPlaylists();
+  const existing = all.find((p) => p.name === "Yandex Liked");
+  const playlistId = existing ? existing.id : (await createPlaylist("Yandex Liked")).id;
+  localStorage.setItem("goamp_last_playlist_id", playlistId);
+  return playlistId;
+}
 
+async function addYandexTrackToGoampPlaylist(t: YandexTrack): Promise<void> {
+  const playlistId = await getOrCreateTargetPlaylist();
   await addTrackToPlaylist(playlistId, {
     title: t.title,
     artist: t.artist,
@@ -475,6 +466,21 @@ async function addYandexTrackToGoampPlaylist(t: YandexTrack): Promise<void> {
     album: t.album,
     cover: t.cover,
   });
+}
+
+async function downloadAndSaveToPlaylist(t: { id: string; title: string; artist: string; duration: number }): Promise<string> {
+  const filePath = await yandexDownloadToLibrary(t.id, t.title, t.artist);
+  const playlistId = await getOrCreateTargetPlaylist();
+  await addTrackToPlaylist(playlistId, {
+    title: t.title,
+    artist: t.artist,
+    duration: t.duration,
+    source: "local",
+    source_id: filePath,
+    original_title: t.title,
+    original_artist: t.artist,
+  });
+  return filePath;
 }
 
 function renderNowPlaying(el: HTMLDivElement) {
@@ -503,6 +509,8 @@ function renderNowPlaying(el: HTMLDivElement) {
       <div style="color:#0f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(title)}</div>
       <div style="color:#666; font-size:10px;">${escapeHtml(artist)}</div>
     </div>
+    <button id="ya-lyrics-now" style="padding:4px 8px; background:#333; border:1px solid #555; color:#aaa; cursor:pointer; font-size:11px; border-radius:3px;" title="Show lyrics">T</button>
+    <button id="ya-similar-now" style="padding:4px 8px; background:#333; border:1px solid #555; color:#88f; cursor:pointer; font-size:11px; border-radius:3px;" title="Play similar tracks">~</button>
     <button id="ya-like-now" data-id="${trackId}" style="padding:4px 8px; background:#333; border:1px solid #555; color:#f55; cursor:pointer; font-size:14px; border-radius:3px;" title="Like this track">♥</button>
   `;
   el.insertBefore(nowPlaying, el.querySelector('[style*="border-top"]') || el.firstChild);
@@ -520,6 +528,42 @@ function renderNowPlaying(el: HTMLDivElement) {
       btn.textContent = "♥";
       btn.style.color = "#f55";
       console.error("[GOAMP] Like failed:", err);
+    }
+  });
+
+  // Lyrics button
+  el.querySelector("#ya-lyrics-now")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    btn.textContent = "...";
+    try {
+      const lyricsInfo = await yandexGetLyrics(trackId, false);
+      const text = await yandexDownloadLyrics(lyricsInfo.download_url);
+      showLyricsPopup(title, artist, text, lyricsInfo.writers);
+      btn.textContent = "T";
+      btn.style.color = "#0f0";
+    } catch {
+      btn.textContent = "T";
+      btn.title = "No lyrics available";
+    }
+  });
+
+  // Similar tracks button
+  el.querySelector("#ya-similar-now")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    btn.textContent = "...";
+    try {
+      const similar = await yandexSimilarTracks(trackId);
+      if (similar.length === 0) {
+        btn.textContent = "~";
+        btn.title = "No similar tracks found";
+        return;
+      }
+      playSimilarTracks(similar);
+      btn.textContent = "~";
+      btn.style.color = "#0f0";
+      if (visible) toggleYandexPanel();
+    } catch {
+      btn.textContent = "~";
     }
   });
 }
@@ -659,28 +703,7 @@ function renderLiked(el: HTMLDivElement) {
       try {
         (btn as HTMLElement).textContent = "…";
         (btn as HTMLElement).style.color = "#aaa";
-        const filePath = await yandexDownloadToLibrary(t.id, t.title, t.artist);
-        // Add to GOAMP playlist with local source so it plays without Yandex
-        const playlists = await listPlaylists();
-        let playlistId: string;
-        const stored = localStorage.getItem("goamp_last_playlist_id");
-        const found = stored ? playlists.find((p) => p.id === stored) : null;
-        if (found) {
-          playlistId = found.id;
-        } else {
-          const existing = playlists.find((p) => p.name === "Yandex Liked");
-          playlistId = existing ? existing.id : (await createPlaylist("Yandex Liked")).id;
-          localStorage.setItem("goamp_last_playlist_id", playlistId);
-        }
-        await addTrackToPlaylist(playlistId, {
-          title: t.title,
-          artist: t.artist,
-          duration: t.duration,
-          source: "local",
-          source_id: filePath,
-          original_title: t.title,
-          original_artist: t.artist,
-        });
+        await downloadAndSaveToPlaylist(t);
         (btn as HTMLElement).textContent = "✓";
         (btn as HTMLElement).style.color = "#0f0";
       } catch (err) {
@@ -724,17 +747,23 @@ let autoLoadPollTimer: ReturnType<typeof setInterval> | null = null;
 async function resolveTrackUrls(
   tracks: { id: string; artist: string; title: string; duration: number }[],
 ) {
-  return Promise.all(
-    tracks.map(async (t) => {
-      const url = await yandexGetTrackUrl(t.id);
-      return {
-        metaData: { artist: t.artist || "Unknown", title: t.title },
-        // Append #ya:{id} fragment so session save can extract the track ID
-        url: `${url}#ya:${t.id}`,
-        duration: t.duration,
-      };
-    }),
-  );
+  if (tracks.length === 0) return [];
+
+  // Use batch API for efficiency (single request instead of N)
+  const ids = tracks.map((t) => t.id);
+  let urls: string[];
+  try {
+    urls = await yandexGetTrackUrlsBatch(ids);
+  } catch {
+    // Fallback to sequential if batch fails
+    urls = await Promise.all(ids.map((id) => yandexGetTrackUrl(id).catch(() => "")));
+  }
+
+  return tracks.map((t, i) => ({
+    metaData: { artist: t.artist || "Unknown", title: t.title },
+    url: `${urls[i]}#ya:${t.id}`,
+    duration: t.duration,
+  }));
 }
 
 function cleanupAutoLoad() {
@@ -774,6 +803,13 @@ function setupAutoLoad() {
   // Trigger on track change (natural progression)
   trackChangeUnsub = webampInstance.onTrackDidChange(() => {
     checkAndLoadMore();
+    // Send station feedback for the new track
+    if (activeStationId) {
+      const info = getCurrentYandexTrackId();
+      if (info) {
+        sendStationFeedback(info.trackId, "trackStarted", 0);
+      }
+    }
   });
 
   // Also poll every 3s — catches user clicking/jumping to tracks near the end
@@ -893,5 +929,60 @@ async function playYandexPlaylist(pl: YandexPlaylist) {
   } catch (e) {
     console.error("[GOAMP] Playlist play failed:", e);
   }
+}
+
+// ─── Lyrics popup ───
+
+function showLyricsPopup(title: string, artist: string, text: string, writers: string[]) {
+  // Remove existing popup if any
+  document.getElementById("ya-lyrics-popup")?.remove();
+
+  const popup = document.createElement("div");
+  popup.id = "ya-lyrics-popup";
+  popup.style.cssText = `
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 400px; max-height: 70vh; background: #1a1a2e; border: 2px solid #444;
+    border-radius: 8px; color: #ccc; font-family: 'MS Sans Serif', 'Tahoma', sans-serif;
+    font-size: 11px; z-index: 10001; display: flex; flex-direction: column;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+  `;
+  popup.innerHTML = `
+    <div style="background:#2a2a4a; padding:6px 10px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444;">
+      <div style="min-width:0; flex:1;">
+        <div style="color:#0f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(title)}</div>
+        <div style="color:#666; font-size:10px;">${escapeHtml(artist)}</div>
+      </div>
+      <button id="ya-lyrics-close" style="background:none; border:none; color:#888; cursor:pointer; font-size:14px; flex-shrink:0;">✕</button>
+    </div>
+    <div style="padding:12px; overflow-y:auto; flex:1; white-space:pre-wrap; line-height:1.6; color:#ddd; font-size:12px;">${escapeHtml(text)}</div>
+    ${writers.length > 0 ? `<div style="padding:6px 12px; border-top:1px solid #333; color:#666; font-size:9px;">Writers: ${escapeHtml(writers.join(", "))}</div>` : ""}
+  `;
+  document.body.appendChild(popup);
+  popup.querySelector("#ya-lyrics-close")!.addEventListener("click", () => popup.remove());
+}
+
+// ─── Similar tracks playback ───
+
+async function playSimilarTracks(tracks: YandexTrack[]) {
+  if (!webampInstance || tracks.length === 0) return;
+  cleanupAutoLoad();
+
+  const firstBatch = tracks.slice(0, BATCH_SIZE);
+  playlistPendingTracks = tracks.slice(BATCH_SIZE);
+
+  const webampTracks = await resolveTrackUrls(firstBatch);
+  webampInstance.setTracksToPlay(webampTracks);
+  if (playlistPendingTracks.length > 0) setupAutoLoad();
+  console.log(`[GOAMP] Playing similar: ${firstBatch.length} loaded, ${playlistPendingTracks.length} queued`);
+}
+
+// ─── Station feedback ───
+
+/** Send station feedback when a track starts/finishes playing */
+export function sendStationFeedback(trackId: string, feedbackType: "trackStarted" | "trackFinished" | "skip", totalPlayedSeconds: number) {
+  if (!activeStationId) return;
+  yandexStationFeedback(activeStationId, trackId, feedbackType, totalPlayedSeconds).catch((e) =>
+    console.error("[GOAMP] Station feedback failed:", e),
+  );
 }
 

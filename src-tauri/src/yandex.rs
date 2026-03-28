@@ -2,6 +2,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::time::Duration;
 use tauri::{Emitter, Manager};
 use yandex_music::model::playlist::PlaylistTracks;
 use yandex_music::YandexMusicClient;
@@ -83,6 +84,43 @@ struct DeviceCodeApiResponse {
 
 fn make_client(token: &str) -> YandexMusicClient {
     YandexMusicClient::builder(token).build().unwrap()
+}
+
+/// Get token, or try to refresh if we have a refresh_token.
+/// Returns the current (possibly refreshed) access token.
+async fn get_or_refresh_token(db: &Db) -> Result<String, String> {
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
+    if token.is_empty() {
+        return Err("not authenticated".into());
+    }
+    Ok(token)
+}
+
+/// Try an API call; on auth failure, attempt token refresh and retry once.
+async fn with_token_refresh<F, Fut, T>(app: &tauri::AppHandle, f: F) -> Result<T, String>
+where
+    F: Fn(YandexMusicClient) -> Fut + Clone,
+    Fut: std::future::Future<Output = Result<T, String>>,
+{
+    let db = app.state::<Db>();
+    let token = get_or_refresh_token(&db).await?;
+    let client = make_client(&token);
+    match f(client).await {
+        Ok(v) => Ok(v),
+        Err(e) if e.contains("401") || e.contains("unauthorized") || e.contains("Unauthorized") => {
+            // Try refresh
+            if let Err(refresh_err) = yandex_refresh_token(app.clone()).await {
+                eprintln!("[GOAMP] Token refresh failed: {refresh_err}");
+                return Err(e);
+            }
+            let new_token = get_or_refresh_token(&db).await?;
+            let new_client = make_client(&new_token);
+            f(new_client).await
+        }
+        Err(e) => Err(e),
+    }
 }
 
 fn track_to_result(t: &yandex_music::model::track::Track) -> YandexTrack {
@@ -274,25 +312,22 @@ pub async fn yandex_search(
     query: String,
     page: Option<u32>,
 ) -> Result<Vec<YandexTrack>, String> {
-    let db = app.state::<Db>();
-    let token = db
-        .get_setting(YA_TOKEN_SETTING)
-        .ok_or("not authenticated")?;
-
-    let client = make_client(&token);
-    let options =
-        yandex_music::api::search::get_search::SearchOptions::new(&query).page(page.unwrap_or(0));
-    let result = client
-        .search(&options)
-        .await
-        .map_err(|e| format!("search failed: {e:?}"))?;
-
-    let tracks = result
-        .tracks
-        .map(|t| t.results.iter().map(track_to_result).collect::<Vec<_>>())
-        .unwrap_or_default();
-
-    Ok(tracks)
+    with_token_refresh(&app, |client| {
+        let query = query.clone();
+        async move {
+            let options = yandex_music::api::search::get_search::SearchOptions::new(&query)
+                .page(page.unwrap_or(0));
+            let result = client
+                .search(&options)
+                .await
+                .map_err(|e| format!("search failed: {e:?}"))?;
+            Ok(result
+                .tracks
+                .map(|t| t.results.iter().map(track_to_result).collect::<Vec<_>>())
+                .unwrap_or_default())
+        }
+    })
+    .await
 }
 
 // --- Commands: Track URL ---
@@ -302,21 +337,23 @@ pub async fn yandex_get_track_url(
     app: tauri::AppHandle,
     track_id: String,
 ) -> Result<String, String> {
-    let db = app.state::<Db>();
-    let token = db
-        .get_setting(YA_TOKEN_SETTING)
-        .ok_or("not authenticated")?;
-
-    let client = make_client(&token);
-    let options = yandex_music::api::track::get_file_info::GetFileInfoOptions::new(&track_id);
-    let info = client
-        .get_file_info(&options)
-        .await
-        .map_err(|e| format!("file info failed: {e:?}"))?;
-
-    let url = info.url;
-    eprintln!("[GOAMP] Yandex track URL: {} (track {})", url, track_id);
-    Ok(url)
+    with_token_refresh(&app, |client| {
+        let track_id = track_id.clone();
+        async move {
+            let options =
+                yandex_music::api::track::get_file_info::GetFileInfoOptions::new(&track_id);
+            let info = client
+                .get_file_info(&options)
+                .await
+                .map_err(|e| format!("file info failed: {e:?}"))?;
+            eprintln!(
+                "[GOAMP] Yandex track URL: {} (track {})",
+                info.url, track_id
+            );
+            Ok(info.url)
+        }
+    })
+    .await
 }
 
 // --- Commands: Radio ---
@@ -359,32 +396,30 @@ pub async fn yandex_station_tracks(
     station_id: String,
     last_track_id: Option<String>,
 ) -> Result<Vec<YandexTrack>, String> {
-    let db = app.state::<Db>();
-    let token = db
-        .get_setting(YA_TOKEN_SETTING)
-        .ok_or("not authenticated")?;
-
-    let client = make_client(&token);
-
-    let mut options =
-        yandex_music::api::rotor::get_station_tracks::GetStationTracksOptions::new(&station_id);
-    if let Some(ref last) = last_track_id {
-        options = options.queue(last);
-    }
-
-    let result = client
-        .get_station_tracks(&options)
-        .await
-        .map_err(|e| format!("station tracks failed: {e:?}"))?;
-
-    let tracks = result
-        .sequence
-        .iter()
-        .map(|s| track_to_result(&s.track))
-        .filter(|t| t.available)
-        .collect();
-
-    Ok(tracks)
+    with_token_refresh(&app, |client| {
+        let station_id = station_id.clone();
+        let last_track_id = last_track_id.clone();
+        async move {
+            let mut options =
+                yandex_music::api::rotor::get_station_tracks::GetStationTracksOptions::new(
+                    &station_id,
+                );
+            if let Some(ref last) = last_track_id {
+                options = options.queue(last);
+            }
+            let result = client
+                .get_station_tracks(&options)
+                .await
+                .map_err(|e| format!("station tracks failed: {e:?}"))?;
+            Ok(result
+                .sequence
+                .iter()
+                .map(|s| track_to_result(&s.track))
+                .filter(|t| t.available)
+                .collect())
+        }
+    })
+    .await
 }
 
 // --- Commands: Playlists ---
@@ -905,4 +940,194 @@ pub async fn yandex_like_track(
     }
 
     Ok(())
+}
+
+// --- Commands: Search suggestions ---
+
+#[derive(Debug, Serialize)]
+pub struct SearchSuggestionResult {
+    pub suggestions: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn yandex_search_suggest(
+    app: tauri::AppHandle,
+    part: String,
+) -> Result<SearchSuggestionResult, String> {
+    with_token_refresh(&app, |client| {
+        let part = part.clone();
+        async move {
+            let options =
+                yandex_music::api::search::get_search_suggestion::GetSearchSuggestionOptions::new(
+                    &part,
+                );
+            let result = client
+                .get_search_suggestion(&options)
+                .await
+                .map_err(|e| format!("search suggest failed: {e:?}"))?;
+            Ok(SearchSuggestionResult {
+                suggestions: result.suggestions,
+            })
+        }
+    })
+    .await
+}
+
+// --- Commands: Similar tracks ---
+
+#[tauri::command]
+pub async fn yandex_similar_tracks(
+    app: tauri::AppHandle,
+    track_id: String,
+) -> Result<Vec<YandexTrack>, String> {
+    with_token_refresh(&app, |client| {
+        let track_id = track_id.clone();
+        async move {
+            let options =
+                yandex_music::api::track::get_similar_tracks::GetSimilarTracksOptions::new(
+                    &track_id,
+                );
+            let result = client
+                .get_similar_tracks(&options)
+                .await
+                .map_err(|e| format!("similar tracks failed: {e:?}"))?;
+            Ok(result
+                .similar_tracks
+                .iter()
+                .map(track_to_result)
+                .filter(|t| t.available)
+                .collect())
+        }
+    })
+    .await
+}
+
+// --- Commands: Lyrics ---
+
+#[derive(Debug, Serialize)]
+pub struct LyricsResult {
+    pub download_url: String,
+    pub writers: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn yandex_get_lyrics(
+    app: tauri::AppHandle,
+    track_id: String,
+    synced: bool,
+) -> Result<LyricsResult, String> {
+    let db = app.state::<Db>();
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
+
+    let client = make_client(&token);
+    let format = if synced {
+        yandex_music::model::info::lyrics::LyricsFormat::LRC
+    } else {
+        yandex_music::model::info::lyrics::LyricsFormat::TEXT
+    };
+    let options = yandex_music::api::track::get_lyrics::GetLyricsOptions::new(&track_id, format);
+    let result = client
+        .get_lyrics(&options)
+        .await
+        .map_err(|e| format!("lyrics failed: {e:?}"))?;
+
+    Ok(LyricsResult {
+        download_url: result.download_url,
+        writers: result.writers,
+    })
+}
+
+/// Download lyrics text from the URL returned by get_lyrics
+#[tauri::command]
+pub async fn yandex_download_lyrics(url: String) -> Result<String, String> {
+    let http = Client::new();
+    let resp = http
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("lyrics download failed: {e}"))?;
+    resp.text()
+        .await
+        .map_err(|e| format!("lyrics read failed: {e}"))
+}
+
+// --- Commands: Station feedback ---
+
+#[tauri::command]
+pub async fn yandex_station_feedback(
+    app: tauri::AppHandle,
+    station_id: String,
+    track_id: String,
+    feedback_type: String,
+    total_played_seconds: f64,
+    batch_id: Option<String>,
+) -> Result<(), String> {
+    let db = app.state::<Db>();
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
+
+    let client = make_client(&token);
+    let feedback = yandex_music::model::rotor::feedback::StationFeedback {
+        item_type: feedback_type,
+        timestamp: chrono::Utc::now(),
+        from: format!("desktop-goamp-{}", station_id),
+        track_id,
+        total_played: Duration::from_secs_f64(total_played_seconds),
+    };
+
+    let mut options =
+        yandex_music::api::rotor::send_station_feedback::GetStationFeedbackOptions::new(
+            &station_id,
+            feedback,
+        );
+    if let Some(bid) = batch_id {
+        options = options.batch_id(bid);
+    }
+
+    client
+        .send_station_feedback(&options)
+        .await
+        .map_err(|e| format!("station feedback failed: {e:?}"))?;
+
+    Ok(())
+}
+
+// --- Commands: Batch file info ---
+
+#[tauri::command]
+pub async fn yandex_get_track_urls_batch(
+    app: tauri::AppHandle,
+    track_ids: Vec<String>,
+) -> Result<Vec<String>, String> {
+    let db = app.state::<Db>();
+    let token = db
+        .get_setting(YA_TOKEN_SETTING)
+        .ok_or("not authenticated")?;
+
+    let client = make_client(&token);
+    let options = yandex_music::api::track::get_file_info_batch::GetFileInfoBatchOptions::new(
+        track_ids.clone(),
+    );
+    let infos = client
+        .get_file_info_batch(&options)
+        .await
+        .map_err(|e| format!("batch file info failed: {e:?}"))?;
+
+    // Map results back by track_id order
+    let mut url_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for info in &infos {
+        url_map
+            .entry(info.track_id.clone())
+            .or_insert_with(|| info.url.clone());
+    }
+
+    let urls = track_ids
+        .iter()
+        .map(|id| url_map.get(id).cloned().unwrap_or_default())
+        .collect();
+
+    Ok(urls)
 }

@@ -21,6 +21,12 @@ import {
   yandexRefreshToken,
   yandexOpenOAuthWindow,
   yandexDownloadPlaylist,
+  yandexSearchSuggest,
+  yandexSimilarTracks,
+  yandexGetLyrics,
+  yandexDownloadLyrics,
+  yandexStationFeedback,
+  yandexGetTrackUrlsBatch,
 } from "./yandex-service";
 
 const mockInvoke = vi.mocked(invoke);
@@ -176,5 +182,62 @@ describe("yandex downloads", () => {
     mockInvoke.mockResolvedValue("/library/track.mp3");
     await yandexDownloadToLibrary("123", "Song", "Artist");
     expect(mockInvoke).toHaveBeenCalledWith("yandex_download_to_library", { trackId: "123", title: "Song", artist: "Artist" });
+  });
+});
+
+describe("yandex search suggestions", () => {
+  it("yandexSearchSuggest passes part string", async () => {
+    mockInvoke.mockResolvedValue({ suggestions: ["rock", "rock music"] });
+    const result = await yandexSearchSuggest("roc");
+    expect(mockInvoke).toHaveBeenCalledWith("yandex_search_suggest", { part: "roc" });
+    expect(result.suggestions).toHaveLength(2);
+  });
+});
+
+describe("yandex similar tracks", () => {
+  it("yandexSimilarTracks passes trackId", async () => {
+    mockInvoke.mockResolvedValue([{ id: "2", title: "Similar", artist: "A", album: "", duration: 200, cover: "", available: true }]);
+    const tracks = await yandexSimilarTracks("1");
+    expect(mockInvoke).toHaveBeenCalledWith("yandex_similar_tracks", { trackId: "1" });
+    expect(tracks).toHaveLength(1);
+  });
+});
+
+describe("yandex lyrics", () => {
+  it("yandexGetLyrics passes trackId and synced flag", async () => {
+    mockInvoke.mockResolvedValue({ download_url: "https://lyrics.ya.ru/1.txt", writers: ["Author"] });
+    const result = await yandexGetLyrics("123", false);
+    expect(mockInvoke).toHaveBeenCalledWith("yandex_get_lyrics", { trackId: "123", synced: false });
+    expect(result.download_url).toContain("lyrics");
+  });
+
+  it("yandexDownloadLyrics fetches text by URL", async () => {
+    mockInvoke.mockResolvedValue("Line 1\nLine 2\nLine 3");
+    const text = await yandexDownloadLyrics("https://lyrics.ya.ru/1.txt");
+    expect(mockInvoke).toHaveBeenCalledWith("yandex_download_lyrics", { url: "https://lyrics.ya.ru/1.txt" });
+    expect(text).toContain("Line 1");
+  });
+});
+
+describe("yandex station feedback", () => {
+  it("yandexStationFeedback sends feedback", async () => {
+    mockInvoke.mockResolvedValue(undefined);
+    await yandexStationFeedback("genre:rock", "123", "trackStarted", 0);
+    expect(mockInvoke).toHaveBeenCalledWith("yandex_station_feedback", {
+      stationId: "genre:rock",
+      trackId: "123",
+      feedbackType: "trackStarted",
+      totalPlayedSeconds: 0,
+      batchId: null,
+    });
+  });
+});
+
+describe("yandex batch URLs", () => {
+  it("yandexGetTrackUrlsBatch passes trackIds array", async () => {
+    mockInvoke.mockResolvedValue(["url1", "url2", "url3"]);
+    const urls = await yandexGetTrackUrlsBatch(["1", "2", "3"]);
+    expect(mockInvoke).toHaveBeenCalledWith("yandex_get_track_urls_batch", { trackIds: ["1", "2", "3"] });
+    expect(urls).toHaveLength(3);
   });
 });

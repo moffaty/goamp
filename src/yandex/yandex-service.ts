@@ -145,3 +145,58 @@ export async function yandexDownloadToLibrary(
 ): Promise<string> {
   return invoke("yandex_download_to_library", { trackId, title, artist });
 }
+
+// --- Search suggestions ---
+
+export interface SearchSuggestionResult {
+  suggestions: string[];
+}
+
+export async function yandexSearchSuggest(part: string): Promise<SearchSuggestionResult> {
+  return invoke("yandex_search_suggest", { part });
+}
+
+// --- Similar tracks ---
+
+export async function yandexSimilarTracks(trackId: string): Promise<YandexTrack[]> {
+  return invoke("yandex_similar_tracks", { trackId });
+}
+
+// --- Lyrics ---
+
+export interface LyricsResult {
+  download_url: string;
+  writers: string[];
+}
+
+export async function yandexGetLyrics(trackId: string, synced: boolean = false): Promise<LyricsResult> {
+  return invoke("yandex_get_lyrics", { trackId, synced });
+}
+
+export async function yandexDownloadLyrics(url: string): Promise<string> {
+  return invoke("yandex_download_lyrics", { url });
+}
+
+// --- Station feedback ---
+
+export async function yandexStationFeedback(
+  stationId: string,
+  trackId: string,
+  feedbackType: string,
+  totalPlayedSeconds: number,
+  batchId?: string,
+): Promise<void> {
+  return invoke("yandex_station_feedback", {
+    stationId,
+    trackId,
+    feedbackType,
+    totalPlayedSeconds,
+    batchId: batchId ?? null,
+  });
+}
+
+// --- Batch track URLs ---
+
+export async function yandexGetTrackUrlsBatch(trackIds: string[]): Promise<string[]> {
+  return invoke("yandex_get_track_urls_batch", { trackIds });
+}
