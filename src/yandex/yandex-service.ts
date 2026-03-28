@@ -8,6 +8,7 @@ export interface YandexTrack {
   duration: number;
   cover: string;
   available: boolean;
+  genre: string;
 }
 
 export interface YandexStation {

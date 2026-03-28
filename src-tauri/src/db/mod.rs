@@ -134,6 +134,16 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         )?;
     }
 
+    // Migration: add genre column
+    let has_genre: bool = conn
+        .prepare("SELECT genre FROM playlist_tracks LIMIT 0")
+        .is_ok();
+    if !has_genre {
+        conn.execute_batch(
+            "ALTER TABLE playlist_tracks ADD COLUMN genre TEXT NOT NULL DEFAULT '';",
+        )?;
+    }
+
     Ok(())
 }
 

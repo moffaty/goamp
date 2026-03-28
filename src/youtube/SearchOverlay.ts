@@ -599,6 +599,7 @@ async function downloadAndAddToPlaylist(item: YoutubeResult, playlistId: string)
       duration: item.duration,
       source: "youtube",
       source_id: filePath,
+      genre: item.genre || "",
     };
     await addTrackToPlaylist(playlistId, trackInput);
 
@@ -968,5 +969,6 @@ function yaTrackToResult(t: YandexTrack): YoutubeResult {
     thumbnail: t.cover,
     source: "yandex",
     webpage_url: "",
+    genre: t.genre || "",
   };
 }

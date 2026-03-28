@@ -26,6 +26,7 @@ pub struct YandexTrack {
     pub duration: f64,
     pub cover: String,
     pub available: bool,
+    pub genre: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -144,6 +145,11 @@ fn track_to_result(t: &yandex_music::model::track::Track) -> YandexTrack {
         .as_ref()
         .map(|c| format!("https://{}", c.replace("%%", "200x200")))
         .unwrap_or_default();
+    let genre = t
+        .meta_data
+        .as_ref()
+        .and_then(|m| m.genre.clone())
+        .unwrap_or_default();
     YandexTrack {
         id,
         title,
@@ -152,6 +158,7 @@ fn track_to_result(t: &yandex_music::model::track::Track) -> YandexTrack {
         duration,
         cover,
         available: t.available.unwrap_or(false),
+        genre,
     }
 }
 
@@ -524,7 +531,7 @@ pub async fn yandex_import_playlist(
         for (i, track) in tracks.iter().enumerate() {
             let track_row_id = uuid::Uuid::new_v4().to_string();
             conn.execute(
-                "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id, album, cover) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id, album, cover, genre) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 rusqlite::params![
                     track_row_id,
                     playlist_id,
@@ -536,6 +543,7 @@ pub async fn yandex_import_playlist(
                     track.id,
                     track.album,
                     track.cover,
+                    track.genre,
                 ],
             ).map_err(|e| format!("insert track failed: {e}"))?;
         }

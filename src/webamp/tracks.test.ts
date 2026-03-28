@@ -10,6 +10,7 @@ describe("toWebampTrack", () => {
       title: "My Song",
       artist: "My Artist",
       album: "My Album",
+      genre: "Rock",
       duration: 240,
     };
 
@@ -26,6 +27,7 @@ describe("toWebampTrack", () => {
       title: "Song",
       artist: null,
       album: null,
+      genre: null,
       duration: 120,
     };
 
@@ -39,6 +41,7 @@ describe("toWebampTrack", () => {
       title: null,
       artist: "Artist",
       album: null,
+      genre: null,
       duration: 120,
     };
 
@@ -50,8 +53,8 @@ describe("toWebampTrack", () => {
 describe("toWebampTracks", () => {
   it("converts array of TrackMeta", () => {
     const metas: TrackMeta[] = [
-      { path: "/a.mp3", title: "A", artist: "X", album: null, duration: 60 },
-      { path: "/b.mp3", title: "B", artist: "Y", album: null, duration: 90 },
+      { path: "/a.mp3", title: "A", artist: "X", album: null, genre: null, duration: 60 },
+      { path: "/b.mp3", title: "B", artist: "Y", album: null, genre: null, duration: 90 },
     ];
 
     const result = toWebampTracks(metas);

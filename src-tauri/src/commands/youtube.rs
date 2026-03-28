@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use tauri::Manager;
 
+use crate::db::Db;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct YoutubeResult {
     pub id: String,
@@ -13,6 +15,7 @@ pub struct YoutubeResult {
     pub thumbnail: String,
     pub source: String,
     pub webpage_url: String,
+    pub genre: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -25,6 +28,8 @@ struct YtDlpEntry {
     thumbnail: Option<String>,
     thumbnails: Option<Vec<YtDlpThumb>>,
     webpage_url: Option<String>,
+    genre: Option<String>,
+    categories: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -201,16 +206,15 @@ pub async fn search_youtube(
         _ => format!("ytsearch{}:{}", count, query),
     };
 
-    let output = run_ytdlp(
-        &app,
-        &[
-            &search_query,
-            "--dump-json",
-            "--flat-playlist",
-            "--no-warnings",
-        ],
-    )
-    .await?;
+    let mut args: Vec<String> = cookies_args(&app);
+    args.extend([
+        search_query,
+        "--dump-json".to_string(),
+        "--flat-playlist".to_string(),
+        "--no-warnings".to_string(),
+    ]);
+    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let output = run_ytdlp(&app, &arg_refs).await?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -248,6 +252,12 @@ pub async fn search_youtube(
 
             let webpage_url = entry.webpage_url.unwrap_or_default();
 
+            // Genre: prefer explicit genre field (SoundCloud), fall back to first category (YouTube)
+            let genre = entry
+                .genre
+                .or_else(|| entry.categories.and_then(|c| c.into_iter().next()))
+                .unwrap_or_default();
+
             Some(YoutubeResult {
                 id,
                 title,
@@ -256,6 +266,7 @@ pub async fn search_youtube(
                 thumbnail,
                 source: src.to_string(),
                 webpage_url,
+                genre,
             })
         })
         .collect();
@@ -281,19 +292,18 @@ pub async fn extract_audio_url(app: tauri::AppHandle, url: String) -> Result<Str
 
     // Try with -x first
     let out_arg = format!("{}.%(ext)s", out_template.display());
-    let output = run_ytdlp(
-        &app,
-        &[
-            &url,
-            "-x",
-            "--audio-format",
-            "opus",
-            "-o",
-            &out_arg,
-            "--no-warnings",
-        ],
-    )
-    .await?;
+    let mut args: Vec<String> = cookies_args(&app);
+    args.extend([
+        url.clone(),
+        "-x".to_string(),
+        "--audio-format".to_string(),
+        "opus".to_string(),
+        "-o".to_string(),
+        out_arg.clone(),
+        "--no-warnings".to_string(),
+    ]);
+    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let output = run_ytdlp(&app, &arg_refs).await?;
 
     if output.status.success() {
         if let Some(path) = find_cached_file(&out_template) {
@@ -302,11 +312,17 @@ pub async fn extract_audio_url(app: tauri::AppHandle, url: String) -> Result<Str
     }
 
     // Fallback: download bestaudio without conversion
-    let output = run_ytdlp(
-        &app,
-        &[&url, "-f", "bestaudio", "-o", &out_arg, "--no-warnings"],
-    )
-    .await?;
+    let mut args2: Vec<String> = cookies_args(&app);
+    args2.extend([
+        url,
+        "-f".to_string(),
+        "bestaudio".to_string(),
+        "-o".to_string(),
+        out_arg,
+        "--no-warnings".to_string(),
+    ]);
+    let arg_refs2: Vec<&str> = args2.iter().map(|s| s.as_str()).collect();
+    let output = run_ytdlp(&app, &arg_refs2).await?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -358,22 +374,21 @@ pub async fn extract_audio(app: tauri::AppHandle, video_id: String) -> Result<St
     let url = format!("https://www.youtube.com/watch?v={}", video_id);
 
     // Try with audio extraction (needs ffmpeg)
-    let output = run_ytdlp(
-        &app,
-        &[
-            "-x",
-            "--audio-format",
-            "opus",
-            "--audio-quality",
-            "5",
-            "-o",
-            &out_template_str,
-            "--no-playlist",
-            "--no-warnings",
-            &url,
-        ],
-    )
-    .await?;
+    let mut args: Vec<String> = cookies_args(&app);
+    args.extend([
+        "-x".to_string(),
+        "--audio-format".to_string(),
+        "opus".to_string(),
+        "--audio-quality".to_string(),
+        "5".to_string(),
+        "-o".to_string(),
+        out_template_str.clone(),
+        "--no-playlist".to_string(),
+        "--no-warnings".to_string(),
+        url.clone(),
+    ]);
+    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let output = run_ytdlp(&app, &arg_refs).await?;
 
     // If -x failed (no ffmpeg), try downloading best audio directly
     if !output.status.success() {
@@ -383,19 +398,18 @@ pub async fn extract_audio(app: tauri::AppHandle, video_id: String) -> Result<St
             stderr
         );
 
-        let output2 = run_ytdlp(
-            &app,
-            &[
-                "-f",
-                "bestaudio",
-                "-o",
-                &out_template_str,
-                "--no-playlist",
-                "--no-warnings",
-                &url,
-            ],
-        )
-        .await?;
+        let mut args2: Vec<String> = cookies_args(&app);
+        args2.extend([
+            "-f".to_string(),
+            "bestaudio".to_string(),
+            "-o".to_string(),
+            out_template_str,
+            "--no-playlist".to_string(),
+            "--no-warnings".to_string(),
+            url,
+        ]);
+        let arg_refs2: Vec<&str> = args2.iter().map(|s| s.as_str()).collect();
+        let output2 = run_ytdlp(&app, &arg_refs2).await?;
 
         if !output2.status.success() {
             let stderr2 = String::from_utf8_lossy(&output2.stderr);
@@ -434,4 +448,109 @@ pub async fn extract_audio(app: tauri::AppHandle, video_id: String) -> Result<St
     }
 
     Err("Audio file not found after extraction".into())
+}
+
+// --- YouTube cookies/auth ---
+
+const YT_COOKIES_SETTING: &str = "youtube_cookies_path";
+
+/// Save YouTube cookies file path to settings
+#[tauri::command]
+pub fn youtube_set_cookies(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let db = app.state::<Db>();
+    db.set_setting(YT_COOKIES_SETTING, &path);
+    Ok(())
+}
+
+/// Get saved YouTube cookies path
+#[tauri::command]
+pub fn youtube_get_cookies(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let db = app.state::<Db>();
+    Ok(db.get_setting(YT_COOKIES_SETTING).filter(|s| !s.is_empty()))
+}
+
+/// Clear YouTube cookies
+#[tauri::command]
+pub fn youtube_clear_cookies(app: tauri::AppHandle) -> Result<(), String> {
+    let db = app.state::<Db>();
+    db.set_setting(YT_COOKIES_SETTING, "");
+    Ok(())
+}
+
+fn cookies_args(app: &tauri::AppHandle) -> Vec<String> {
+    let db = app.state::<Db>();
+    if let Some(path) = db.get_setting(YT_COOKIES_SETTING) {
+        if !path.is_empty() && std::path::Path::new(&path).exists() {
+            return vec!["--cookies".to_string(), path];
+        }
+    }
+    Vec::new()
+}
+
+// --- YouTube playlist import ---
+
+/// Fetch playlist metadata (title + track list) from a YouTube playlist URL
+#[tauri::command]
+pub async fn youtube_get_playlist(
+    app: tauri::AppHandle,
+    url: String,
+) -> Result<Vec<YoutubeResult>, String> {
+    let mut args: Vec<String> = cookies_args(&app);
+    args.extend([
+        url,
+        "--dump-json".to_string(),
+        "--flat-playlist".to_string(),
+        "--no-warnings".to_string(),
+    ]);
+
+    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let output = run_ytdlp(&app, &arg_refs).await?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("yt-dlp error: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let results: Vec<YoutubeResult> = stdout
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .filter_map(|line| {
+            let entry: YtDlpEntry = serde_json::from_str(line).ok()?;
+            let id = entry.id?;
+            let title = entry.title.unwrap_or_else(|| "Unknown".into());
+            let channel = entry
+                .channel
+                .or(entry.uploader)
+                .unwrap_or_else(|| "Unknown".into());
+            let duration = entry.duration.unwrap_or(0.0);
+            let thumbnail = entry
+                .thumbnail
+                .or_else(|| {
+                    entry
+                        .thumbnails
+                        .and_then(|t| t.into_iter().last())
+                        .and_then(|t| t.url)
+                })
+                .unwrap_or_default();
+            let webpage_url = entry.webpage_url.unwrap_or_default();
+            let genre = entry
+                .genre
+                .or_else(|| entry.categories.and_then(|c| c.into_iter().next()))
+                .unwrap_or_default();
+
+            Some(YoutubeResult {
+                id,
+                title,
+                channel,
+                duration,
+                thumbnail,
+                source: "youtube".to_string(),
+                webpage_url,
+                genre,
+            })
+        })
+        .collect();
+
+    Ok(results)
 }

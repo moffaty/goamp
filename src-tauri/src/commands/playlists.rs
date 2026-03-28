@@ -25,6 +25,7 @@ pub struct PlaylistTrack {
     pub original_title: String,
     pub original_artist: String,
     pub cover: String,
+    pub genre: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,6 +43,8 @@ pub struct TrackInput {
     pub original_artist: String,
     #[serde(default)]
     pub cover: String,
+    #[serde(default)]
+    pub genre: String,
 }
 
 #[tauri::command]
@@ -114,7 +117,7 @@ pub fn get_playlist_tracks(
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, position, title, artist, duration, source, source_id, album, original_title, original_artist, cover
+            "SELECT id, position, title, artist, duration, source, source_id, album, original_title, original_artist, cover, genre
              FROM playlist_tracks
              WHERE playlist_id = ?1
              ORDER BY position",
@@ -135,6 +138,7 @@ pub fn get_playlist_tracks(
                 original_title: row.get(8)?,
                 original_artist: row.get(9)?,
                 cover: row.get(10)?,
+                genre: row.get(11)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -164,8 +168,8 @@ pub fn add_track_to_playlist(
     let position = max_pos + 1;
 
     conn.execute(
-        "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id, album, original_title, original_artist, cover)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id, album, original_title, original_artist, cover, genre)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         params![
             id,
             playlist_id,
@@ -178,7 +182,8 @@ pub fn add_track_to_playlist(
             track.album,
             track.original_title,
             track.original_artist,
-            track.cover
+            track.cover,
+            track.genre
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -202,6 +207,7 @@ pub fn add_track_to_playlist(
         original_title: track.original_title,
         original_artist: track.original_artist,
         cover: track.cover,
+        genre: track.genre,
     })
 }
 
@@ -245,8 +251,8 @@ pub fn save_session(db: State<'_, Db>, tracks: Vec<TrackInput>) -> Result<(), St
     for (i, track) in tracks.iter().enumerate() {
         let id = uuid::Uuid::new_v4().to_string();
         conn.execute(
-            "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id, album, original_title, original_artist, cover)
-             VALUES (?1, '__last_session__', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT INTO playlist_tracks (id, playlist_id, position, title, artist, duration, source, source_id, album, original_title, original_artist, cover, genre)
+             VALUES (?1, '__last_session__', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 id,
                 i as i32,
@@ -258,7 +264,8 @@ pub fn save_session(db: State<'_, Db>, tracks: Vec<TrackInput>) -> Result<(), St
                 track.album,
                 track.original_title,
                 track.original_artist,
-                track.cover
+                track.cover,
+                track.genre
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -298,6 +305,56 @@ pub fn rename_track(
     }
 
     Ok(())
+}
+
+/// Get all unique genres from all playlist tracks
+#[tauri::command]
+pub fn list_genres(db: State<'_, Db>) -> Result<Vec<String>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT DISTINCT genre FROM playlist_tracks WHERE genre != '' ORDER BY genre")
+        .map_err(|e| e.to_string())?;
+    let genres = stmt
+        .query_map([], |row| row.get(0))
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(genres)
+}
+
+/// Get all tracks matching a genre (across all playlists)
+#[tauri::command]
+pub fn get_tracks_by_genre(db: State<'_, Db>, genre: String) -> Result<Vec<PlaylistTrack>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, position, title, artist, duration, source, source_id, album, original_title, original_artist, cover, genre
+             FROM playlist_tracks
+             WHERE genre = ?1
+             ORDER BY title",
+        )
+        .map_err(|e| e.to_string())?;
+    let tracks = stmt
+        .query_map(params![genre], |row| {
+            Ok(PlaylistTrack {
+                id: row.get(0)?,
+                position: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                duration: row.get(4)?,
+                source: row.get(5)?,
+                source_id: row.get(6)?,
+                album: row.get(7)?,
+                original_title: row.get(8)?,
+                original_artist: row.get(9)?,
+                cover: row.get(10)?,
+                genre: row.get(11)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(tracks)
 }
 
 /// Update source/source_id of a playlist track — used when converting a

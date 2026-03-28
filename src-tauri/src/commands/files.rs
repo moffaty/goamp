@@ -10,6 +10,7 @@ pub struct TrackMeta {
     pub title: Option<String>,
     pub artist: Option<String>,
     pub album: Option<String>,
+    pub genre: Option<String>,
     pub duration: f64,
 }
 
@@ -25,22 +26,24 @@ fn is_audio_file(path: &Path) -> bool {
 fn read_track_meta(path: &Path) -> TrackMeta {
     let path_str = path.to_string_lossy().to_string();
 
-    let (title, artist, album, duration) = match Probe::open(path).and_then(|probe| probe.read()) {
-        Ok(tagged_file) => {
-            let tag = tagged_file
-                .primary_tag()
-                .or_else(|| tagged_file.first_tag());
-            let props = tagged_file.properties();
-            let duration_secs = props.duration().as_secs_f64();
+    let (title, artist, album, genre, duration) =
+        match Probe::open(path).and_then(|probe| probe.read()) {
+            Ok(tagged_file) => {
+                let tag = tagged_file
+                    .primary_tag()
+                    .or_else(|| tagged_file.first_tag());
+                let props = tagged_file.properties();
+                let duration_secs = props.duration().as_secs_f64();
 
-            let title = tag.and_then(|t| t.title().map(|s| s.to_string()));
-            let artist = tag.and_then(|t| t.artist().map(|s| s.to_string()));
-            let album = tag.and_then(|t| t.album().map(|s| s.to_string()));
+                let title = tag.and_then(|t| t.title().map(|s| s.to_string()));
+                let artist = tag.and_then(|t| t.artist().map(|s| s.to_string()));
+                let album = tag.and_then(|t| t.album().map(|s| s.to_string()));
+                let genre = tag.and_then(|t| t.genre().map(|s| s.to_string()));
 
-            (title, artist, album, duration_secs)
-        }
-        Err(_) => (None, None, None, 0.0),
-    };
+                (title, artist, album, genre, duration_secs)
+            }
+            Err(_) => (None, None, None, None, 0.0),
+        };
 
     let fallback_title = title.clone().unwrap_or_else(|| {
         path.file_stem()
@@ -53,6 +56,7 @@ fn read_track_meta(path: &Path) -> TrackMeta {
         title: Some(fallback_title),
         artist,
         album,
+        genre,
         duration,
     }
 }
