@@ -61,13 +61,13 @@ pub fn setup(app: &AppHandle) {
     let _ = controls.set_playback(MediaPlayback::Stopped);
 
     let state = app.state::<MediaControlsState>();
-    *state.controls.lock().unwrap() = Some(controls);
+    *state.controls.lock().unwrap_or_else(|e| e.into_inner()) = Some(controls);
 }
 
 #[tauri::command]
 pub fn update_media_metadata(app: AppHandle, title: String, artist: String) {
     let state = app.state::<MediaControlsState>();
-    let mut guard = state.controls.lock().unwrap();
+    let mut guard = state.controls.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(controls) = guard.as_mut() {
         let _ = controls.set_metadata(MediaMetadata {
             title: Some(&title),
@@ -80,7 +80,7 @@ pub fn update_media_metadata(app: AppHandle, title: String, artist: String) {
 #[tauri::command]
 pub fn update_media_playback(app: AppHandle, playing: bool) {
     let state = app.state::<MediaControlsState>();
-    let mut guard = state.controls.lock().unwrap();
+    let mut guard = state.controls.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(controls) = guard.as_mut() {
         let playback = if playing {
             MediaPlayback::Playing { progress: None }

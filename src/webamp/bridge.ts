@@ -91,7 +91,7 @@ async function saveCurrentSession(webamp: Webamp) {
         artist: t.artist || "",
         duration: t.duration || 0,
         source: isYandex ? "yandex" : isYoutube ? "youtube" : "local",
-        source_id: isYandex ? yaMatch![1] : url,
+        source_id: yaMatch?.[1] ?? url,
       };
     });
 
@@ -357,9 +357,12 @@ let currentTrackScrobbled = false;
 let currentTrackArtist = "";
 let currentTrackTitle = "";
 
+let flushInterval: ReturnType<typeof setInterval> | null = null;
+
 function setupScrobbling(webamp: Webamp) {
   // Periodic queue flush (every 30 seconds)
-  setInterval(() => {
+  if (flushInterval) clearInterval(flushInterval);
+  flushInterval = setInterval(() => {
     scrobbleFlushQueue().catch(() => {});
   }, 30000);
 

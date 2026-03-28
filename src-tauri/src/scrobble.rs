@@ -46,7 +46,7 @@ fn api_sig(params: &BTreeMap<&str, &str>, secret: &str) -> String {
 // ─── Queue helpers ───
 
 fn queue_add(db: &Db, artist: &str, track: &str, timestamp: u64, duration: u32, service: &str) {
-    let conn = db.0.lock().unwrap();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     let _ = conn.execute(
         "INSERT INTO scrobble_queue (artist, track, timestamp, duration, service) VALUES (?1, ?2, ?3, ?4, ?5)",
         rusqlite::params![artist, track, timestamp, duration, service],
@@ -54,7 +54,7 @@ fn queue_add(db: &Db, artist: &str, track: &str, timestamp: u64, duration: u32, 
 }
 
 fn queue_count(db: &Db) -> u32 {
-    let conn = db.0.lock().unwrap();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     conn.query_row(
         "SELECT COUNT(*) FROM scrobble_queue WHERE status = 'pending'",
         [],
@@ -310,7 +310,7 @@ pub fn listenbrainz_get_status(app: tauri::AppHandle) -> Result<Option<String>, 
 #[tauri::command]
 pub fn listenbrainz_logout(app: tauri::AppHandle) -> Result<(), String> {
     let db = app.state::<Db>();
-    let conn = db.0.lock().unwrap();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     let _ = conn.execute("DELETE FROM settings WHERE key LIKE 'listenbrainz_%'", []);
     Ok(())
 }
@@ -428,7 +428,7 @@ pub async fn scrobble_flush_queue(app: tauri::AppHandle) -> Result<u32, String> 
 
     // Read pending items (max 50 per flush)
     let items: Vec<(i64, String, String, u64, String)> = {
-        let conn = db.0.lock().unwrap();
+        let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
         let mut stmt = conn
             .prepare(
                 "SELECT id, artist, track, timestamp, service FROM scrobble_queue WHERE status = 'pending' AND attempts < 10 ORDER BY id LIMIT 50",
@@ -468,7 +468,7 @@ pub async fn scrobble_flush_queue(app: tauri::AppHandle) -> Result<u32, String> 
             _ => false,
         };
 
-        let conn = db.0.lock().unwrap();
+        let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
         if ok {
             let _ = conn.execute("DELETE FROM scrobble_queue WHERE id = ?1", [id]);
             flushed += 1;
@@ -664,7 +664,7 @@ mod tests {
         queue_add(&db, "Artist", "Track", 1000, 300, "lastfm");
         assert_eq!(queue_count(&db), 1);
 
-        let conn = db.0.lock().unwrap();
+        let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE scrobble_queue SET status = 'completed' WHERE artist = 'Artist'",
             [],

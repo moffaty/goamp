@@ -65,7 +65,8 @@ pub fn scan_directory(path: String) -> Result<Vec<TrackMeta>, String> {
     }
 
     let mut tracks: Vec<TrackMeta> = WalkDir::new(dir)
-        .follow_links(true)
+        .follow_links(false)
+        .max_depth(20)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file() && is_audio_file(e.path()))

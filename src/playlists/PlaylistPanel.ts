@@ -210,7 +210,7 @@ function webampTrackToInput(t: { title: string; artist: string; duration: number
     artist: t.artist,
     duration: t.duration,
     source: isYandex ? "yandex" : isYoutube ? "youtube" : "local",
-    source_id: isYandex ? yaMatch![1] : t.url,
+    source_id: yaMatch?.[1] ?? t.url,
   };
 }
 
@@ -236,9 +236,9 @@ async function renderTracks(playlistId: string, c: ReturnType<typeof getSkinColo
       const wTracks = getWebampTracks();
       const store = (webampRef as any)?.store;
       const currentIndex = store?.getState()?.playlist?.currentTrack;
-      const order: string[] = store?.getState()?.playlist?.trackOrder || [];
-      const currentId = currentIndex != null ? order[currentIndex] : null;
-      const currentTrack = currentId ? wTracks.find((_, i) => i === currentIndex) : wTracks[0];
+      const currentTrack = currentIndex != null && currentIndex < wTracks.length
+        ? wTracks[currentIndex]
+        : wTracks[0];
       if (!currentTrack) {
         if (status) status.textContent = "No track playing";
         return;

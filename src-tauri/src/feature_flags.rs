@@ -13,7 +13,7 @@ pub struct FeatureFlag {
 #[tauri::command]
 pub fn feature_flags_list(app: tauri::AppHandle) -> Result<Vec<FeatureFlag>, String> {
     let db = app.state::<Db>();
-    let conn = db.0.lock().unwrap();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     let mut stmt = conn
         .prepare("SELECT key, enabled, description FROM feature_flags ORDER BY key")
         .map_err(|e| format!("query failed: {e}"))?;
@@ -34,7 +34,7 @@ pub fn feature_flags_list(app: tauri::AppHandle) -> Result<Vec<FeatureFlag>, Str
 #[tauri::command]
 pub fn feature_flags_set(app: tauri::AppHandle, key: String, enabled: bool) -> Result<(), String> {
     let db = app.state::<Db>();
-    let conn = db.0.lock().unwrap();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute(
         "UPDATE feature_flags SET enabled = ?1 WHERE key = ?2",
         rusqlite::params![enabled as i32, key],
@@ -47,7 +47,7 @@ pub fn feature_flags_set(app: tauri::AppHandle, key: String, enabled: bool) -> R
 #[tauri::command]
 pub fn feature_flag_get(app: tauri::AppHandle, key: String) -> Result<bool, String> {
     let db = app.state::<Db>();
-    let conn = db.0.lock().unwrap();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     let enabled: i32 = conn
         .query_row(
             "SELECT enabled FROM feature_flags WHERE key = ?1",

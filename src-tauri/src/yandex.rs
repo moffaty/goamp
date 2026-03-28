@@ -261,7 +261,7 @@ pub async fn yandex_get_status(app: tauri::AppHandle) -> Result<Option<YandexAcc
 #[tauri::command]
 pub fn yandex_logout(app: tauri::AppHandle) -> Result<(), String> {
     let db = app.state::<Db>();
-    let conn = db.0.lock().unwrap();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     let _ = conn.execute("DELETE FROM settings WHERE key LIKE 'yandex_%'", []);
     Ok(())
 }
@@ -479,7 +479,7 @@ pub async fn yandex_import_playlist(
     let db = app.state::<Db>();
     let playlist_id = uuid::Uuid::new_v4().to_string();
     {
-        let conn = db.0.lock().unwrap();
+        let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "INSERT INTO playlists (id, name) VALUES (?1, ?2)",
             [&playlist_id, &name],
@@ -522,7 +522,9 @@ fn yandex_cache_dir(app: &tauri::AppHandle) -> PathBuf {
         .app_cache_dir()
         .unwrap_or_else(|_| std::env::temp_dir().join("goamp"));
     let dir = base.join("yandex_cache");
-    let _ = fs::create_dir_all(&dir);
+    if let Err(e) = fs::create_dir_all(&dir) {
+        eprintln!("[GOAMP] Failed to create cache dir: {e}");
+    }
     dir
 }
 
@@ -533,7 +535,9 @@ fn yandex_library_dir(app: &tauri::AppHandle) -> PathBuf {
         .app_data_dir()
         .unwrap_or_else(|_| std::env::temp_dir().join("goamp"));
     let dir = base.join("yandex_library");
-    let _ = fs::create_dir_all(&dir);
+    if let Err(e) = fs::create_dir_all(&dir) {
+        eprintln!("[GOAMP] Failed to create library dir: {e}");
+    }
     dir
 }
 

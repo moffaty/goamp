@@ -7,7 +7,7 @@ pub struct Db(pub Mutex<Connection>);
 
 impl Db {
     pub fn get_setting(&self, key: &str) -> Option<String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
             row.get(0)
         })
@@ -15,7 +15,7 @@ impl Db {
     }
 
     pub fn set_setting(&self, key: &str, value: &str) {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.lock().unwrap_or_else(|e| e.into_inner());
         let _ = conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
             [key, value],
