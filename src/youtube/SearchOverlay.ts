@@ -9,6 +9,7 @@ import {
 import {
   yandexSearch,
   yandexGetTrackUrl,
+  yandexSearchSuggest,
   type YandexTrack,
 } from "../yandex/yandex-service";
 import {
@@ -134,8 +135,36 @@ function openOverlay() {
   input.select();
 
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeOverlay();
-    if (e.key === "Enter") doSearch(input.value);
+    if (e.key === "Escape") {
+      hideSuggestions();
+      closeOverlay();
+    }
+    if (e.key === "Enter") {
+      hideSuggestions();
+      doSearch(input.value);
+    }
+  });
+
+  // Search suggestions for Yandex
+  let suggestTimer: ReturnType<typeof setTimeout> | null = null;
+  input.addEventListener("input", () => {
+    if (suggestTimer) clearTimeout(suggestTimer);
+    if (currentSource !== "yandex" || input.value.trim().length < 2) {
+      hideSuggestions();
+      return;
+    }
+    suggestTimer = setTimeout(async () => {
+      try {
+        const result = await yandexSearchSuggest(input.value.trim());
+        if (result.suggestions.length > 0 && input.value.trim().length >= 2) {
+          showSuggestions(result.suggestions, input);
+        } else {
+          hideSuggestions();
+        }
+      } catch {
+        hideSuggestions();
+      }
+    }, 300);
   });
 
   closeBtn.addEventListener("click", closeOverlay);
@@ -147,6 +176,7 @@ function openOverlay() {
 }
 
 function closeOverlay() {
+  hideSuggestions();
   if (overlay) {
     overlay.classList.add("yt-closing");
     setTimeout(() => {
@@ -154,6 +184,42 @@ function closeOverlay() {
       overlay = null;
     }, 150);
   }
+}
+
+function showSuggestions(suggestions: string[], input: HTMLInputElement) {
+  hideSuggestions();
+  const dropdown = document.createElement("div");
+  dropdown.id = "yt-suggestions";
+  dropdown.style.cssText = `
+    position: absolute; left: 0; right: 0; top: 100%;
+    background: #111; border: 1px solid #444; border-top: none;
+    max-height: 200px; overflow-y: auto; z-index: 10002;
+    font-size: 11px; font-family: inherit;
+  `;
+  for (const s of suggestions.slice(0, 8)) {
+    const item = document.createElement("div");
+    item.textContent = s;
+    item.style.cssText = "padding: 5px 10px; cursor: pointer; color: #0f0;";
+    item.addEventListener("mouseenter", () => { item.style.background = "#222"; });
+    item.addEventListener("mouseleave", () => { item.style.background = "transparent"; });
+    item.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      input.value = s;
+      hideSuggestions();
+      doSearch(s);
+    });
+    dropdown.appendChild(item);
+  }
+  // Position relative to search header
+  const header = overlay?.querySelector(".yt-search-header") as HTMLElement;
+  if (header) {
+    header.style.position = "relative";
+    header.appendChild(dropdown);
+  }
+}
+
+function hideSuggestions() {
+  document.getElementById("yt-suggestions")?.remove();
 }
 
 async function doSearch(query: string) {
