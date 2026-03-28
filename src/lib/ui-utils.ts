@@ -62,10 +62,10 @@ export function getSkinColors(webamp: Webamp | null): SkinColors {
 }
 
 /** HTML-escape a string */
+const _escapeDiv = document.createElement("div");
 export function escapeHtml(s: string): string {
-  const div = document.createElement("div");
-  div.textContent = s;
-  return div.innerHTML;
+  _escapeDiv.textContent = s;
+  return _escapeDiv.innerHTML;
 }
 
 /** Format seconds as m:ss */

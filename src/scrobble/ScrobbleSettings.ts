@@ -20,8 +20,9 @@ export function initScrobbleSettings() {
 
 export function toggleScrobbleSettings() {
   if (!panel) createPanel();
+  if (!panel) return;
   visible = !visible;
-  panel!.style.display = visible ? "flex" : "none";
+  panel.style.display = visible ? "flex" : "none";
   if (visible) refreshAllStatus();
 }
 
@@ -116,22 +117,22 @@ function createPanel() {
 
   // ─── Queue flush ───
   panel.querySelector("#scrobble-flush-btn")!.addEventListener("click", async () => {
-    const btn = panel!.querySelector("#scrobble-flush-btn") as HTMLButtonElement;
-    btn.textContent = "...";
+    const btn = panel?.querySelector("#scrobble-flush-btn") as HTMLButtonElement | null;
+    if (btn) btn.textContent = "...";
     try {
       const count = await scrobbleFlushQueue();
-      btn.textContent = count > 0 ? `Flushed ${count}` : "Nothing to flush";
+      if (btn) btn.textContent = count > 0 ? `Flushed ${count}` : "Nothing to flush";
       setTimeout(() => refreshAllStatus(), 1000);
     } catch (e) {
-      btn.textContent = "Error";
+      if (btn) btn.textContent = "Error";
       console.error("[GOAMP] Flush failed:", e);
     }
   });
 
   // ─── Last.fm: Save keys ───
   panel.querySelector("#scrobble-save-keys")!.addEventListener("click", async () => {
-    const apiKey = (panel!.querySelector("#scrobble-api-key") as HTMLInputElement).value.trim();
-    const secret = (panel!.querySelector("#scrobble-secret") as HTMLInputElement).value.trim();
+    const apiKey = (panel?.querySelector("#scrobble-api-key") as HTMLInputElement | null)?.value.trim() ?? "";
+    const secret = (panel?.querySelector("#scrobble-secret") as HTMLInputElement | null)?.value.trim() ?? "";
     if (!apiKey || !secret) return;
     try {
       await lastfmSaveSettings(apiKey, secret);
@@ -146,7 +147,8 @@ function createPanel() {
     try {
       const url = await lastfmGetAuthUrl();
       openUrl(url);
-      panel!.querySelector<HTMLDivElement>("#scrobble-auth-flow")!.style.display = "block";
+      const authFlow = panel?.querySelector<HTMLDivElement>("#scrobble-auth-flow");
+      if (authFlow) authFlow.style.display = "block";
       setMsg("lastfm-msg", "Authorize in browser, then paste token below", "#ff0");
     } catch (e) {
       setMsg("lastfm-msg", `Error: ${e}`, "#f00");
@@ -155,12 +157,13 @@ function createPanel() {
 
   // ─── Last.fm: Confirm token ───
   panel.querySelector("#scrobble-confirm")!.addEventListener("click", async () => {
-    const token = (panel!.querySelector("#scrobble-token") as HTMLInputElement).value.trim();
+    const token = (panel?.querySelector("#scrobble-token") as HTMLInputElement | null)?.value.trim() ?? "";
     if (!token) return;
     try {
       const session = await lastfmAuth(token);
       setMsg("lastfm-msg", `Authenticated as: ${session.name}`, "#0f0");
-      panel!.querySelector<HTMLDivElement>("#scrobble-auth-flow")!.style.display = "none";
+      const authFlow = panel?.querySelector<HTMLDivElement>("#scrobble-auth-flow");
+      if (authFlow) authFlow.style.display = "none";
       localStorage.setItem("goamp_lastfm_enabled", "1");
       refreshAllStatus();
     } catch (e) {
@@ -170,19 +173,19 @@ function createPanel() {
 
   // ─── ListenBrainz: Save token ───
   panel.querySelector("#lb-save")!.addEventListener("click", async () => {
-    const token = (panel!.querySelector("#lb-token") as HTMLInputElement).value.trim();
+    const token = (panel?.querySelector("#lb-token") as HTMLInputElement | null)?.value.trim() ?? "";
     if (!token) return;
-    const btn = panel!.querySelector("#lb-save") as HTMLButtonElement;
-    btn.textContent = "...";
+    const btn = panel?.querySelector("#lb-save") as HTMLButtonElement | null;
+    if (btn) btn.textContent = "...";
     try {
       const username = await listenbrainzSaveToken(token);
       setMsg("lb-msg", `Connected as: ${username}`, "#0f0");
       localStorage.setItem("goamp_lb_enabled", "1");
-      btn.textContent = "Connect";
+      if (btn) btn.textContent = "Connect";
       refreshAllStatus();
     } catch (e) {
       setMsg("lb-msg", `Error: ${e}`, "#f00");
-      btn.textContent = "Connect";
+      if (btn) btn.textContent = "Connect";
     }
   });
 
