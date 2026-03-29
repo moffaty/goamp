@@ -6,6 +6,7 @@ import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
 import { toggleYandexPanel, getCurrentYandexTrackId, likeCurrentYandexTrack, addCurrentTrackToPlaylist, downloadCurrentYandexTrack } from "../yandex/YandexPanel";
 import { toggleVisualizerPanel } from "./VisualizerPanel";
 import { toggleGenrePanel, toggleYouTubeSettings } from "../settings/GenrePanel";
+import { toggleRadioPanel } from "../radio/RadioPanel";
 import { openFolder, openFiles, loadSkin } from "./bridge";
 import type Webamp from "webamp";
 
@@ -77,6 +78,7 @@ function showGoampMenu(x: number, y: number) {
     { label: "Search", shortcut: "Ctrl+Y", action: () => toggleSearchOverlay() },
     { label: "Yandex Music", shortcut: "Ctrl+M", action: () => toggleYandexPanel() },
     { label: "Genres", shortcut: "Ctrl+G", action: () => toggleGenrePanel() },
+    { label: "Internet Radio", shortcut: "Ctrl+R", action: () => toggleRadioPanel() },
     { label: "Playlists", shortcut: "Ctrl+P", action: () => togglePlaylistPanel() },
     { label: "Visualizer Presets", shortcut: "V", action: () => toggleVisualizerPanel() },
     {

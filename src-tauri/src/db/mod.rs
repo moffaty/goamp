@@ -134,6 +134,24 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         )?;
     }
 
+    // Migration: radio tables
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS radio_favorites (
+            stationuuid TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            added_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+        CREATE TABLE IF NOT EXISTS radio_custom (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            url TEXT NOT NULL,
+            tags TEXT NOT NULL DEFAULT '',
+            added_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+        ",
+    )?;
+
     // Migration: add genre column
     let has_genre: bool = conn
         .prepare("SELECT genre FROM playlist_tracks LIMIT 0")
@@ -354,6 +372,34 @@ mod tests {
             )
             .unwrap();
         assert_eq!(enabled, 1);
+    }
+
+    #[test]
+    fn test_radio_tables_exist() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+
+        // Insert a favorite
+        conn.execute(
+            "INSERT INTO radio_favorites (stationuuid, data) VALUES ('test-uuid', '{}')",
+            [],
+        )
+        .unwrap();
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM radio_favorites", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+
+        // Insert a custom station
+        conn.execute(
+            "INSERT INTO radio_custom (id, name, url, tags) VALUES ('c1', 'My Station', 'http://example.com/stream', 'rock')",
+            [],
+        )
+        .unwrap();
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM radio_custom", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
     }
 
     #[test]
