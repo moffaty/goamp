@@ -6,6 +6,7 @@ mod feature_flags;
 mod hook;
 mod md5;
 mod media_keys;
+mod radio;
 mod scrobble;
 mod tray;
 mod yandex;
@@ -26,6 +27,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(media_keys::MediaControlsState::new())
+        .manage(radio::RadioStreamState::new())
         .invoke_handler(tauri::generate_handler![
             commands::files::scan_directory,
             commands::files::read_metadata,
@@ -93,6 +95,22 @@ pub fn run() {
             feature_flags::feature_flags_list,
             feature_flags::feature_flags_set,
             feature_flags::feature_flag_get,
+            radio::radio_search,
+            radio::radio_top_stations,
+            radio::radio_by_tag,
+            radio::radio_tags,
+            radio::radio_add_favorite,
+            radio::radio_remove_favorite,
+            radio::radio_list_favorites,
+            radio::radio_add_custom,
+            radio::radio_remove_custom,
+            radio::radio_list_custom,
+            radio::radio_play,
+            radio::radio_stop,
+            radio::radio_now_playing,
+            radio::radio_list_cached,
+            radio::radio_save_segment,
+            radio::radio_save_last_secs,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");

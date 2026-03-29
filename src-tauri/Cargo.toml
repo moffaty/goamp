@@ -27,8 +27,10 @@ rdev = "0.5.3"
 tauri-plugin-shell = "2"
 tokio = { version = "1", features = ["process"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
-reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }
+reqwest = { version = "0.12", features = ["rustls-tls", "stream"], default-features = false }
 souvlaki = "0.7"
 yandex-music = "0.4.10"
 chrono = "0.4"
+urlencoding = "2"
+futures-util = "0.3"
 tauri-plugin-updater = "2"

@@ -135,3 +135,108 @@ export async function youtubeClearCookies(): Promise<void> {
 export async function youtubeGetPlaylist(url: string): Promise<any[]> {
   return invoke("youtube_get_playlist", { url });
 }
+
+// ─── Radio ───
+
+export interface RadioStation {
+  stationuuid: string;
+  name: string;
+  url: string;
+  url_resolved: string;
+  homepage: string;
+  favicon: string;
+  tags: string;
+  country: string;
+  countrycode: string;
+  language: string;
+  codec: string;
+  bitrate: number;
+  votes: number;
+  clickcount: number;
+}
+
+export interface RadioTag {
+  name: string;
+  stationcount: number;
+}
+
+export interface RadioNowPlaying {
+  title: string;
+  station_name: string;
+  station_uuid: string;
+}
+
+export interface CachedSegment {
+  index: number;
+  title: string;
+  duration_secs: number;
+}
+
+export async function radioSearch(
+  query: string,
+  tag?: string,
+  country?: string,
+  limit?: number,
+): Promise<RadioStation[]> {
+  return invoke("radio_search", { query, tag: tag ?? null, country: country ?? null, limit: limit ?? null });
+}
+
+export async function radioTopStations(limit?: number): Promise<RadioStation[]> {
+  return invoke("radio_top_stations", { limit: limit ?? null });
+}
+
+export async function radioByTag(tag: string, limit?: number): Promise<RadioStation[]> {
+  return invoke("radio_by_tag", { tag, limit: limit ?? null });
+}
+
+export async function radioTags(): Promise<RadioTag[]> {
+  return invoke("radio_tags");
+}
+
+export async function radioAddFavorite(station: RadioStation): Promise<void> {
+  return invoke("radio_add_favorite", { stationJson: JSON.stringify(station) });
+}
+
+export async function radioRemoveFavorite(stationuuid: string): Promise<void> {
+  return invoke("radio_remove_favorite", { stationuuid });
+}
+
+export async function radioListFavorites(): Promise<RadioStation[]> {
+  return invoke("radio_list_favorites");
+}
+
+export async function radioAddCustom(name: string, url: string, tags?: string): Promise<void> {
+  return invoke("radio_add_custom", { name, url, tags: tags ?? null });
+}
+
+export async function radioRemoveCustom(id: string): Promise<void> {
+  return invoke("radio_remove_custom", { id });
+}
+
+export async function radioListCustom(): Promise<RadioStation[]> {
+  return invoke("radio_list_custom");
+}
+
+export async function radioPlay(station: RadioStation): Promise<string> {
+  return invoke("radio_play", { stationJson: JSON.stringify(station) });
+}
+
+export async function radioStop(): Promise<void> {
+  return invoke("radio_stop");
+}
+
+export async function radioNowPlaying(): Promise<RadioNowPlaying | null> {
+  return invoke("radio_now_playing");
+}
+
+export async function radioListCached(): Promise<CachedSegment[]> {
+  return invoke("radio_list_cached");
+}
+
+export async function radioSaveSegment(index: number, title?: string): Promise<string> {
+  return invoke("radio_save_segment", { index, title: title ?? null });
+}
+
+export async function radioSaveLastSecs(secs: number, title?: string): Promise<string> {
+  return invoke("radio_save_last_secs", { secs, title: title ?? null });
+}
