@@ -12,6 +12,7 @@ mod media_keys;
 mod node;
 mod radio;
 mod scrobble;
+mod track_id;
 #[cfg(desktop)]
 mod tray;
 
