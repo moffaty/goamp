@@ -176,7 +176,7 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
             peer_count INTEGER NOT NULL DEFAULT 1,
             created_at INTEGER NOT NULL DEFAULT (unixepoch()),
             updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
-            UNIQUE(source, source_id)
+            PRIMARY KEY (source, source_id)
         );
 
         CREATE INDEX IF NOT EXISTS idx_track_identity_canonical
@@ -220,7 +220,7 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
 
         CREATE TABLE IF NOT EXISTS survey_responses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            survey_id INTEGER NOT NULL REFERENCES surveys(id),
+            survey_id INTEGER NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
             response TEXT NOT NULL,
             responded_at INTEGER NOT NULL DEFAULT (unixepoch())
         );
