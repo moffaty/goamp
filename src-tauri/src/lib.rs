@@ -100,6 +100,7 @@ pub fn run() {
             radio::radio_list_cached,
             radio::radio_save_segment,
             radio::radio_save_last_secs,
+            track_id::resolve_track_id,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");

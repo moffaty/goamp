@@ -99,6 +99,118 @@ pub fn is_aggregation_eligible(conn: &Connection, canonical_id: &str, peer_thres
     .unwrap_or(false)
 }
 
+use serde::{Deserialize, Serialize};
+use tauri::Manager;
+
+const MB_API_URL: &str = "https://musicbrainz.org/ws/2";
+const MB_USER_AGENT: &str = "GOAMP/1.0 (https://github.com/nicoss01/goamp)";
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MusicBrainzMatch {
+    pub mbid: String,
+    pub title: String,
+    pub artist: String,
+    pub score: u32,
+}
+
+pub fn musicbrainz_search_url(artist: &str, title: &str) -> String {
+    let norm_artist = normalize(artist);
+    let norm_title = normalize(title);
+    let q_artist = urlencoding::encode(&norm_artist);
+    let q_title = urlencoding::encode(&norm_title);
+    format!(
+        "{}/recording?query=recording:{}+artist:{}&fmt=json&limit=3",
+        MB_API_URL, q_title, q_artist
+    )
+}
+
+/// Look up a track on MusicBrainz. Returns best match if score >= 90.
+pub async fn musicbrainz_lookup(
+    client: &reqwest::Client,
+    artist: &str,
+    title: &str,
+) -> Option<MusicBrainzMatch> {
+    let url = musicbrainz_search_url(artist, title);
+    let resp = client
+        .get(&url)
+        .header("User-Agent", MB_USER_AGENT)
+        .send()
+        .await
+        .ok()?;
+
+    let body: serde_json::Value = resp.json().await.ok()?;
+    let recordings = body.get("recordings")?.as_array()?;
+
+    for rec in recordings {
+        let score = rec.get("score")?.as_u64()? as u32;
+        if score < 90 {
+            continue;
+        }
+        let mbid = rec.get("id")?.as_str()?.to_string();
+        let title = rec.get("title")?.as_str()?.to_string();
+        let artist = rec
+            .get("artist-credit")?
+            .as_array()?
+            .first()?
+            .get("name")?
+            .as_str()?
+            .to_string();
+
+        return Some(MusicBrainzMatch {
+            mbid,
+            title,
+            artist,
+            score,
+        });
+    }
+    None
+}
+
+/// Tauri command: resolve track identity with optional MusicBrainz lookup.
+#[tauri::command]
+pub async fn resolve_track_id(
+    app: tauri::AppHandle,
+    source: String,
+    source_id: String,
+    artist: String,
+    title: String,
+    duration: f64,
+) -> Result<String, String> {
+    let db = app.state::<crate::db::Db>();
+    let cid = {
+        let conn =
+            db.0.lock()
+                .unwrap_or_else(|e: std::sync::PoisonError<_>| e.into_inner());
+        let cid = resolve_or_create(&conn, &source, &source_id, &artist, &title, duration);
+        // Check if MusicBrainz ID already set before releasing lock
+        let has_mb: bool = conn.query_row(
+            "SELECT musicbrainz_id FROM track_identity WHERE canonical_id = ?1 AND musicbrainz_id IS NOT NULL LIMIT 1",
+            [&cid],
+            |_| Ok(true),
+        ).unwrap_or(false);
+        if has_mb {
+            return Ok(cid);
+        }
+        cid
+    }; // lock released here
+
+    if !artist.is_empty() && !title.is_empty() {
+        let client = reqwest::Client::new();
+        if let Some(mb_match) = musicbrainz_lookup(&client, &artist, &title).await {
+            let conn =
+                db.0.lock()
+                    .unwrap_or_else(|e: std::sync::PoisonError<_>| e.into_inner());
+            set_musicbrainz_id(&conn, &cid, &mb_match.mbid);
+            eprintln!(
+                "[GOAMP] MusicBrainz match: {} - {} (score={})",
+                mb_match.artist, mb_match.title, mb_match.score
+            );
+        }
+    }
+
+    Ok(cid)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,6 +310,22 @@ mod tests {
             |row| row.get(0),
         ).unwrap();
         assert_eq!(mb_count, 2);
+    }
+
+    #[test]
+    fn test_musicbrainz_query_url() {
+        let url = musicbrainz_search_url("Rick Astley", "Never Gonna Give You Up");
+        assert!(url.contains("recording"));
+        assert!(
+            url.contains("rick+astley")
+                || url.contains("rick%20astley")
+                || url.contains("rick astley")
+        );
+        assert!(
+            url.contains("never+gonna+give+you+up")
+                || url.contains("never%20gonna")
+                || url.contains("never gonna")
+        );
     }
 
     #[test]

@@ -240,3 +240,14 @@ export async function radioSaveSegment(index: number, title?: string): Promise<s
 export async function radioSaveLastSecs(secs: number, title?: string): Promise<string> {
   return invoke("radio_save_last_secs", { secs, title: title ?? null });
 }
+
+// Track Identity
+export async function resolveTrackId(
+  source: string,
+  sourceId: string,
+  artist: string,
+  title: string,
+  duration: number,
+): Promise<string> {
+  return invoke("resolve_track_id", { source, sourceId, artist, title, duration });
+}
