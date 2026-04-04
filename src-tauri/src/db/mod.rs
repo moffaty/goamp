@@ -105,7 +105,6 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         INSERT OR IGNORE INTO feature_flags (key, enabled, description) VALUES
             ('youtube_search', 1, 'YouTube search and playback'),
             ('soundcloud_search', 1, 'SoundCloud search'),
-            ('yandex_music', 1, 'Yandex Music integration'),
             ('lastfm_scrobble', 1, 'Last.fm scrobbling'),
             ('listenbrainz_scrobble', 1, 'ListenBrainz scrobbling'),
             ('visualizer', 1, 'Butterchurn visualizer'),
@@ -162,6 +161,72 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         )?;
     }
 
+    // Migration: track identity & recommendation tables
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS track_identity (
+            canonical_id TEXT NOT NULL,
+            source TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            artist TEXT NOT NULL DEFAULT '',
+            title TEXT NOT NULL DEFAULT '',
+            duration REAL NOT NULL DEFAULT 0,
+            musicbrainz_id TEXT,
+            acoustid TEXT,
+            peer_count INTEGER NOT NULL DEFAULT 1,
+            created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+            updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+            UNIQUE(source, source_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_track_identity_canonical
+            ON track_identity(canonical_id);
+        CREATE INDEX IF NOT EXISTS idx_track_identity_musicbrainz
+            ON track_identity(musicbrainz_id) WHERE musicbrainz_id IS NOT NULL;
+
+        CREATE TABLE IF NOT EXISTS listen_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            canonical_id TEXT NOT NULL,
+            source TEXT NOT NULL,
+            started_at INTEGER NOT NULL,
+            duration_secs INTEGER NOT NULL DEFAULT 0,
+            listened_secs INTEGER NOT NULL DEFAULT 0,
+            completed INTEGER NOT NULL DEFAULT 0,
+            skipped_early INTEGER NOT NULL DEFAULT 0,
+            context_hour INTEGER NOT NULL DEFAULT 0,
+            context_weekday INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_listen_history_canonical
+            ON listen_history(canonical_id);
+        CREATE INDEX IF NOT EXISTS idx_listen_history_time
+            ON listen_history(started_at);
+
+        CREATE TABLE IF NOT EXISTS track_likes (
+            canonical_id TEXT PRIMARY KEY,
+            liked INTEGER NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+            updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+
+        CREATE TABLE IF NOT EXISTS surveys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            survey_type TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+            shown INTEGER NOT NULL DEFAULT 0,
+            answered INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS survey_responses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            survey_id INTEGER NOT NULL REFERENCES surveys(id),
+            response TEXT NOT NULL,
+            responded_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+        ",
+    )?;
+
     Ok(())
 }
 
@@ -198,7 +263,7 @@ mod tests {
         let count: i32 = conn
             .query_row("SELECT COUNT(*) FROM feature_flags", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(count, 9);
+        assert_eq!(count, 8);
 
         // All default flags should be enabled
         let disabled: i32 = conn
@@ -235,7 +300,7 @@ mod tests {
         let count: i32 = conn
             .query_row("SELECT COUNT(*) FROM feature_flags", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(count, 9); // INSERT OR IGNORE — no duplicates
+        assert_eq!(count, 8); // INSERT OR IGNORE — no duplicates
     }
 
     #[test]
@@ -400,6 +465,85 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM radio_custom", [], |row| row.get(0))
             .unwrap();
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_track_identity_table_exists() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+
+        conn.execute(
+            "INSERT INTO track_identity (canonical_id, source, source_id, artist, title, duration, musicbrainz_id, acoustid)
+             VALUES ('hash_abc', 'youtube', 'dQw4w9WgXcQ', 'Rick Astley', 'Never Gonna Give You Up', 213.0, 'mb-123', NULL)",
+            [],
+        ).unwrap();
+
+        let canonical: String = conn.query_row(
+            "SELECT canonical_id FROM track_identity WHERE source = 'youtube' AND source_id = 'dQw4w9WgXcQ'",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(canonical, "hash_abc");
+    }
+
+    #[test]
+    fn test_listen_history_table_exists() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+
+        conn.execute(
+            "INSERT INTO listen_history (canonical_id, source, started_at, duration_secs, listened_secs, completed, skipped_early, context_hour, context_weekday)
+             VALUES ('hash_abc', 'youtube', 1712200000, 213, 200, 1, 0, 14, 5)",
+            [],
+        ).unwrap();
+
+        let count: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM listen_history WHERE canonical_id = 'hash_abc'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_track_likes_table_exists() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+
+        conn.execute(
+            "INSERT INTO track_likes (canonical_id, liked, created_at) VALUES ('hash_abc', 1, 1712200000)",
+            [],
+        ).unwrap();
+
+        let liked: i32 = conn
+            .query_row(
+                "SELECT liked FROM track_likes WHERE canonical_id = 'hash_abc'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(liked, 1);
+    }
+
+    #[test]
+    fn test_track_identity_unique_source_pair() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+
+        conn.execute(
+            "INSERT INTO track_identity (canonical_id, source, source_id, artist, title, duration)
+             VALUES ('hash_1', 'youtube', 'vid1', 'A', 'B', 180.0)",
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO track_identity (canonical_id, source, source_id, artist, title, duration)
+             VALUES ('hash_2', 'youtube', 'vid1', 'A', 'B', 180.0)",
+            [],
+        );
+        assert!(result.is_err());
     }
 
     #[test]

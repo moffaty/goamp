@@ -3,7 +3,7 @@
 /// Spawns `goamp-node --mode=client --api-port=7472` as a Tauri sidecar
 /// and reads its stdout for the `ready:PORT` signal before considering it up.
 use std::sync::{Arc, Mutex};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
