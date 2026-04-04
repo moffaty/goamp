@@ -1,0 +1,14 @@
+{
+  "name": "@goamp/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript client SDK for the GOAMP P2P node API",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "license": "MIT"
+}

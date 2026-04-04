@@ -3,13 +3,17 @@ use tauri::Manager;
 mod commands;
 mod db;
 mod feature_flags;
+#[cfg(not(target_os = "android"))]
 mod hook;
 mod md5;
+#[cfg(not(target_os = "android"))]
 mod media_keys;
+#[cfg(desktop)]
+mod node;
 mod radio;
 mod scrobble;
+#[cfg(desktop)]
 mod tray;
-mod yandex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,14 +24,21 @@ pub fn run() {
         ..Default::default()
     });
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .manage(media_keys::MediaControlsState::new())
         .manage(radio::RadioStreamState::new())
+        .manage(node::NodeProcess::new());
+
+    #[cfg(not(target_os = "android"))]
+    {
+        builder = builder.manage(media_keys::MediaControlsState::new());
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             commands::files::scan_directory,
             commands::files::read_metadata,
@@ -43,8 +54,11 @@ pub fn run() {
             commands::playlists::save_session,
             commands::playlists::load_session,
             commands::playlists::rename_track,
+            #[cfg(desktop)]
             tray::update_tray_tooltip,
+            #[cfg(not(target_os = "android"))]
             media_keys::update_media_metadata,
+            #[cfg(not(target_os = "android"))]
             media_keys::update_media_playback,
             scrobble::lastfm_get_auth_url,
             scrobble::lastfm_auth,
@@ -59,32 +73,6 @@ pub fn run() {
             scrobble::listenbrainz_scrobble,
             scrobble::scrobble_get_status,
             scrobble::scrobble_flush_queue,
-            yandex::yandex_save_token,
-            yandex::yandex_request_device_code,
-            yandex::yandex_poll_token,
-            yandex::yandex_refresh_token,
-            yandex::yandex_get_status,
-            yandex::yandex_logout,
-            yandex::yandex_search,
-            yandex::yandex_get_track_url,
-            yandex::yandex_list_stations,
-            yandex::yandex_station_tracks,
-            yandex::yandex_list_playlists,
-            yandex::yandex_get_playlist_tracks,
-            yandex::yandex_import_playlist,
-            yandex::yandex_download_track,
-            yandex::yandex_download_playlist,
-            yandex::yandex_get_liked_tracks,
-            yandex::yandex_get_track_urls,
-            yandex::yandex_open_oauth_window,
-            yandex::yandex_like_track,
-            yandex::yandex_download_to_library,
-            yandex::yandex_search_suggest,
-            yandex::yandex_similar_tracks,
-            yandex::yandex_get_lyrics,
-            yandex::yandex_download_lyrics,
-            yandex::yandex_station_feedback,
-            yandex::yandex_get_track_urls_batch,
             commands::playlists::update_track_source,
             commands::playlists::list_genres,
             commands::playlists::get_tracks_by_genre,
@@ -115,25 +103,39 @@ pub fn run() {
         .setup(|app| {
             db::init(app).expect("failed to initialize database");
 
-            let handle = app.handle();
-            tray::setup(handle).expect("failed to setup tray");
-            media_keys::setup(handle);
+            // Spawn the GOAMP P2P node sidecar (desktop only)
+            #[cfg(desktop)]
+            if let Err(e) = node::start_node(app.handle()) {
+                eprintln!("[goamp] failed to start node sidecar: {e}");
+            }
 
-            let window = app.get_webview_window("main").unwrap();
+            #[cfg(desktop)]
+            {
+                let handle = app.handle();
+                tray::setup(handle).expect("failed to setup tray");
 
-            // Close-to-tray: hide window instead of closing
-            let app_handle = handle.clone();
-            window.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    if let Some(w) = app_handle.get_webview_window("main") {
-                        let _ = w.hide();
+                #[cfg(not(target_os = "android"))]
+                media_keys::setup(handle);
+
+                let window = app.get_webview_window("main").unwrap();
+
+                // Close-to-tray: hide window instead of closing
+                let app_handle = handle.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        if let Some(w) = app_handle.get_webview_window("main") {
+                            let _ = w.hide();
+                        }
                     }
-                }
-            });
+                });
 
-            let _ = window.maximize();
-            hook::start_global_mouse_stream(window);
+                let _ = window.maximize();
+
+                #[cfg(not(target_os = "android"))]
+                hook::start_global_mouse_stream(window);
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())
