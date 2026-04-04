@@ -251,3 +251,41 @@ export async function resolveTrackId(
 ): Promise<string> {
   return invoke("resolve_track_id", { source, sourceId, artist, title, duration });
 }
+
+// Listen History
+export interface ListenStats {
+  canonical_id: string;
+  listen_count: number;
+  completed_count: number;
+  liked: boolean | null;
+}
+
+export async function recordTrackListen(
+  canonicalId: string,
+  source: string,
+  startedAt: number,
+  durationSecs: number,
+  listenedSecs: number,
+  completed: boolean,
+  skippedEarly: boolean,
+): Promise<void> {
+  return invoke("record_track_listen", {
+    canonicalId, source, startedAt, durationSecs, listenedSecs, completed, skippedEarly,
+  });
+}
+
+export async function setTrackLike(canonicalId: string, liked: boolean): Promise<void> {
+  return invoke("set_track_like", { canonicalId, liked });
+}
+
+export async function removeTrackLike(canonicalId: string): Promise<void> {
+  return invoke("remove_track_like", { canonicalId });
+}
+
+export async function getTrackStats(canonicalId: string): Promise<ListenStats> {
+  return invoke("get_track_stats", { canonicalId });
+}
+
+export async function getLikedTracks(): Promise<string[]> {
+  return invoke("get_liked_tracks");
+}

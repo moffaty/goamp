@@ -3,6 +3,7 @@ use tauri::Manager;
 mod commands;
 mod db;
 mod feature_flags;
+mod history;
 #[cfg(not(target_os = "android"))]
 mod hook;
 mod md5;
@@ -101,6 +102,11 @@ pub fn run() {
             radio::radio_save_segment,
             radio::radio_save_last_secs,
             track_id::resolve_track_id,
+            history::record_track_listen,
+            history::set_track_like,
+            history::remove_track_like,
+            history::get_track_stats,
+            history::get_liked_tracks,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");
