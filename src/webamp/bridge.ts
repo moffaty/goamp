@@ -4,14 +4,12 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { scanDirectory, saveSession, loadSession, getPlaylistTracks } from "../lib/tauri-ipc";
-import { yandexGetTrackUrl } from "../yandex/yandex-service";
 import { toWebampTracks } from "./tracks";
 import { track, trackError } from "../lib/analytics";
 import { initSearchOverlay, toggleSearchOverlay } from "../youtube/SearchOverlay";
 import { initPlaylistPanel, togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { initAudioDevicePanel, toggleAudioDevicePanel, restoreAudioDevice } from "../settings/AudioDevicePanel";
 import { initScrobbleSettings, toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
-import { initYandexPanel, toggleYandexPanel, likeCurrentYandexTrack, addCurrentTrackToPlaylist, downloadCurrentYandexTrack } from "../yandex/YandexPanel";
 import { initGoampMenu } from "./goamp-menu";
 import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
 import { initVisualizerPanel, toggleVisualizerPanel } from "./VisualizerPanel";
@@ -41,7 +39,6 @@ export function setupBridge(webamp: Webamp) {
   initPlaylistPanel(webamp);
   initAudioDevicePanel(webamp);
   initScrobbleSettings();
-  initYandexPanel(webamp);
   initVisualizerPanel(webamp);
   initGenrePanel(webamp);
   initRadioPanel(webamp);
@@ -88,15 +85,12 @@ async function saveCurrentSession(webamp: Webamp) {
     .map((t: any) => {
       const url: string = t.url || "";
       const isYoutube = url.includes("audio_cache");
-      // Yandex tracks have #ya:{track_id} fragment
-      const yaMatch = url.match(/#ya:(\d+)$/);
-      const isYandex = !!yaMatch;
       return {
         title: t.title || t.defaultName || "Unknown",
         artist: t.artist || "",
         duration: t.duration || 0,
-        source: isYandex ? "yandex" : isYoutube ? "youtube" : "local",
-        source_id: yaMatch?.[1] ?? url,
+        source: isYoutube ? "youtube" : "local",
+        source_id: url,
       };
     });
 
@@ -112,17 +106,7 @@ async function resolvePlaylistTracks(
 ) {
   const resolved = await Promise.all(
     tracks.map(async (t) => {
-      let url: string;
-      if (t.source === "yandex") {
-        try {
-          const streamUrl = await yandexGetTrackUrl(t.source_id);
-          url = `${streamUrl}#ya:${t.source_id}`;
-        } catch {
-          url = "";
-        }
-      } else {
-        url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
-      }
+      const url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
       return {
         metaData: { artist: t.artist || "Unknown Artist", title: t.title || "Unknown Track" },
         url,
@@ -272,26 +256,6 @@ function setupKeyboard(webamp: Webamp) {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyL") {
       e.preventDefault();
       toggleScrobbleSettings();
-    }
-    // Ctrl+M — Yandex Music panel
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyM") {
-      e.preventDefault();
-      toggleYandexPanel();
-    }
-    // Ctrl+H — Like current Yandex track (Heart)
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyH") {
-      e.preventDefault();
-      likeCurrentYandexTrack().catch(() => {});
-    }
-    // Ctrl+Shift+A — Add current track to GOAMP playlist
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyA") {
-      e.preventDefault();
-      addCurrentTrackToPlaylist().catch(() => {});
-    }
-    // Ctrl+Shift+D — Download current Yandex track locally
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyD") {
-      e.preventDefault();
-      downloadCurrentYandexTrack().catch(() => {});
     }
     // Ctrl+G — Genre browser
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyG") {

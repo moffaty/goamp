@@ -358,7 +358,7 @@ pub fn get_tracks_by_genre(db: State<'_, Db>, genre: String) -> Result<Vec<Playl
 }
 
 /// Update source/source_id of a playlist track — used when converting a
-/// Yandex-streamed track to a locally downloaded file.
+/// streamed track to a locally downloaded file.
 #[tauri::command]
 pub fn update_track_source(
     db: State<'_, Db>,

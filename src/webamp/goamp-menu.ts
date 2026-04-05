@@ -3,7 +3,6 @@ import { togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { toggleAudioDevicePanel } from "../settings/AudioDevicePanel";
 import { toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
 import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
-import { toggleYandexPanel, getCurrentYandexTrackId, likeCurrentYandexTrack, addCurrentTrackToPlaylist, downloadCurrentYandexTrack } from "../yandex/YandexPanel";
 import { toggleVisualizerPanel } from "./VisualizerPanel";
 import { toggleGenrePanel, toggleYouTubeSettings } from "../settings/GenrePanel";
 import { toggleRadioPanel } from "../radio/RadioPanel";
@@ -54,29 +53,8 @@ export function initGoampMenu(webamp: Webamp) {
 function showGoampMenu(x: number, y: number) {
   closeGoampMenu();
 
-  const yaTrack = getCurrentYandexTrackId();
-
   const items: MenuItem[] = [
-    ...(yaTrack ? [
-      {
-        label: `♥ Like "${yaTrack.title.slice(0, 30)}"`,
-        shortcut: "Ctrl+H",
-        action: () => likeCurrentYandexTrack().catch((e) => console.error("[GOAMP] Like failed:", e)),
-      },
-      {
-        label: "+ Add to Playlist",
-        shortcut: "Ctrl+Shift+A",
-        action: () => addCurrentTrackToPlaylist().catch((e) => console.error("[GOAMP] Add failed:", e)),
-      },
-      {
-        label: "↓ Download Locally",
-        shortcut: "Ctrl+Shift+D",
-        action: () => downloadCurrentYandexTrack().catch((e) => console.error("[GOAMP] Download failed:", e)),
-        separator: true,
-      },
-    ] : []),
     { label: "Search", shortcut: "Ctrl+Y", action: () => toggleSearchOverlay() },
-    { label: "Yandex Music", shortcut: "Ctrl+M", action: () => toggleYandexPanel() },
     { label: "Genres", shortcut: "Ctrl+G", action: () => toggleGenrePanel() },
     { label: "Internet Radio", shortcut: "Ctrl+R", action: () => toggleRadioPanel() },
     { label: "Playlists", shortcut: "Ctrl+P", action: () => togglePlaylistPanel() },
