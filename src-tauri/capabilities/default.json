@@ -21,11 +21,6 @@
     "core:window:allow-set-size",
     "core:window:allow-maximize",
     "core:window:allow-set-ignore-cursor-events",
-    "core:event:allow-listen",
-    "shell:allow-spawn",
-    "shell:allow-stdin-write",
-    "shell:allow-kill",
-    "shell:allow-open",
-    "updater:default"
+    "core:event:allow-listen"
   ]
 }

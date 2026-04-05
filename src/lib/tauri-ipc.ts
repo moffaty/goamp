@@ -240,3 +240,123 @@ export async function radioSaveSegment(index: number, title?: string): Promise<s
 export async function radioSaveLastSecs(secs: number, title?: string): Promise<string> {
   return invoke("radio_save_last_secs", { secs, title: title ?? null });
 }
+
+// Track Identity
+export async function resolveTrackId(
+  source: string,
+  sourceId: string,
+  artist: string,
+  title: string,
+  duration: number,
+): Promise<string> {
+  return invoke("resolve_track_id", { source, sourceId, artist, title, duration });
+}
+
+// Listen History
+export interface ListenStats {
+  canonical_id: string;
+  listen_count: number;
+  completed_count: number;
+  liked: boolean | null;
+}
+
+export async function recordTrackListen(
+  canonicalId: string,
+  source: string,
+  startedAt: number,
+  durationSecs: number,
+  listenedSecs: number,
+  completed: boolean,
+  skippedEarly: boolean,
+): Promise<void> {
+  return invoke("record_track_listen", {
+    canonicalId, source, startedAt, durationSecs, listenedSecs, completed, skippedEarly,
+  });
+}
+
+export async function setTrackLike(canonicalId: string, liked: boolean): Promise<void> {
+  return invoke("set_track_like", { canonicalId, liked });
+}
+
+export async function removeTrackLike(canonicalId: string): Promise<void> {
+  return invoke("remove_track_like", { canonicalId });
+}
+
+export async function getTrackStats(canonicalId: string): Promise<ListenStats> {
+  return invoke("get_track_stats", { canonicalId });
+}
+
+export async function getLikedTracks(): Promise<string[]> {
+  return invoke("get_liked_tracks");
+}
+
+// Surveys
+export interface Survey {
+  id: number;
+  survey_type: string;
+  payload: string;
+  created_at: number;
+}
+
+export async function surveyGetPending(): Promise<Survey | null> {
+  return invoke("survey_get_pending");
+}
+
+export async function surveyRespond(surveyId: number, response: string): Promise<void> {
+  return invoke("survey_respond", { surveyId, response });
+}
+
+export async function surveySkip(surveyId: number): Promise<void> {
+  return invoke("survey_skip", { surveyId });
+}
+
+export async function surveyMarkShown(surveyId: number): Promise<void> {
+  return invoke("survey_mark_shown", { surveyId });
+}
+
+// Aggregator
+export async function syncProfile(): Promise<number> {
+  return invoke("sync_profile");
+}
+
+export async function getRecommendations(limit?: number): Promise<[string, number, string, string, string][]> {
+  return invoke("get_recommendations", { limit: limit ?? null });
+}
+
+// Recommendations
+export async function getHybridRecommendations(limit?: number): Promise<[string, number, string, string, string][]> {
+  return invoke("get_hybrid_recommendations", { limit: limit ?? null });
+}
+
+export async function getColdstartRecommendations(
+  artist: string,
+  title: string,
+  limit?: number,
+): Promise<[string, string, number][]> {
+  return invoke("get_coldstart_recommendations", { artist, title, limit: limit ?? null });
+}
+
+// Mood Channels
+export interface MoodChannel {
+  id: string;
+  name: string;
+  description: string;
+  seed_tracks: string[];
+  is_default: boolean;
+}
+
+export async function listMoodChannels(): Promise<MoodChannel[]> {
+  return invoke("list_mood_channels");
+}
+
+export async function createMoodChannel(name: string, description: string): Promise<MoodChannel> {
+  return invoke("create_mood_channel", { name, description });
+}
+
+export async function addSeedTrack(channelId: string, canonicalId: string): Promise<void> {
+  return invoke("add_seed_track", { channelId, canonicalId });
+}
+
+export async function deleteMoodChannel(channelId: string): Promise<void> {
+  return invoke("delete_mood_channel", { channelId });
+}

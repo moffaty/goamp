@@ -1,17 +1,25 @@
 use tauri::Manager;
 
+mod aggregator;
 mod commands;
 mod db;
 mod feature_flags;
+mod history;
 #[cfg(not(target_os = "android"))]
 mod hook;
+mod http;
 mod md5;
 #[cfg(not(target_os = "android"))]
 mod media_keys;
 #[cfg(desktop)]
 mod node;
 mod radio;
+mod recommend;
 mod scrobble;
+mod survey;
+mod sybil;
+mod taste_profile;
+mod track_id;
 #[cfg(desktop)]
 mod tray;
 
@@ -99,6 +107,25 @@ pub fn run() {
             radio::radio_list_cached,
             radio::radio_save_segment,
             radio::radio_save_last_secs,
+            track_id::resolve_track_id,
+            history::record_track_listen,
+            history::set_track_like,
+            history::remove_track_like,
+            history::get_track_stats,
+            history::get_liked_tracks,
+            survey::survey_get_pending,
+            survey::survey_respond,
+            survey::survey_skip,
+            survey::survey_mark_shown,
+            taste_profile::build_profile,
+            aggregator::sync_profile,
+            aggregator::get_recommendations,
+            recommend::get_hybrid_recommendations,
+            recommend::get_coldstart_recommendations,
+            recommend::list_mood_channels,
+            recommend::create_mood_channel,
+            recommend::add_seed_track,
+            recommend::delete_mood_channel,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");

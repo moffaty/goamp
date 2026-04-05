@@ -4,20 +4,21 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { scanDirectory, saveSession, loadSession, getPlaylistTracks } from "../lib/tauri-ipc";
-import { yandexGetTrackUrl } from "../yandex/yandex-service";
 import { toWebampTracks } from "./tracks";
 import { track, trackError } from "../lib/analytics";
 import { initSearchOverlay, toggleSearchOverlay } from "../youtube/SearchOverlay";
 import { initPlaylistPanel, togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { initAudioDevicePanel, toggleAudioDevicePanel, restoreAudioDevice } from "../settings/AudioDevicePanel";
 import { initScrobbleSettings, toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
-import { initYandexPanel, toggleYandexPanel, likeCurrentYandexTrack, addCurrentTrackToPlaylist, downloadCurrentYandexTrack } from "../yandex/YandexPanel";
 import { initGoampMenu } from "./goamp-menu";
 import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
 import { initVisualizerPanel, toggleVisualizerPanel } from "./VisualizerPanel";
 import { initGenrePanel, toggleGenrePanel } from "../settings/GenrePanel";
 import { toggleYouTubeSettings } from "../settings/GenrePanel";
 import { initRadioPanel, toggleRadioPanel } from "../radio/RadioPanel";
+import { initRecommendationPanel, toggleRecommendationPanel } from "../recommendations/RecommendationPanel";
+import { HistoryTracker } from "../recommendations/history-service";
+import { resolveTrackId, recordTrackListen } from "../lib/tauri-ipc";
 import { refreshFlagCache, isFeatureEnabled } from "../settings/feature-flags-service";
 import { checkForUpdates } from "../updater/UpdateNotification";
 import {
@@ -41,14 +42,15 @@ export function setupBridge(webamp: Webamp) {
   initPlaylistPanel(webamp);
   initAudioDevicePanel(webamp);
   initScrobbleSettings();
-  initYandexPanel(webamp);
   initVisualizerPanel(webamp);
   initGenrePanel(webamp);
   initRadioPanel(webamp);
+  initRecommendationPanel(webamp);
   initGoampMenu(webamp);
   restoreAudioDevice();
   refreshFlagCache().catch(() => {});
   setupScrobbling(webamp);
+  setupHistoryTracking(webamp);
   // Check for updates 5 seconds after startup
   setTimeout(() => checkForUpdates(), 5000);
 }
@@ -88,15 +90,12 @@ async function saveCurrentSession(webamp: Webamp) {
     .map((t: any) => {
       const url: string = t.url || "";
       const isYoutube = url.includes("audio_cache");
-      // Yandex tracks have #ya:{track_id} fragment
-      const yaMatch = url.match(/#ya:(\d+)$/);
-      const isYandex = !!yaMatch;
       return {
         title: t.title || t.defaultName || "Unknown",
         artist: t.artist || "",
         duration: t.duration || 0,
-        source: isYandex ? "yandex" : isYoutube ? "youtube" : "local",
-        source_id: yaMatch?.[1] ?? url,
+        source: isYoutube ? "youtube" : "local",
+        source_id: url,
       };
     });
 
@@ -112,17 +111,7 @@ async function resolvePlaylistTracks(
 ) {
   const resolved = await Promise.all(
     tracks.map(async (t) => {
-      let url: string;
-      if (t.source === "yandex") {
-        try {
-          const streamUrl = await yandexGetTrackUrl(t.source_id);
-          url = `${streamUrl}#ya:${t.source_id}`;
-        } catch {
-          url = "";
-        }
-      } else {
-        url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
-      }
+      const url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
       return {
         metaData: { artist: t.artist || "Unknown Artist", title: t.title || "Unknown Track" },
         url,
@@ -273,26 +262,6 @@ function setupKeyboard(webamp: Webamp) {
       e.preventDefault();
       toggleScrobbleSettings();
     }
-    // Ctrl+M — Yandex Music panel
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyM") {
-      e.preventDefault();
-      toggleYandexPanel();
-    }
-    // Ctrl+H — Like current Yandex track (Heart)
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyH") {
-      e.preventDefault();
-      likeCurrentYandexTrack().catch(() => {});
-    }
-    // Ctrl+Shift+A — Add current track to GOAMP playlist
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyA") {
-      e.preventDefault();
-      addCurrentTrackToPlaylist().catch(() => {});
-    }
-    // Ctrl+Shift+D — Download current Yandex track locally
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyD") {
-      e.preventDefault();
-      downloadCurrentYandexTrack().catch(() => {});
-    }
     // Ctrl+G — Genre browser
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyG") {
       e.preventDefault();
@@ -302,6 +271,11 @@ function setupKeyboard(webamp: Webamp) {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyR") {
       e.preventDefault();
       toggleRadioPanel();
+    }
+    // Ctrl+Shift+R — Recommendation panel
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyR") {
+      e.preventDefault();
+      toggleRecommendationPanel();
     }
     // Ctrl+Shift+Y — YouTube settings
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyY") {
@@ -472,6 +446,46 @@ function setupScrobbling(webamp: Webamp) {
         }
       }
     }, 5000);
+  });
+}
+
+function extractSource(url: string): { source: string; sourceId: string } {
+  if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('audio_cache')) {
+    const match = url.match(/[?&]v=([^&]+)/) || url.match(/youtu\.be\/([^?]+)/);
+    return { source: 'youtube', sourceId: match?.[1] ?? url };
+  }
+  if (url.includes('soundcloud.com')) {
+    return { source: 'soundcloud', sourceId: url };
+  }
+  return { source: 'local', sourceId: url };
+}
+
+function setupHistoryTracking(webamp: Webamp) {
+  if (!isFeatureEnabled('recommendations')) return;
+
+  const historyTracker = new HistoryTracker(resolveTrackId, recordTrackListen);
+  let tracking = false;
+
+  webamp.onTrackDidChange((trackInfo) => {
+    // End previous track — use actual playback position, not wall clock
+    if (tracking) {
+      const state = (webamp as any).store?.getState();
+      const listenedSecs = Math.floor(state?.media?.timeElapsed ?? 0);
+      historyTracker.onTrackEnd(listenedSecs).catch(() => {});
+      tracking = false;
+    }
+
+    if (!trackInfo) return;
+
+    const url = (trackInfo as any).url || '';
+    const meta = (trackInfo as any).metaData;
+    const artist = meta?.artist || '';
+    const title = meta?.title || '';
+    const duration = (trackInfo as any).duration ?? 0;
+    const { source, sourceId } = extractSource(url);
+
+    historyTracker.onTrackStart(source, sourceId, artist, title, duration);
+    tracking = true;
   });
 }
 

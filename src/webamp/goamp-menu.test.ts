@@ -16,13 +16,6 @@ vi.mock("../scrobble/ScrobbleSettings", () => ({
 vi.mock("../settings/FeatureFlagsPanel", () => ({
   toggleFeatureFlagsPanel: vi.fn(),
 }));
-vi.mock("../yandex/YandexPanel", () => ({
-  toggleYandexPanel: vi.fn(),
-  getCurrentYandexTrackId: vi.fn(() => null),
-  likeCurrentYandexTrack: vi.fn(),
-  addCurrentTrackToPlaylist: vi.fn(),
-  downloadCurrentYandexTrack: vi.fn(),
-}));
 vi.mock("./VisualizerPanel", () => ({
   toggleVisualizerPanel: vi.fn(),
 }));
@@ -77,7 +70,6 @@ describe("initGoampMenu", () => {
     const labels = Array.from(menu.querySelectorAll("div > span:first-child")).map((el) => el.textContent);
 
     expect(labels).toContain("Search");
-    expect(labels).toContain("Yandex Music");
     expect(labels).toContain("Playlists");
     expect(labels).toContain("Audio Devices");
     expect(labels).toContain("Scrobbling");

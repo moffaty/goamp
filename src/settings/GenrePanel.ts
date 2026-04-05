@@ -7,7 +7,6 @@ import {
   youtubeGetPlaylist,
   type PlaylistTrack,
 } from "../lib/tauri-ipc";
-import { yandexGetTrackUrl } from "../yandex/yandex-service";
 import { extractAudio, extractAudioUrl } from "../youtube/youtube-service";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { escapeHtml, formatDuration } from "../lib/ui-utils";
@@ -62,7 +61,7 @@ async function renderGenreList() {
       content.innerHTML = `
         <div style="color:#888; text-align:center; padding:20px;">
           <div style="margin-bottom:8px;">No genres found yet.</div>
-          <div style="font-size:10px; color:#666;">Genres are collected from your tracks. Import playlists from Yandex or SoundCloud to see genres here.</div>
+          <div style="font-size:10px; color:#666;">Genres are collected from your tracks. Import playlists from SoundCloud or YouTube to see genres here.</div>
         </div>
       `;
       return;
@@ -144,7 +143,6 @@ async function renderGenreTracks(genre: string) {
 
 function sourceIcon(source: string): string {
   switch (source) {
-    case "yandex": return "Y";
     case "youtube": return "▶";
     case "soundcloud": return "SC";
     default: return "♪";
@@ -157,14 +155,7 @@ async function playTracks(tracks: PlaylistTrack[]) {
   const webampTracks = await Promise.all(
     tracks.map(async (t) => {
       let url: string;
-      if (t.source === "yandex") {
-        try {
-          const streamUrl = await yandexGetTrackUrl(t.source_id);
-          url = `${streamUrl}#ya:${t.source_id}`;
-        } catch {
-          url = "";
-        }
-      } else if (t.source === "youtube") {
+      if (t.source === "youtube") {
         try {
           const filePath = t.source_id.startsWith("/") || t.source_id.includes(":\\")
             ? t.source_id

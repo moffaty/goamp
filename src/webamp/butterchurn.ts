@@ -7,8 +7,19 @@ export function getButterchurnOptions() {
       return mod;
     },
     getPresets: async () => {
-      // butterchurn-presets exports packs as classes with static .getPresets()
-      const [pack1, pack2, pack3, pack4, pack5] = await Promise.all([
+      const packPaths = [
+        "butterchurn-presets/lib/butterchurnPresets.min.js",
+        "butterchurn-presets/lib/butterchurnPresetsExtra.min.js",
+        "butterchurn-presets/lib/butterchurnPresetsExtra2.min.js",
+        "butterchurn-presets/lib/butterchurnPresetsNonMinimal.min.js",
+        "butterchurn-presets/lib/butterchurnPresetsMinimal.min.js",
+      ];
+
+      const allPresets: Record<string, unknown> = {};
+
+      // Load each pack individually to survive partial failures
+      // Static import strings required for Vite to bundle them
+      const packs = await Promise.allSettled([
         import("butterchurn-presets/lib/butterchurnPresets.min.js"),
         import("butterchurn-presets/lib/butterchurnPresetsExtra.min.js"),
         import("butterchurn-presets/lib/butterchurnPresetsExtra2.min.js"),
@@ -16,21 +27,43 @@ export function getButterchurnOptions() {
         import("butterchurn-presets/lib/butterchurnPresetsMinimal.min.js"),
       ]);
 
-      const allPresets: Record<string, unknown> = {};
-
-      for (const mod of [pack1, pack2, pack3, pack4, pack5]) {
+      for (let i = 0; i < packs.length; i++) {
+        const result = packs[i];
+        if (result.status === "rejected") {
+          console.warn(`[GOAMP] Failed to load preset pack ${packPaths[i]}:`, result.reason);
+          continue;
+        }
+        const mod = result.value;
+        // UMD modules: Vite wraps CJS as { default: <export> }
+        // Try multiple access patterns for robustness
         const Pack = (mod as any).default || mod;
-        if (typeof Pack?.getPresets === "function") {
-          Object.assign(allPresets, Pack.getPresets());
+        const getPresets =
+          typeof Pack?.getPresets === "function"
+            ? Pack.getPresets
+            : typeof Pack === "function" && typeof (Pack as any).prototype?.getPresets === "function"
+              ? () => new (Pack as any)().getPresets()
+              : null;
+
+        if (getPresets) {
+          const presets = getPresets();
+          const count = Object.keys(presets).length;
+          console.log(`[GOAMP] Pack ${i}: ${count} presets from ${packPaths[i]}`);
+          Object.assign(allPresets, presets);
+        } else {
+          console.warn(`[GOAMP] Pack ${i}: no getPresets() found`, {
+            type: typeof Pack,
+            keys: Pack ? Object.keys(Pack).slice(0, 10) : [],
+            hasDefault: "default" in mod,
+          });
         }
       }
 
       // Load user custom presets
-      const customPresets = await loadCustomPresets();
+      const customPresets = loadCustomPresets();
       Object.assign(allPresets, customPresets);
 
       const entries = Object.entries(allPresets);
-      console.log(`[GOAMP] Butterchurn presets loaded: ${entries.length} (${Object.keys(customPresets).length} custom)`);
+      console.log(`[GOAMP] Butterchurn presets total: ${entries.length} (${Object.keys(customPresets).length} custom)`);
 
       return entries.map(([name, preset]) => ({
         name,

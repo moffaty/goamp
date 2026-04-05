@@ -7,11 +7,9 @@ import {
   addTrackToPlaylist,
   removeTrackFromPlaylist,
   renameTrack,
-  updateTrackSource,
   type PlaylistTrack,
   type TrackInput,
 } from "../lib/tauri-ipc";
-import { yandexGetTrackUrl, yandexDownloadToLibrary } from "../yandex/yandex-service";
 import { track, trackError } from "../lib/analytics";
 import { getSkinColors, escapeHtml, formatDuration } from "../lib/ui-utils";
 import type Webamp from "webamp";
@@ -34,8 +32,6 @@ export function togglePlaylistPanel() {
 
 function sourceLabel(source: string): { icon: string; color: string } {
   switch (source) {
-    case "yandex":
-      return { icon: "Y", color: "#fc0" };
     case "youtube":
       return { icon: "▶", color: "#f00" };
     case "soundcloud":
@@ -202,15 +198,13 @@ function getWebampTracks(): { title: string; artist: string; duration: number; u
 }
 
 function webampTrackToInput(t: { title: string; artist: string; duration: number; url: string }): TrackInput {
-  const yaMatch = t.url.match(/#ya:(\d+)$/);
-  const isYandex = !!yaMatch;
   const isYoutube = t.url.includes("audio_cache");
   return {
     title: t.title,
     artist: t.artist,
     duration: t.duration,
-    source: isYandex ? "yandex" : isYoutube ? "youtube" : "local",
-    source_id: yaMatch?.[1] ?? t.url,
+    source: isYoutube ? "youtube" : "local",
+    source_id: t.url,
   };
 }
 
@@ -308,9 +302,6 @@ async function renderTracks(playlistId: string, c: ReturnType<typeof getSkinColo
       const row = document.createElement("div");
       row.className = "pl-track-row";
       row.style.animationDelay = `${i * 20}ms`;
-      const dlBtn = t.source === "yandex"
-        ? `<button class="pl-track-dl" style="color:#88f" title="Download locally">↓</button>`
-        : "";
       row.innerHTML = `
         <span class="pl-track-num" style="color:${c.fg}">${i + 1}</span>
         <span class="pl-source-badge" style="color:${sourceBadge.color};font-size:8px;width:14px;text-align:center;" title="${t.source}">${sourceBadge.icon}</span>
@@ -319,14 +310,13 @@ async function renderTracks(playlistId: string, c: ReturnType<typeof getSkinColo
           <span class="pl-track-artist" style="color:${c.accent}">${escapeHtml(t.artist)}</span>
         </div>
         <span class="pl-track-dur" style="color:${c.fg}">${formatDuration(t.duration)}</span>
-        ${dlBtn}
         <button class="pl-track-rename" style="color:${c.fg}" title="Rename">✎</button>
         <button class="pl-track-del" style="color:${c.fg}" title="Remove">\u00d7</button>
       `;
 
       row.addEventListener("click", (e) => {
         const target = e.target as HTMLElement;
-        if (target.classList.contains("pl-track-del") || target.classList.contains("pl-track-rename") || target.classList.contains("pl-track-dl")) return;
+        if (target.classList.contains("pl-track-del") || target.classList.contains("pl-track-rename")) return;
         playSingleTrack(t);
       });
 
@@ -343,27 +333,6 @@ async function renderTracks(playlistId: string, c: ReturnType<typeof getSkinColo
           trackError(err, { action: "rename_track" });
         }
       });
-
-      const dlEl = row.querySelector(".pl-track-dl");
-      if (dlEl) {
-        dlEl.addEventListener("click", async (e) => {
-          e.stopPropagation();
-          const btn = dlEl as HTMLButtonElement;
-          try {
-            btn.textContent = "…";
-            const filePath = await yandexDownloadToLibrary(t.source_id, t.title, t.artist);
-            await updateTrackSource(t.id, "local", filePath);
-            btn.textContent = "✓";
-            btn.style.color = "#0f0";
-            // Refresh after short delay so user sees the checkmark
-            setTimeout(() => renderTracks(playlistId, c), 1000);
-          } catch (err) {
-            btn.textContent = "!";
-            btn.style.color = "#f00";
-            trackError(err, { action: "download_track" });
-          }
-        });
-      }
 
       row.querySelector(".pl-track-del")!.addEventListener("click", async (e) => {
         e.stopPropagation();
@@ -384,18 +353,8 @@ async function renderTracks(playlistId: string, c: ReturnType<typeof getSkinColo
 }
 
 async function trackToWebamp(t: PlaylistTrack) {
-  let url: string;
-  if (t.source === "yandex") {
-    try {
-      const streamUrl = await yandexGetTrackUrl(t.source_id);
-      url = `${streamUrl}#ya:${t.source_id}`;
-    } catch {
-      url = "";
-    }
-  } else {
-    // source_id is saved as Tauri asset URL — use directly, don't double-wrap
-    url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
-  }
+  // source_id is saved as Tauri asset URL — use directly, don't double-wrap
+  const url = t.source_id.startsWith("http") ? t.source_id : convertFileSrc(t.source_id);
   return {
     metaData: { artist: t.artist, title: t.title },
     url,

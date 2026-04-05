@@ -13,10 +13,6 @@ vi.mock("./youtube-service", () => ({
   extractAudio: vi.fn(),
   extractAudioUrl: vi.fn(),
 }));
-vi.mock("../yandex/yandex-service", () => ({
-  yandexSearch: vi.fn(),
-  yandexGetTrackUrl: vi.fn(),
-}));
 vi.mock("../lib/tauri-ipc", () => ({
   listPlaylists: vi.fn().mockResolvedValue([]),
   createPlaylist: vi.fn(),
@@ -59,11 +55,10 @@ describe("SearchOverlay", () => {
     expect(input.tagName).toBe("INPUT");
 
     const tabs = document.querySelectorAll(".yt-source-tab");
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toHaveLength(2);
     const tabLabels = Array.from(tabs).map((t) => t.textContent);
     expect(tabLabels).toContain("YouTube");
     expect(tabLabels).toContain("SoundCloud");
-    expect(tabLabels).toContain("Yandex");
   });
 
   it("closes overlay on close button", async () => {

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type SearchSource = "youtube" | "soundcloud" | "yandex";
+export type SearchSource = "youtube" | "soundcloud";
 
 export interface YoutubeResult {
   id: string;
