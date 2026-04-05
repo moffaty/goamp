@@ -289,3 +289,27 @@ export async function getTrackStats(canonicalId: string): Promise<ListenStats> {
 export async function getLikedTracks(): Promise<string[]> {
   return invoke("get_liked_tracks");
 }
+
+// Surveys
+export interface Survey {
+  id: number;
+  survey_type: string;
+  payload: string;
+  created_at: number;
+}
+
+export async function surveyGetPending(): Promise<Survey | null> {
+  return invoke("survey_get_pending");
+}
+
+export async function surveyRespond(surveyId: number, response: string): Promise<void> {
+  return invoke("survey_respond", { surveyId, response });
+}
+
+export async function surveySkip(surveyId: number): Promise<void> {
+  return invoke("survey_skip", { surveyId });
+}
+
+export async function surveyMarkShown(surveyId: number): Promise<void> {
+  return invoke("survey_mark_shown", { surveyId });
+}

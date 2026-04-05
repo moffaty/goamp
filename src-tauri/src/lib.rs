@@ -13,6 +13,7 @@ mod media_keys;
 mod node;
 mod radio;
 mod scrobble;
+mod survey;
 mod track_id;
 #[cfg(desktop)]
 mod tray;
@@ -107,6 +108,10 @@ pub fn run() {
             history::remove_track_like,
             history::get_track_stats,
             history::get_liked_tracks,
+            survey::survey_get_pending,
+            survey::survey_respond,
+            survey::survey_skip,
+            survey::survey_mark_shown,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");
