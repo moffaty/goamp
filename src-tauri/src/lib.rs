@@ -13,6 +13,7 @@ mod media_keys;
 #[cfg(desktop)]
 mod node;
 mod radio;
+mod recommend;
 mod scrobble;
 mod survey;
 mod sybil;
@@ -118,6 +119,7 @@ pub fn run() {
             taste_profile::build_profile,
             aggregator::sync_profile,
             aggregator::get_recommendations,
+            recommend::get_hybrid_recommendations,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");

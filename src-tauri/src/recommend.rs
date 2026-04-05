@@ -1,0 +1,230 @@
+// src-tauri/src/recommend.rs
+
+use rusqlite::Connection;
+use serde::Serialize;
+use std::collections::{HashMap, HashSet};
+use tauri::Manager;
+
+/// Collaborative filtering: tracks liked by similar peers but not yet liked by user.
+pub fn collaborative_recommend(
+    conn: &Connection,
+    my_likes: &[String],
+    limit: usize,
+) -> Vec<(String, f64, String)> {
+    let my_set: HashSet<&str> = my_likes.iter().map(|s| s.as_str()).collect();
+    if my_set.is_empty() {
+        return vec![];
+    }
+
+    let mut stmt = conn
+        .prepare("SELECT profile_data FROM peer_profiles")
+        .unwrap();
+    let peers: Vec<String> = stmt
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let mut track_scores: HashMap<String, f64> = HashMap::new();
+
+    for peer_json in &peers {
+        let peer: serde_json::Value = match serde_json::from_str(peer_json) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let peer_likes: Vec<&str> = peer
+            .get("liked_hashes")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
+            .unwrap_or_default();
+
+        let peer_set: HashSet<&str> = peer_likes.iter().copied().collect();
+        let intersection = my_set.intersection(&peer_set).count();
+        if intersection == 0 {
+            continue;
+        }
+        let similarity = intersection as f64 / my_set.union(&peer_set).count() as f64;
+
+        for track in peer_likes {
+            if !my_set.contains(track) {
+                *track_scores.entry(track.to_string()).or_insert(0.0) += similarity;
+            }
+        }
+    }
+
+    let mut sorted: Vec<(String, f64, String)> = track_scores
+        .into_iter()
+        .map(|(id, score)| (id, score.min(1.0), "collaborative".to_string()))
+        .collect();
+    sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    sorted.truncate(limit);
+    sorted
+}
+
+/// Content-based: tracks with high completion rate not yet explicitly liked/disliked.
+pub fn content_recommend(conn: &Connection, limit: usize) -> Vec<(String, f64, String)> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT lh.canonical_id,
+                COUNT(*) as total,
+                SUM(CASE WHEN lh.completed = 1 THEN 1 ELSE 0 END) as completed,
+                AVG(CAST(lh.listened_secs AS REAL) / NULLIF(lh.duration_secs, 0)) as avg_completion
+         FROM listen_history lh
+         LEFT JOIN track_likes tl ON tl.canonical_id = lh.canonical_id
+         WHERE tl.canonical_id IS NULL
+         GROUP BY lh.canonical_id
+         HAVING total >= 2 AND avg_completion > 0.7
+         ORDER BY avg_completion DESC, total DESC
+         LIMIT ?1",
+        )
+        .unwrap();
+    stmt.query_map([limit as i64], |row| {
+        let cid: String = row.get(0)?;
+        let avg_completion: f64 = row.get(3)?;
+        Ok((cid, avg_completion.min(1.0), "content".to_string()))
+    })
+    .unwrap()
+    .filter_map(|r| r.ok())
+    .collect()
+}
+
+/// Hybrid: merge collaborative (0.4) + content (0.3) + server cache (0.3).
+pub fn hybrid_recommend(conn: &Connection, limit: usize) -> Vec<(String, f64, String)> {
+    let my_likes = crate::history::get_liked_canonical_ids(conn);
+    let collab = collaborative_recommend(conn, &my_likes, limit * 2);
+    let content = content_recommend(conn, limit * 2);
+    let cached = crate::aggregator::get_cached_recommendations(conn, limit * 2);
+
+    let mut merged: HashMap<String, (f64, String)> = HashMap::new();
+    for (id, score, source) in &collab {
+        merged.entry(id.clone()).or_insert((0.0, source.clone())).0 += score * 0.4;
+    }
+    for (id, score, source) in &content {
+        merged.entry(id.clone()).or_insert((0.0, source.clone())).0 += score * 0.3;
+    }
+    for (id, score, source) in &cached {
+        merged.entry(id.clone()).or_insert((0.0, source.clone())).0 += score * 0.3;
+    }
+
+    let mut result: Vec<(String, f64, String)> = merged
+        .into_iter()
+        .map(|(id, (score, source))| (id, score.min(1.0), source))
+        .collect();
+    result.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    result.truncate(limit);
+    result
+}
+
+// ─── Tauri commands ───
+
+#[tauri::command]
+pub fn get_hybrid_recommendations(
+    app: tauri::AppHandle,
+    limit: Option<u32>,
+) -> Result<Vec<(String, f64, String)>, String> {
+    let db = app.state::<crate::db::Db>();
+    let conn =
+        db.0.lock()
+            .unwrap_or_else(|e: std::sync::PoisonError<_>| e.into_inner());
+    Ok(hybrid_recommend(&conn, limit.unwrap_or(30) as usize))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::test_db;
+    use crate::history::*;
+    use crate::track_id::*;
+
+    fn seed_rich_data(conn: &rusqlite::Connection) {
+        let tracks = vec![
+            ("youtube", "v1", "Boards of Canada", "Dayvan Cowboy", 300.0),
+            ("youtube", "v2", "Aphex Twin", "Windowlicker", 390.0),
+            ("youtube", "v3", "Autechre", "Gantz Graf", 260.0),
+            ("soundcloud", "s1", "Four Tet", "She Moves She", 420.0),
+            ("youtube", "v4", "Metallica", "Enter Sandman", 331.0),
+            ("soundcloud", "s2", "Bonobo", "Kerala", 335.0),
+        ];
+        for (src, sid, artist, title, dur) in &tracks {
+            resolve_or_create(conn, src, sid, artist, title, *dur);
+        }
+        let cid1 = canonical_hash("Boards of Canada", "Dayvan Cowboy");
+        let cid2 = canonical_hash("Aphex Twin", "Windowlicker");
+        let cid3 = canonical_hash("Autechre", "Gantz Graf");
+        let cid4 = canonical_hash("Four Tet", "She Moves She");
+        for i in 0..10i64 {
+            record_listen(
+                conn,
+                &cid1,
+                "youtube",
+                1000 + i * 400,
+                300,
+                280,
+                true,
+                false,
+            );
+            record_listen(
+                conn,
+                &cid2,
+                "youtube",
+                1200 + i * 400,
+                390,
+                380,
+                true,
+                false,
+            );
+        }
+        for i in 0..3i64 {
+            record_listen(
+                conn,
+                &cid3,
+                "youtube",
+                5000 + i * 400,
+                260,
+                250,
+                true,
+                false,
+            );
+        }
+        set_like(conn, &cid1, true);
+        set_like(conn, &cid2, true);
+        set_like(conn, &cid3, true);
+        set_like(conn, &cid4, true);
+        let peer_profile = serde_json::json!({
+            "liked_hashes": [cid1, cid2, cid4, canonical_hash("Bonobo", "Kerala")]
+        })
+        .to_string();
+        crate::aggregator::store_peer_profile(conn, "peer1", &peer_profile);
+    }
+
+    #[test]
+    fn test_collaborative_recommendations() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        seed_rich_data(&conn);
+        let my_likes = crate::history::get_liked_canonical_ids(&conn);
+        let recs = collaborative_recommend(&conn, &my_likes, 10);
+        assert!(recs.len() <= 10);
+    }
+
+    #[test]
+    fn test_content_based_recommendations() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        seed_rich_data(&conn);
+        let recs = content_recommend(&conn, 10);
+        assert!(recs.len() <= 10);
+    }
+
+    #[test]
+    fn test_hybrid_recommendations_merge() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        seed_rich_data(&conn);
+        let recs = hybrid_recommend(&conn, 10);
+        assert!(recs.len() <= 10);
+        for (_, score, _) in &recs {
+            assert!(*score >= 0.0 && *score <= 1.0);
+        }
+    }
+}
