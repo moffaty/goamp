@@ -120,6 +120,7 @@ pub fn run() {
             aggregator::sync_profile,
             aggregator::get_recommendations,
             recommend::get_hybrid_recommendations,
+            recommend::get_coldstart_recommendations,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");

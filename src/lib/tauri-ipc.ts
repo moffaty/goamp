@@ -322,3 +322,16 @@ export async function syncProfile(): Promise<number> {
 export async function getRecommendations(limit?: number): Promise<[string, number, string][]> {
   return invoke("get_recommendations", { limit: limit ?? null });
 }
+
+// Recommendations
+export async function getHybridRecommendations(limit?: number): Promise<[string, number, string][]> {
+  return invoke("get_hybrid_recommendations", { limit: limit ?? null });
+}
+
+export async function getColdstartRecommendations(
+  artist: string,
+  title: string,
+  limit?: number,
+): Promise<[string, string, number][]> {
+  return invoke("get_coldstart_recommendations", { artist, title, limit: limit ?? null });
+}

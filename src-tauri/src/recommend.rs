@@ -115,6 +115,54 @@ pub fn hybrid_recommend(conn: &Connection, limit: usize) -> Vec<(String, f64, St
     result
 }
 
+// ─── Last.fm cold-start helpers ───
+
+const LASTFM_API_URL: &str = "https://ws.audioscrobbler.com/2.0/";
+
+pub fn lastfm_similar_url(api_key: &str, artist: &str, track: &str) -> String {
+    let enc_artist = urlencoding::encode(artist);
+    let enc_track = urlencoding::encode(track);
+    format!(
+        "{}?method=track.getSimilar&artist={}&track={}&api_key={}&format=json&limit=20",
+        LASTFM_API_URL, enc_artist, enc_track, api_key
+    )
+}
+
+/// Fetch similar tracks from Last.fm for cold start / fallback.
+pub async fn lastfm_get_similar(
+    client: &reqwest::Client,
+    api_key: &str,
+    artist: &str,
+    track: &str,
+) -> Vec<(String, String, f64)> {
+    let url = lastfm_similar_url(api_key, artist, track);
+    let resp = match client.get(&url).send().await {
+        Ok(r) => r,
+        Err(_) => return vec![],
+    };
+    let body: serde_json::Value = match resp.json().await {
+        Ok(v) => v,
+        Err(_) => return vec![],
+    };
+    let tracks = match body
+        .get("similartracks")
+        .and_then(|st| st.get("track"))
+        .and_then(|t| t.as_array())
+    {
+        Some(arr) => arr,
+        None => return vec![],
+    };
+    tracks
+        .iter()
+        .filter_map(|t| {
+            let name = t.get("name")?.as_str()?;
+            let artist = t.get("artist")?.get("name")?.as_str()?;
+            let match_score = t.get("match")?.as_str()?.parse::<f64>().ok()?;
+            Some((artist.to_string(), name.to_string(), match_score))
+        })
+        .collect()
+}
+
 // ─── Tauri commands ───
 
 #[tauri::command]
@@ -129,8 +177,39 @@ pub fn get_hybrid_recommendations(
     Ok(hybrid_recommend(&conn, limit.unwrap_or(30) as usize))
 }
 
+#[tauri::command]
+pub async fn get_coldstart_recommendations(
+    app: tauri::AppHandle,
+    artist: String,
+    title: String,
+    limit: Option<u32>,
+) -> Result<Vec<(String, String, f64)>, String> {
+    let db = app.state::<crate::db::Db>();
+    let api_key = {
+        let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
+        conn.query_row(
+            "SELECT value FROM settings WHERE key = 'lastfm_api_key'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .map_err(|_| "Last.fm API key not set".to_string())?
+    };
+    let client = reqwest::Client::new();
+    let mut similar = lastfm_get_similar(&client, &api_key, &artist, &title).await;
+    similar.truncate(limit.unwrap_or(20) as usize);
+    Ok(similar)
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_lastfm_similar_url() {
+        let url = super::lastfm_similar_url("abc123", "Boards of Canada", "Dayvan Cowboy");
+        assert!(url.contains("method=track.getSimilar"));
+        assert!(url.contains("Boards"));
+        assert!(url.contains("Dayvan"));
+    }
+
     use super::*;
     use crate::db::test_db;
     use crate::history::*;
