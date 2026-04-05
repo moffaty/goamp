@@ -14,6 +14,7 @@ mod node;
 mod radio;
 mod scrobble;
 mod survey;
+mod taste_profile;
 mod track_id;
 #[cfg(desktop)]
 mod tray;
@@ -112,6 +113,7 @@ pub fn run() {
             survey::survey_respond,
             survey::survey_skip,
             survey::survey_mark_shown,
+            taste_profile::build_profile,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");
