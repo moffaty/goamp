@@ -9,6 +9,9 @@ use crate::taste_profile::TasteProfile;
 
 const DEFAULT_AGGREGATOR: &str = "https://api.goamp.app/v1";
 
+type RecEntry = (String, f64, String, String, String);
+
+#[allow(dead_code)]
 pub fn store_peer_profile(conn: &Connection, profile_hash: &str, profile_data: &str) {
     let _ = conn.execute(
         "INSERT OR REPLACE INTO peer_profiles (profile_hash, profile_data, received_at)
@@ -17,7 +20,7 @@ pub fn store_peer_profile(conn: &Connection, profile_hash: &str, profile_data: &
     );
 }
 
-pub fn cache_recommendations(conn: &Connection, recs: &[(String, f64, String, String, String)]) {
+pub fn cache_recommendations(conn: &Connection, recs: &[RecEntry]) {
     // tuple: (canonical_id, score, source, artist, title)
     for (canonical_id, score, source, artist, title) in recs {
         let metadata = serde_json::json!({ "artist": artist, "title": title }).to_string();
@@ -29,10 +32,7 @@ pub fn cache_recommendations(conn: &Connection, recs: &[(String, f64, String, St
     }
 }
 
-pub fn get_cached_recommendations(
-    conn: &Connection,
-    limit: usize,
-) -> Vec<(String, f64, String, String, String)> {
+pub fn get_cached_recommendations(conn: &Connection, limit: usize) -> Vec<RecEntry> {
     let mut stmt = conn.prepare(
         "SELECT canonical_id, score, source, metadata FROM recommendation_cache ORDER BY score DESC LIMIT ?1"
     ).unwrap();
@@ -121,7 +121,7 @@ pub async fn sync_profile(app: tauri::AppHandle) -> Result<u32, String> {
     let response = submit_to_aggregator(&crate::http::CLIENT, &base_url, &submission).await?;
 
     let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
-    let recs: Vec<(String, f64, String, String, String)> = response
+    let recs: Vec<RecEntry> = response
         .recommendations
         .iter()
         .map(|r| {
@@ -148,7 +148,7 @@ pub async fn sync_profile(app: tauri::AppHandle) -> Result<u32, String> {
 pub fn get_recommendations(
     app: tauri::AppHandle,
     limit: Option<u32>,
-) -> Result<Vec<(String, f64, String, String, String)>, String> {
+) -> Result<Vec<RecEntry>, String> {
     let db = app.state::<crate::db::Db>();
     let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     Ok(get_cached_recommendations(

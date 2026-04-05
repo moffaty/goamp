@@ -73,6 +73,7 @@ pub fn set_musicbrainz_id(conn: &Connection, canonical_id: &str, mbid: &str) {
 }
 
 /// Attach an AcoustID fingerprint to a specific source entry.
+#[allow(dead_code)]
 pub fn set_acoustid(conn: &Connection, source: &str, source_id: &str, acoustid: &str) {
     let _ = conn.execute(
         "UPDATE track_identity SET acoustid = ?1, updated_at = unixepoch() WHERE source = ?2 AND source_id = ?3",
@@ -81,6 +82,7 @@ pub fn set_acoustid(conn: &Connection, source: &str, source_id: &str, acoustid: 
 }
 
 /// Update peer_count for all entries with a given canonical_id.
+#[allow(dead_code)]
 pub fn update_peer_count(conn: &Connection, canonical_id: &str, count: i32) {
     let _ = conn.execute(
         "UPDATE track_identity SET peer_count = ?1, updated_at = unixepoch() WHERE canonical_id = ?2",
@@ -90,6 +92,7 @@ pub fn update_peer_count(conn: &Connection, canonical_id: &str, count: i32) {
 
 /// Check if a track should participate in P2P aggregation.
 /// Tracks qualify if they have a MusicBrainz ID, OR peer_count >= threshold.
+#[allow(dead_code)]
 pub fn is_aggregation_eligible(conn: &Connection, canonical_id: &str, peer_threshold: i32) -> bool {
     conn.query_row(
         "SELECT 1 FROM track_identity WHERE canonical_id = ?1 AND (musicbrainz_id IS NOT NULL OR peer_count >= ?2) LIMIT 1",

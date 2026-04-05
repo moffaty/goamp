@@ -1,9 +1,10 @@
 // src-tauri/src/recommend.rs
 
 use rusqlite::Connection;
-use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use tauri::Manager;
+
+type RecEntry = (String, f64, String, String, String);
 
 /// Collaborative filtering: tracks liked by similar peers but not yet liked by user.
 pub fn collaborative_recommend(
@@ -169,13 +170,13 @@ pub async fn lastfm_get_similar(
 pub fn get_hybrid_recommendations(
     app: tauri::AppHandle,
     limit: Option<u32>,
-) -> Result<Vec<(String, f64, String, String, String)>, String> {
+) -> Result<Vec<RecEntry>, String> {
     let db = app.state::<crate::db::Db>();
     let conn =
         db.0.lock()
             .unwrap_or_else(|e: std::sync::PoisonError<_>| e.into_inner());
     let recs = hybrid_recommend(&conn, limit.unwrap_or(30) as usize);
-    let resolved: Vec<(String, f64, String, String, String)> = recs
+    let resolved: Vec<RecEntry> = recs
         .into_iter()
         .map(|(cid, score, source)| {
             let (artist, title) = conn

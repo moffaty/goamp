@@ -4,6 +4,7 @@ use serde::Serialize;
 use tauri::Manager;
 
 /// Record a listening event.
+#[allow(clippy::too_many_arguments)]
 pub fn record_listen(
     conn: &Connection,
     canonical_id: &str,
@@ -91,6 +92,7 @@ pub fn get_liked_canonical_ids(conn: &Connection) -> Vec<String> {
 }
 
 /// Check if listen duration qualifies as implicit like (>=80% completion).
+#[allow(dead_code)]
 pub fn is_implicit_like(duration_secs: i32, listened_secs: i32) -> bool {
     if duration_secs <= 0 {
         return false;
@@ -109,6 +111,7 @@ pub struct ListenStats {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn record_track_listen(
     app: tauri::AppHandle,
     canonical_id: String,

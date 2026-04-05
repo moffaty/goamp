@@ -19,6 +19,7 @@ impl NodeProcess {
         *self.0.lock().unwrap() = Some(child);
     }
 
+    #[allow(dead_code)]
     pub fn kill(&self) {
         if let Some(child) = self.0.lock().unwrap().take() {
             let _ = child.kill();

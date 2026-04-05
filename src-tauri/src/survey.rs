@@ -10,6 +10,7 @@ pub struct Survey {
     pub created_at: i64,
 }
 
+#[allow(dead_code)]
 pub fn create_similarity_survey(
     conn: &Connection,
     track_a: &str,
@@ -30,6 +31,7 @@ pub fn create_similarity_survey(
     })
 }
 
+#[allow(dead_code)]
 pub fn create_genre_survey(
     conn: &Connection,
     track: &str,
@@ -49,6 +51,7 @@ pub fn create_genre_survey(
     })
 }
 
+#[allow(dead_code)]
 pub fn create_mood_survey(conn: &Connection, track: &str) -> Result<Survey, rusqlite::Error> {
     let payload =
         serde_json::json!({ "track": track, "choices": ["energetic", "calm"] }).to_string();
