@@ -195,8 +195,7 @@ pub async fn resolve_track_id(
     }; // lock released here
 
     if !artist.is_empty() && !title.is_empty() {
-        let client = reqwest::Client::new();
-        if let Some(mb_match) = musicbrainz_lookup(&client, &artist, &title).await {
+        if let Some(mb_match) = musicbrainz_lookup(&crate::http::CLIENT, &artist, &title).await {
             let conn =
                 db.0.lock()
                     .unwrap_or_else(|e: std::sync::PoisonError<_>| e.into_inner());

@@ -7,6 +7,7 @@ mod feature_flags;
 mod history;
 #[cfg(not(target_os = "android"))]
 mod hook;
+mod http;
 mod md5;
 #[cfg(not(target_os = "android"))]
 mod media_keys;

@@ -1900,6 +1900,7 @@ dependencies = [
  "chrono",
  "futures-util",
  "lofty",
+ "once_cell",
  "rdev",
  "reqwest 0.12.28",
  "rusqlite",

@@ -100,9 +100,8 @@ pub async fn sync_profile(app: tauri::AppHandle) -> Result<u32, String> {
         (base_url, profile, proofs)
     };
 
-    let client = reqwest::Client::new();
     let submission = ProfileSubmission { profile, proofs };
-    let response = submit_to_aggregator(&client, &base_url, &submission).await?;
+    let response = submit_to_aggregator(&crate::http::CLIENT, &base_url, &submission).await?;
 
     let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     let recs: Vec<(String, f64, String)> = response

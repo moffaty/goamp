@@ -17,7 +17,7 @@ pub fn collaborative_recommend(
     }
 
     let mut stmt = conn
-        .prepare("SELECT profile_data FROM peer_profiles")
+        .prepare("SELECT profile_data FROM peer_profiles ORDER BY received_at DESC LIMIT 500")
         .unwrap();
     let peers: Vec<String> = stmt
         .query_map([], |row| row.get(0))
@@ -194,8 +194,7 @@ pub async fn get_coldstart_recommendations(
         )
         .map_err(|_| "Last.fm API key not set".to_string())?
     };
-    let client = reqwest::Client::new();
-    let mut similar = lastfm_get_similar(&client, &api_key, &artist, &title).await;
+    let mut similar = lastfm_get_similar(&crate::http::CLIENT, &api_key, &artist, &title).await;
     similar.truncate(limit.unwrap_or(20) as usize);
     Ok(similar)
 }
