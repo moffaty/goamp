@@ -110,7 +110,8 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
             ('visualizer', 1, 'Butterchurn visualizer'),
             ('media_keys', 1, 'System media keys / MPRIS'),
             ('system_tray', 1, 'System tray icon'),
-            ('auto_scrobble', 1, 'Auto-scrobble after 50% or 4 min');
+            ('auto_scrobble', 1, 'Auto-scrobble after 50% or 4 min'),
+            ('recommendations', 1, 'GOAMP recommendations and mood radio');
 
         -- Special system playlist for last session
         INSERT OR IGNORE INTO playlists (id, name, position)
@@ -303,7 +304,7 @@ mod tests {
         let count: i32 = conn
             .query_row("SELECT COUNT(*) FROM feature_flags", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(count, 8);
+        assert_eq!(count, 9);
 
         // All default flags should be enabled
         let disabled: i32 = conn
@@ -340,7 +341,7 @@ mod tests {
         let count: i32 = conn
             .query_row("SELECT COUNT(*) FROM feature_flags", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(count, 8); // INSERT OR IGNORE — no duplicates
+        assert_eq!(count, 9); // INSERT OR IGNORE — no duplicates
     }
 
     #[test]

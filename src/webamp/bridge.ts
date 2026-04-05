@@ -17,6 +17,8 @@ import { initGenrePanel, toggleGenrePanel } from "../settings/GenrePanel";
 import { toggleYouTubeSettings } from "../settings/GenrePanel";
 import { initRadioPanel, toggleRadioPanel } from "../radio/RadioPanel";
 import { initRecommendationPanel, toggleRecommendationPanel } from "../recommendations/RecommendationPanel";
+import { HistoryTracker } from "../recommendations/history-service";
+import { resolveTrackId, recordTrackListen } from "../lib/tauri-ipc";
 import { refreshFlagCache, isFeatureEnabled } from "../settings/feature-flags-service";
 import { checkForUpdates } from "../updater/UpdateNotification";
 import {
@@ -48,6 +50,7 @@ export function setupBridge(webamp: Webamp) {
   restoreAudioDevice();
   refreshFlagCache().catch(() => {});
   setupScrobbling(webamp);
+  setupHistoryTracking(webamp);
   // Check for updates 5 seconds after startup
   setTimeout(() => checkForUpdates(), 5000);
 }
@@ -443,6 +446,49 @@ function setupScrobbling(webamp: Webamp) {
         }
       }
     }, 5000);
+  });
+}
+
+function extractSource(url: string): { source: string; sourceId: string } {
+  if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('audio_cache')) {
+    const match = url.match(/[?&]v=([^&]+)/) || url.match(/youtu\.be\/([^?]+)/);
+    return { source: 'youtube', sourceId: match?.[1] ?? url };
+  }
+  if (url.includes('soundcloud.com')) {
+    return { source: 'soundcloud', sourceId: url };
+  }
+  return { source: 'local', sourceId: url };
+}
+
+let historyTrackStartTime = 0;
+
+function setupHistoryTracking(webamp: Webamp) {
+  if (!isFeatureEnabled('recommendations')) return;
+
+  const historyTracker = new HistoryTracker(resolveTrackId, recordTrackListen);
+
+  webamp.onTrackDidChange((trackInfo) => {
+    // End previous track
+    if (historyTrackStartTime > 0) {
+      const listenedSecs = Math.floor((Date.now() - historyTrackStartTime) / 1000);
+      historyTracker.onTrackEnd(listenedSecs).catch(() => {});
+    }
+
+    if (!trackInfo) {
+      historyTrackStartTime = 0;
+      return;
+    }
+
+    historyTrackStartTime = Date.now();
+
+    const url = (trackInfo as any).url || '';
+    const meta = (trackInfo as any).metaData;
+    const artist = meta?.artist || '';
+    const title = meta?.title || '';
+    const duration = (trackInfo as any).duration ?? 0;
+    const { source, sourceId } = extractSource(url);
+
+    historyTracker.onTrackStart(source, sourceId, artist, title, duration);
   });
 }
 
