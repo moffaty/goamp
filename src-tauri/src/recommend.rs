@@ -200,6 +200,123 @@ pub async fn get_coldstart_recommendations(
     Ok(similar)
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct MoodChannel {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub seed_tracks: Vec<String>,
+    pub is_default: bool,
+}
+
+#[tauri::command]
+pub fn list_mood_channels(app: tauri::AppHandle) -> Result<Vec<MoodChannel>, String> {
+    let db = app.state::<crate::db::Db>();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
+
+    let mut stmt = conn.prepare(
+        "SELECT id, name, description, seed_tracks, is_default FROM mood_channels ORDER BY is_default DESC, name"
+    ).map_err(|e| format!("{e}"))?;
+
+    let channels = stmt
+        .query_map([], |row| {
+            let seeds_json: String = row.get(3)?;
+            let seeds: Vec<String> = serde_json::from_str(&seeds_json).unwrap_or_default();
+            Ok(MoodChannel {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                seed_tracks: seeds,
+                is_default: row.get::<_, i32>(4)? != 0,
+            })
+        })
+        .map_err(|e| format!("{e}"))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(channels)
+}
+
+#[tauri::command]
+pub fn create_mood_channel(
+    app: tauri::AppHandle,
+    name: String,
+    description: String,
+) -> Result<MoodChannel, String> {
+    let db = app.state::<crate::db::Db>();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
+
+    let id = uuid::Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO mood_channels (id, name, description) VALUES (?1, ?2, ?3)",
+        rusqlite::params![id, name, description],
+    )
+    .map_err(|e| format!("{e}"))?;
+
+    Ok(MoodChannel {
+        id,
+        name,
+        description,
+        seed_tracks: vec![],
+        is_default: false,
+    })
+}
+
+#[tauri::command]
+pub fn add_seed_track(
+    app: tauri::AppHandle,
+    channel_id: String,
+    canonical_id: String,
+) -> Result<(), String> {
+    let db = app.state::<crate::db::Db>();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
+
+    let current: String = conn
+        .query_row(
+            "SELECT seed_tracks FROM mood_channels WHERE id = ?1",
+            [&channel_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "channel not found".to_string())?;
+
+    let mut seeds: Vec<String> = serde_json::from_str(&current).unwrap_or_default();
+    if !seeds.contains(&canonical_id) {
+        seeds.push(canonical_id);
+    }
+
+    let updated = serde_json::to_string(&seeds).unwrap();
+    conn.execute(
+        "UPDATE mood_channels SET seed_tracks = ?1 WHERE id = ?2",
+        rusqlite::params![updated, channel_id],
+    )
+    .map_err(|e| format!("{e}"))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_mood_channel(app: tauri::AppHandle, channel_id: String) -> Result<(), String> {
+    let db = app.state::<crate::db::Db>();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
+
+    let is_default: i32 = conn
+        .query_row(
+            "SELECT is_default FROM mood_channels WHERE id = ?1",
+            [&channel_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "channel not found".to_string())?;
+
+    if is_default != 0 {
+        return Err("cannot delete default channel".into());
+    }
+
+    conn.execute("DELETE FROM mood_channels WHERE id = ?1", [&channel_id])
+        .map_err(|e| format!("{e}"))?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

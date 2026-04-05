@@ -121,6 +121,10 @@ pub fn run() {
             aggregator::get_recommendations,
             recommend::get_hybrid_recommendations,
             recommend::get_coldstart_recommendations,
+            recommend::list_mood_channels,
+            recommend::create_mood_channel,
+            recommend::add_seed_track,
+            recommend::delete_mood_channel,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");

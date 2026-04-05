@@ -227,6 +227,27 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         ",
     )?;
 
+    // Migration: mood channels
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS mood_channels (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            seed_tracks TEXT NOT NULL DEFAULT '[]',
+            filters TEXT NOT NULL DEFAULT '{}',
+            created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+            is_default INTEGER NOT NULL DEFAULT 0
+        );
+
+        INSERT OR IGNORE INTO mood_channels (id, name, description, is_default) VALUES
+            ('calm', 'Calm', 'Relaxing and ambient music', 1),
+            ('energetic', 'Energetic', 'Upbeat and driving tracks', 1),
+            ('focus', 'Focus', 'Music for concentration', 1),
+            ('discovery', 'Discovery', 'New tracks from recommendations', 1);
+        ",
+    )?;
+
     // Migration: aggregation tables
     conn.execute_batch(
         "
@@ -577,6 +598,26 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM peer_profiles", [], |row| row.get(0))
             .unwrap();
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_mood_channels_table_exists() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO mood_channels (id, name, description, seed_tracks, filters)
+             VALUES ('ch1', 'Focus', 'Music for deep work', '[]', '{}')",
+            [],
+        )
+        .unwrap();
+        let name: String = conn
+            .query_row(
+                "SELECT name FROM mood_channels WHERE id = 'ch1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(name, "Focus");
     }
 
     #[test]

@@ -335,3 +335,28 @@ export async function getColdstartRecommendations(
 ): Promise<[string, string, number][]> {
   return invoke("get_coldstart_recommendations", { artist, title, limit: limit ?? null });
 }
+
+// Mood Channels
+export interface MoodChannel {
+  id: string;
+  name: string;
+  description: string;
+  seed_tracks: string[];
+  is_default: boolean;
+}
+
+export async function listMoodChannels(): Promise<MoodChannel[]> {
+  return invoke("list_mood_channels");
+}
+
+export async function createMoodChannel(name: string, description: string): Promise<MoodChannel> {
+  return invoke("create_mood_channel", { name, description });
+}
+
+export async function addSeedTrack(channelId: string, canonicalId: string): Promise<void> {
+  return invoke("add_seed_track", { channelId, canonicalId });
+}
+
+export async function deleteMoodChannel(channelId: string): Promise<void> {
+  return invoke("delete_mood_channel", { channelId });
+}
