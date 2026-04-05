@@ -16,6 +16,7 @@ import { initVisualizerPanel, toggleVisualizerPanel } from "./VisualizerPanel";
 import { initGenrePanel, toggleGenrePanel } from "../settings/GenrePanel";
 import { toggleYouTubeSettings } from "../settings/GenrePanel";
 import { initRadioPanel, toggleRadioPanel } from "../radio/RadioPanel";
+import { initRecommendationPanel, toggleRecommendationPanel } from "../recommendations/RecommendationPanel";
 import { refreshFlagCache, isFeatureEnabled } from "../settings/feature-flags-service";
 import { checkForUpdates } from "../updater/UpdateNotification";
 import {
@@ -42,6 +43,7 @@ export function setupBridge(webamp: Webamp) {
   initVisualizerPanel(webamp);
   initGenrePanel(webamp);
   initRadioPanel(webamp);
+  initRecommendationPanel(webamp);
   initGoampMenu(webamp);
   restoreAudioDevice();
   refreshFlagCache().catch(() => {});
@@ -266,6 +268,11 @@ function setupKeyboard(webamp: Webamp) {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyR") {
       e.preventDefault();
       toggleRadioPanel();
+    }
+    // Ctrl+Shift+R — Recommendation panel
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyR") {
+      e.preventDefault();
+      toggleRecommendationPanel();
     }
     // Ctrl+Shift+Y — YouTube settings
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyY") {

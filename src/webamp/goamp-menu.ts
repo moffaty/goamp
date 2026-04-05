@@ -6,6 +6,7 @@ import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
 import { toggleVisualizerPanel } from "./VisualizerPanel";
 import { toggleGenrePanel, toggleYouTubeSettings } from "../settings/GenrePanel";
 import { toggleRadioPanel } from "../radio/RadioPanel";
+import { toggleRecommendationPanel } from "../recommendations/RecommendationPanel";
 import { openFolder, openFiles, loadSkin } from "./bridge";
 import type Webamp from "webamp";
 
@@ -57,6 +58,7 @@ function showGoampMenu(x: number, y: number) {
     { label: "Search", shortcut: "Ctrl+Y", action: () => toggleSearchOverlay() },
     { label: "Genres", shortcut: "Ctrl+G", action: () => toggleGenrePanel() },
     { label: "Internet Radio", shortcut: "Ctrl+R", action: () => toggleRadioPanel() },
+    { label: "Recommendations", shortcut: "Ctrl+Shift+R", action: () => toggleRecommendationPanel() },
     { label: "Playlists", shortcut: "Ctrl+P", action: () => togglePlaylistPanel() },
     { label: "Visualizer Presets", shortcut: "V", action: () => toggleVisualizerPanel() },
     {
