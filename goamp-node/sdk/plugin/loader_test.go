@@ -17,65 +17,42 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// buildFakePlugin compiles the fake_plugin helper binary into a temp dir.
+// buildFakePlugin compiles the fake plugin (from testdata/fakeplugin) into a temp dir.
+// It builds from the module root so all dependencies are resolved.
 func buildFakePlugin(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	// Write a minimal Go plugin that prints {"port": N} and then serves gRPC
-	src := filepath.Join(dir, "main.go")
-	binName := "fake-plugin"
-	if runtime.GOOS == "windows" {
-		binName += ".exe"
-	}
-	bin := filepath.Join(dir, binName)
 
-	// Find a free port first
+	// Find module root by walking up from this file
+	_, filename, _, _ := runtime.Caller(0)
+	moduleRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
+
+	// Find a free port
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
 
-	mainSrc := fmt.Sprintf(`package main
-import (
-	"fmt"
-	"net"
-	"context"
-	pb "github.com/goamp/sdk/proto"
-	"google.golang.org/grpc"
-)
+	bin := filepath.Join(dir, "fake-plugin")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
 
-type server struct{ pb.UnimplementedGoampPluginServer }
-
-func (s *server) Register(_ context.Context, _ *pb.RegisterRequest) (*pb.PluginManifest, error) {
-	return &pb.PluginManifest{Id: "fake-plugin", Version: "1.0.0"}, nil
-}
-
-func main() {
-	lis, _ := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", %d))
-	fmt.Printf("{\"port\": %d}\n", %d)
-	srv := grpc.NewServer()
-	pb.RegisterGoampPluginServer(srv, &server{})
-	srv.Serve(lis)
-}
-`, port, port, port)
-
-	require.NoError(t, os.WriteFile(src, []byte(mainSrc), 0600))
-	cmd := exec.Command("go", "build", "-o", bin, src)
-	cmd.Dir = dir
+	// Build from module root where go.mod lives; embed port via ldflags
+	cmd := exec.Command("go", "build",
+		"-ldflags", fmt.Sprintf("-X main.port=%d", port),
+		"-o", bin,
+		"./sdk/plugin/testdata/fakeplugin",
+	)
+	cmd.Dir = moduleRoot
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "build fake plugin: %s", out)
+	require.NoError(t, os.Chmod(bin, 0755))
 
 	// Write plugin.json
 	m := plugin.Manifest{ID: "fake-plugin", Version: "1.0.0"}
 	data, _ := json.Marshal(m)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "plugin.json"), data, 0600))
-
-	// Rename binary to match plugin ID
-	finalBin := filepath.Join(dir, "fake-plugin")
-	if bin != finalBin {
-		require.NoError(t, os.Rename(bin, finalBin))
-	}
-	require.NoError(t, os.Chmod(finalBin, 0755))
 
 	return dir
 }

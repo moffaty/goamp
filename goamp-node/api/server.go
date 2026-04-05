@@ -69,3 +69,18 @@ func (s *Server) Start(addr string) error {
 func (s *Server) Hub() *WSHub {
 	return s.hub
 }
+
+// ServeHTTP builds the mux and serves a single request. Used in tests.
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", s.handleHealth)
+	mux.HandleFunc("GET /peers", s.handlePeers)
+	mux.HandleFunc("GET /catalog/search", s.handleCatalogSearch)
+	mux.HandleFunc("POST /catalog/announce", s.handleCatalogAnnounce)
+	mux.HandleFunc("POST /profiles/sync", s.handleProfileSync)
+	mux.HandleFunc("GET /recommendations", s.handleRecommendations)
+	mux.HandleFunc("GET /events", s.hub.ServeWS)
+	mux.HandleFunc("GET /plugins", s.handlePluginList)
+	mux.HandleFunc("/plugins/", s.handlePluginProxy)
+	mux.ServeHTTP(w, r)
+}
