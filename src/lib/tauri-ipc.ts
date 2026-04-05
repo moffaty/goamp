@@ -319,12 +319,12 @@ export async function syncProfile(): Promise<number> {
   return invoke("sync_profile");
 }
 
-export async function getRecommendations(limit?: number): Promise<[string, number, string][]> {
+export async function getRecommendations(limit?: number): Promise<[string, number, string, string, string][]> {
   return invoke("get_recommendations", { limit: limit ?? null });
 }
 
 // Recommendations
-export async function getHybridRecommendations(limit?: number): Promise<[string, number, string][]> {
+export async function getHybridRecommendations(limit?: number): Promise<[string, number, string, string, string][]> {
   return invoke("get_hybrid_recommendations", { limit: limit ?? null });
 }
 

@@ -14,11 +14,13 @@ export interface Recommendation {
   canonicalId: string;
   score: number;
   source: string;
+  artist: string;
+  title: string;
 }
 
 export async function fetchRecommendations(limit = 30): Promise<Recommendation[]> {
   const recs = await getHybridRecommendations(limit);
-  return recs.map(([canonicalId, score, source]) => ({ canonicalId, score, source }));
+  return recs.map(([canonicalId, score, source, artist, title]) => ({ canonicalId, score, source, artist, title }));
 }
 
 export async function fetchColdstart(artist: string, title: string, limit = 20) {

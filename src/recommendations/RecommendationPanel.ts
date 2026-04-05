@@ -84,7 +84,10 @@ function buildPanel(): HTMLElement {
     for (const rec of recs) {
       const item = document.createElement('div');
       item.style.cssText = 'padding:2px 0;border-bottom:1px solid #030;display:flex;justify-content:space-between;';
-      item.innerHTML = `<span>${rec.canonicalId.substring(0, 12)}...</span><span style="opacity:0.7;">${Math.round(rec.score * 100)}% ${rec.source}</span>`;
+      const displayName = rec.artist && rec.title
+        ? `${rec.artist} — ${rec.title}`
+        : rec.canonicalId.substring(0, 12) + '...';
+      item.innerHTML = `<span>${displayName}</span><span style="opacity:0.7;">${Math.round(rec.score * 100)}%</span>`;
       listEl.appendChild(item);
     }
   }

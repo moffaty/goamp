@@ -17,22 +17,39 @@ pub fn store_peer_profile(conn: &Connection, profile_hash: &str, profile_data: &
     );
 }
 
-pub fn cache_recommendations(conn: &Connection, recs: &[(String, f64, String)]) {
-    for (canonical_id, score, source) in recs {
+pub fn cache_recommendations(conn: &Connection, recs: &[(String, f64, String, String, String)]) {
+    // tuple: (canonical_id, score, source, artist, title)
+    for (canonical_id, score, source, artist, title) in recs {
+        let metadata = serde_json::json!({ "artist": artist, "title": title }).to_string();
         let _ = conn.execute(
-            "INSERT OR REPLACE INTO recommendation_cache (canonical_id, score, source, cached_at)
-             VALUES (?1, ?2, ?3, unixepoch())",
-            rusqlite::params![canonical_id, score, source],
+            "INSERT OR REPLACE INTO recommendation_cache (canonical_id, score, source, metadata, cached_at)
+             VALUES (?1, ?2, ?3, ?4, unixepoch())",
+            rusqlite::params![canonical_id, score, source, metadata],
         );
     }
 }
 
-pub fn get_cached_recommendations(conn: &Connection, limit: usize) -> Vec<(String, f64, String)> {
+pub fn get_cached_recommendations(
+    conn: &Connection,
+    limit: usize,
+) -> Vec<(String, f64, String, String, String)> {
     let mut stmt = conn.prepare(
-        "SELECT canonical_id, score, source FROM recommendation_cache ORDER BY score DESC LIMIT ?1"
+        "SELECT canonical_id, score, source, metadata FROM recommendation_cache ORDER BY score DESC LIMIT ?1"
     ).unwrap();
     stmt.query_map([limit as i64], |row| {
-        Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        let metadata_json: String = row.get(3).unwrap_or_default();
+        let meta: serde_json::Value = serde_json::from_str(&metadata_json).unwrap_or_default();
+        let artist = meta
+            .get("artist")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let title = meta
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        Ok((row.get(0)?, row.get(1)?, row.get(2)?, artist, title))
     })
     .unwrap()
     .filter_map(|r| r.ok())
@@ -104,10 +121,18 @@ pub async fn sync_profile(app: tauri::AppHandle) -> Result<u32, String> {
     let response = submit_to_aggregator(&crate::http::CLIENT, &base_url, &submission).await?;
 
     let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
-    let recs: Vec<(String, f64, String)> = response
+    let recs: Vec<(String, f64, String, String, String)> = response
         .recommendations
         .iter()
-        .map(|r| (r.canonical_id.clone(), r.score, r.source.clone()))
+        .map(|r| {
+            (
+                r.canonical_id.clone(),
+                r.score,
+                r.source.clone(),
+                r.artist.clone(),
+                r.title.clone(),
+            )
+        })
         .collect();
     cache_recommendations(&conn, &recs);
 
@@ -123,7 +148,7 @@ pub async fn sync_profile(app: tauri::AppHandle) -> Result<u32, String> {
 pub fn get_recommendations(
     app: tauri::AppHandle,
     limit: Option<u32>,
-) -> Result<Vec<(String, f64, String)>, String> {
+) -> Result<Vec<(String, f64, String, String, String)>, String> {
     let db = app.state::<crate::db::Db>();
     let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     Ok(get_cached_recommendations(
@@ -158,8 +183,20 @@ mod tests {
         let db = test_db();
         let conn = db.0.lock().unwrap();
         let recs = vec![
-            ("hash_1".to_string(), 0.95, "collaborative".to_string()),
-            ("hash_2".to_string(), 0.80, "content".to_string()),
+            (
+                "hash_1".to_string(),
+                0.95,
+                "collaborative".to_string(),
+                "Artist A".to_string(),
+                "Track 1".to_string(),
+            ),
+            (
+                "hash_2".to_string(),
+                0.80,
+                "content".to_string(),
+                "Artist B".to_string(),
+                "Track 2".to_string(),
+            ),
         ];
         cache_recommendations(&conn, &recs);
         let count: i32 = conn
@@ -175,12 +212,26 @@ mod tests {
         let db = test_db();
         let conn = db.0.lock().unwrap();
         let recs = vec![
-            ("hash_1".to_string(), 0.95, "collaborative".to_string()),
-            ("hash_2".to_string(), 0.80, "content".to_string()),
+            (
+                "hash_1".to_string(),
+                0.95,
+                "collaborative".to_string(),
+                "Artist A".to_string(),
+                "Track 1".to_string(),
+            ),
+            (
+                "hash_2".to_string(),
+                0.80,
+                "content".to_string(),
+                "Artist B".to_string(),
+                "Track 2".to_string(),
+            ),
         ];
         cache_recommendations(&conn, &recs);
         let cached = get_cached_recommendations(&conn, 10);
         assert_eq!(cached.len(), 2);
         assert_eq!(cached[0].0, "hash_1");
+        assert_eq!(cached[0].3, "Artist A");
+        assert_eq!(cached[0].4, "Track 1");
     }
 }

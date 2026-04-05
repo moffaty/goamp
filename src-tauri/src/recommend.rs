@@ -102,7 +102,7 @@ pub fn hybrid_recommend(conn: &Connection, limit: usize) -> Vec<(String, f64, St
     for (id, score, source) in &content {
         merged.entry(id.clone()).or_insert((0.0, source.clone())).0 += score * 0.3;
     }
-    for (id, score, source) in &cached {
+    for (id, score, source, _artist, _title) in &cached {
         merged.entry(id.clone()).or_insert((0.0, source.clone())).0 += score * 0.3;
     }
 
@@ -169,12 +169,26 @@ pub async fn lastfm_get_similar(
 pub fn get_hybrid_recommendations(
     app: tauri::AppHandle,
     limit: Option<u32>,
-) -> Result<Vec<(String, f64, String)>, String> {
+) -> Result<Vec<(String, f64, String, String, String)>, String> {
     let db = app.state::<crate::db::Db>();
     let conn =
         db.0.lock()
             .unwrap_or_else(|e: std::sync::PoisonError<_>| e.into_inner());
-    Ok(hybrid_recommend(&conn, limit.unwrap_or(30) as usize))
+    let recs = hybrid_recommend(&conn, limit.unwrap_or(30) as usize);
+    let resolved: Vec<(String, f64, String, String, String)> = recs
+        .into_iter()
+        .map(|(cid, score, source)| {
+            let (artist, title) = conn
+                .query_row(
+                    "SELECT artist, title FROM track_identity WHERE canonical_id = ?1 LIMIT 1",
+                    [&cid],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                )
+                .unwrap_or_else(|_| ("".to_string(), "".to_string()));
+            (cid, score, source, artist, title)
+        })
+        .collect();
+    Ok(resolved)
 }
 
 #[tauri::command]
