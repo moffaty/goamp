@@ -15,53 +15,54 @@ pub fn create_similarity_survey(
     track_a: &str,
     track_b: &str,
     track_c: &str,
-) -> Survey {
+) -> Result<Survey, rusqlite::Error> {
     let payload = serde_json::json!({ "tracks": [track_a, track_b, track_c] }).to_string();
     conn.execute(
         "INSERT INTO surveys (survey_type, payload) VALUES ('similarity', ?1)",
         [&payload],
-    )
-    .unwrap();
+    )?;
     let id = conn.last_insert_rowid();
-    Survey {
+    Ok(Survey {
         id,
         survey_type: "similarity".to_string(),
         payload,
         created_at: 0,
-    }
+    })
 }
 
-pub fn create_genre_survey(conn: &Connection, track: &str, options: &[&str]) -> Survey {
+pub fn create_genre_survey(
+    conn: &Connection,
+    track: &str,
+    options: &[&str],
+) -> Result<Survey, rusqlite::Error> {
     let payload = serde_json::json!({ "track": track, "options": options }).to_string();
     conn.execute(
         "INSERT INTO surveys (survey_type, payload) VALUES ('genre', ?1)",
         [&payload],
-    )
-    .unwrap();
+    )?;
     let id = conn.last_insert_rowid();
-    Survey {
+    Ok(Survey {
         id,
         survey_type: "genre".to_string(),
         payload,
         created_at: 0,
-    }
+    })
 }
 
-pub fn create_mood_survey(conn: &Connection, track: &str) -> Survey {
+pub fn create_mood_survey(conn: &Connection, track: &str) -> Result<Survey, rusqlite::Error> {
     let payload =
         serde_json::json!({ "track": track, "choices": ["energetic", "calm"] }).to_string();
     conn.execute(
         "INSERT INTO surveys (survey_type, payload) VALUES ('mood', ?1)",
         [&payload],
-    )
-    .unwrap();
+    )?;
     let id = conn.last_insert_rowid();
-    Survey {
+    Ok(Survey {
         id,
         survey_type: "mood".to_string(),
         payload,
         created_at: 0,
-    }
+    })
 }
 
 pub fn respond_to_survey(conn: &Connection, survey_id: i64, response: &str) {
@@ -139,7 +140,7 @@ mod tests {
     fn test_create_similarity_survey() {
         let db = test_db();
         let conn = db.0.lock().unwrap();
-        let survey = create_similarity_survey(&conn, "hash_a", "hash_b", "hash_c");
+        let survey = create_similarity_survey(&conn, "hash_a", "hash_b", "hash_c").unwrap();
         assert!(survey.id > 0);
         assert_eq!(survey.survey_type, "similarity");
     }
@@ -149,7 +150,8 @@ mod tests {
         let db = test_db();
         let conn = db.0.lock().unwrap();
         let survey =
-            create_genre_survey(&conn, "hash_a", &["electronic", "ambient", "rock", "jazz"]);
+            create_genre_survey(&conn, "hash_a", &["electronic", "ambient", "rock", "jazz"])
+                .unwrap();
         assert!(survey.id > 0);
         assert_eq!(survey.survey_type, "genre");
     }
@@ -158,7 +160,7 @@ mod tests {
     fn test_create_mood_survey() {
         let db = test_db();
         let conn = db.0.lock().unwrap();
-        let survey = create_mood_survey(&conn, "hash_a");
+        let survey = create_mood_survey(&conn, "hash_a").unwrap();
         assert!(survey.id > 0);
         assert_eq!(survey.survey_type, "mood");
     }
@@ -167,7 +169,7 @@ mod tests {
     fn test_respond_to_survey() {
         let db = test_db();
         let conn = db.0.lock().unwrap();
-        let survey = create_mood_survey(&conn, "hash_a");
+        let survey = create_mood_survey(&conn, "hash_a").unwrap();
         respond_to_survey(&conn, survey.id, "energetic");
         let answered: i32 = conn
             .query_row(
@@ -183,7 +185,7 @@ mod tests {
     fn test_get_pending_survey_respects_cooldown() {
         let db = test_db();
         let conn = db.0.lock().unwrap();
-        create_mood_survey(&conn, "hash_a");
+        create_mood_survey(&conn, "hash_a").unwrap();
         let pending = get_pending_survey(&conn);
         assert!(pending.is_some());
         if let Some(s) = pending {
@@ -197,7 +199,7 @@ mod tests {
     fn test_skip_survey() {
         let db = test_db();
         let conn = db.0.lock().unwrap();
-        let survey = create_mood_survey(&conn, "hash_a");
+        let survey = create_mood_survey(&conn, "hash_a").unwrap();
         skip_survey(&conn, survey.id);
         let shown: i32 = conn
             .query_row(

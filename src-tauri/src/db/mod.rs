@@ -294,6 +294,14 @@ mod tests {
         assert!(tables.contains(&"settings".to_string()));
         assert!(tables.contains(&"scrobble_queue".to_string()));
         assert!(tables.contains(&"feature_flags".to_string()));
+        assert!(tables.contains(&"track_identity".to_string()));
+        assert!(tables.contains(&"listen_history".to_string()));
+        assert!(tables.contains(&"track_likes".to_string()));
+        assert!(tables.contains(&"surveys".to_string()));
+        assert!(tables.contains(&"survey_responses".to_string()));
+        assert!(tables.contains(&"peer_profiles".to_string()));
+        assert!(tables.contains(&"recommendation_cache".to_string()));
+        assert!(tables.contains(&"mood_channels".to_string()));
     }
 
     #[test]
