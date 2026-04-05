@@ -227,6 +227,25 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         ",
     )?;
 
+    // Migration: aggregation tables
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS peer_profiles (
+            profile_hash TEXT PRIMARY KEY,
+            profile_data TEXT NOT NULL,
+            received_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+
+        CREATE TABLE IF NOT EXISTS recommendation_cache (
+            canonical_id TEXT PRIMARY KEY,
+            score REAL NOT NULL,
+            source TEXT NOT NULL,
+            metadata TEXT NOT NULL DEFAULT '{}',
+            cached_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+        ",
+    )?;
+
     Ok(())
 }
 
@@ -544,6 +563,38 @@ mod tests {
             [],
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_peer_profiles_table_exists() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO peer_profiles (profile_hash, profile_data, received_at) VALUES ('abc', '{}', 1712200000)",
+            [],
+        ).unwrap();
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM peer_profiles", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_recommendation_cache_table_exists() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO recommendation_cache (canonical_id, score, source, cached_at) VALUES ('hash_abc', 0.95, 'collaborative', 1712200000)",
+            [],
+        ).unwrap();
+        let score: f64 = conn
+            .query_row(
+                "SELECT score FROM recommendation_cache WHERE canonical_id = 'hash_abc'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!((score - 0.95).abs() < f64::EPSILON);
     }
 
     #[test]

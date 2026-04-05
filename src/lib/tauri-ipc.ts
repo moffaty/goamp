@@ -313,3 +313,12 @@ export async function surveySkip(surveyId: number): Promise<void> {
 export async function surveyMarkShown(surveyId: number): Promise<void> {
   return invoke("survey_mark_shown", { surveyId });
 }
+
+// Aggregator
+export async function syncProfile(): Promise<number> {
+  return invoke("sync_profile");
+}
+
+export async function getRecommendations(limit?: number): Promise<[string, number, string][]> {
+  return invoke("get_recommendations", { limit: limit ?? null });
+}

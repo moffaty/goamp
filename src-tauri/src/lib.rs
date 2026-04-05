@@ -1,5 +1,6 @@
 use tauri::Manager;
 
+mod aggregator;
 mod commands;
 mod db;
 mod feature_flags;
@@ -115,6 +116,8 @@ pub fn run() {
             survey::survey_skip,
             survey::survey_mark_shown,
             taste_profile::build_profile,
+            aggregator::sync_profile,
+            aggregator::get_recommendations,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");
