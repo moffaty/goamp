@@ -14,6 +14,7 @@ mod node;
 mod radio;
 mod scrobble;
 mod survey;
+mod sybil;
 mod taste_profile;
 mod track_id;
 #[cfg(desktop)]
