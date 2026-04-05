@@ -460,26 +460,22 @@ function extractSource(url: string): { source: string; sourceId: string } {
   return { source: 'local', sourceId: url };
 }
 
-let historyTrackStartTime = 0;
-
 function setupHistoryTracking(webamp: Webamp) {
   if (!isFeatureEnabled('recommendations')) return;
 
   const historyTracker = new HistoryTracker(resolveTrackId, recordTrackListen);
+  let tracking = false;
 
   webamp.onTrackDidChange((trackInfo) => {
-    // End previous track
-    if (historyTrackStartTime > 0) {
-      const listenedSecs = Math.floor((Date.now() - historyTrackStartTime) / 1000);
+    // End previous track — use actual playback position, not wall clock
+    if (tracking) {
+      const state = (webamp as any).store?.getState();
+      const listenedSecs = Math.floor(state?.media?.timeElapsed ?? 0);
       historyTracker.onTrackEnd(listenedSecs).catch(() => {});
+      tracking = false;
     }
 
-    if (!trackInfo) {
-      historyTrackStartTime = 0;
-      return;
-    }
-
-    historyTrackStartTime = Date.now();
+    if (!trackInfo) return;
 
     const url = (trackInfo as any).url || '';
     const meta = (trackInfo as any).metaData;
@@ -489,6 +485,7 @@ function setupHistoryTracking(webamp: Webamp) {
     const { source, sourceId } = extractSource(url);
 
     historyTracker.onTrackStart(source, sourceId, artist, title, duration);
+    tracking = true;
   });
 }
 
