@@ -44,15 +44,19 @@ fn get_top_liked(conn: &Connection, limit: usize) -> Vec<String> {
 fn get_listen_pairs(conn: &Connection, limit: usize) -> Vec<(String, String)> {
     let mut stmt = conn
         .prepare(
-            "SELECT a.canonical_id, b.canonical_id
-         FROM listen_history a
-         JOIN listen_history b ON b.started_at > a.started_at
-            AND b.started_at - a.started_at < 600
-            AND b.id = (SELECT MIN(c.id) FROM listen_history c WHERE c.started_at > a.started_at)
-         WHERE a.completed = 1
-         GROUP BY a.canonical_id, b.canonical_id
-         ORDER BY COUNT(*) DESC
-         LIMIT ?1",
+            "WITH ordered AS (
+                SELECT
+                    canonical_id,
+                    LAG(canonical_id) OVER (ORDER BY started_at) AS prev_canonical_id
+                FROM listen_history
+                WHERE completed = 1
+            )
+            SELECT prev_canonical_id, canonical_id
+            FROM ordered
+            WHERE prev_canonical_id IS NOT NULL
+            GROUP BY prev_canonical_id, canonical_id
+            ORDER BY COUNT(*) DESC
+            LIMIT ?1",
         )
         .unwrap();
     stmt.query_map([limit as i64], |row| {
