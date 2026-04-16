@@ -1,4 +1,8 @@
-import { getNextSurvey, answerSurvey, dismissSurvey } from './recommendation-service';
+import { surveyGetPending, surveyRespond, surveySkip } from '../lib/tauri-ipc';
+
+const getNextSurvey = () => surveyGetPending();
+const answerSurvey = (id: number, response: string) => surveyRespond(id, response);
+const dismissSurvey = (id: number) => surveySkip(id);
 
 export function createSurveyWidget(container: HTMLElement): { check: () => void } {
   const widget = document.createElement('div');

@@ -1,8 +1,9 @@
-import {
-  fetchRecommendations,
-  getMoodChannels,
-  syncWithServer,
-} from './recommendation-service';
+import { recommendations } from '../services/index';
+import { listMoodChannels, syncProfile } from '../lib/tauri-ipc';
+
+const fetchRecommendations = (limit: number) => recommendations.getRecommendations(limit);
+const getMoodChannels = () => listMoodChannels();
+const syncWithServer = () => syncProfile();
 import { createSurveyWidget } from './SurveyWidget';
 import type Webamp from 'webamp';
 

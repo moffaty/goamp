@@ -1,15 +1,5 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import {
-  lastfmSaveSettings,
-  lastfmGetAuthUrl,
-  lastfmAuth,
-  lastfmGetStatus,
-  listenbrainzSaveToken,
-  listenbrainzGetStatus,
-  listenbrainzLogout,
-  scrobbleGetStatus,
-  scrobbleFlushQueue,
-} from "./scrobble-service";
+import { scrobble } from "../services/index";
 
 let panel: HTMLDivElement | null = null;
 let visible = false;
@@ -120,7 +110,7 @@ function createPanel() {
     const btn = panel?.querySelector("#scrobble-flush-btn") as HTMLButtonElement | null;
     if (btn) btn.textContent = "...";
     try {
-      const count = await scrobbleFlushQueue();
+      const count = await scrobble.flushQueue();
       if (btn) btn.textContent = count > 0 ? `Flushed ${count}` : "Nothing to flush";
       setTimeout(() => refreshAllStatus(), 1000);
     } catch (e) {
@@ -135,7 +125,7 @@ function createPanel() {
     const secret = (panel?.querySelector("#scrobble-secret") as HTMLInputElement | null)?.value.trim() ?? "";
     if (!apiKey || !secret) return;
     try {
-      await lastfmSaveSettings(apiKey, secret);
+      await scrobble.lastfmSaveSettings(apiKey, secret);
       setMsg("lastfm-msg", "Keys saved", "#0f0");
     } catch (e) {
       setMsg("lastfm-msg", `Error: ${e}`, "#f00");
@@ -145,7 +135,7 @@ function createPanel() {
   // ─── Last.fm: Authorize ───
   panel.querySelector("#scrobble-auth")!.addEventListener("click", async () => {
     try {
-      const url = await lastfmGetAuthUrl();
+      const url = await scrobble.lastfmGetAuthUrl();
       openUrl(url);
       const authFlow = panel?.querySelector<HTMLDivElement>("#scrobble-auth-flow");
       if (authFlow) authFlow.style.display = "block";
@@ -160,7 +150,7 @@ function createPanel() {
     const token = (panel?.querySelector("#scrobble-token") as HTMLInputElement | null)?.value.trim() ?? "";
     if (!token) return;
     try {
-      const session = await lastfmAuth(token);
+      const session = await scrobble.lastfmAuth(token);
       setMsg("lastfm-msg", `Authenticated as: ${session.name}`, "#0f0");
       const authFlow = panel?.querySelector<HTMLDivElement>("#scrobble-auth-flow");
       if (authFlow) authFlow.style.display = "none";
@@ -178,7 +168,7 @@ function createPanel() {
     const btn = panel?.querySelector("#lb-save") as HTMLButtonElement | null;
     if (btn) btn.textContent = "...";
     try {
-      const username = await listenbrainzSaveToken(token);
+      const username = await scrobble.listenbrainzSaveToken(token);
       setMsg("lb-msg", `Connected as: ${username}`, "#0f0");
       localStorage.setItem("goamp_lb_enabled", "1");
       if (btn) btn.textContent = "Connect";
@@ -191,7 +181,7 @@ function createPanel() {
 
   // ─── ListenBrainz: Logout ───
   panel.querySelector("#lb-logout")!.addEventListener("click", async () => {
-    await listenbrainzLogout();
+    await scrobble.listenbrainzLogout();
     localStorage.removeItem("goamp_lb_enabled");
     setMsg("lb-msg", "Disconnected", "#888");
     refreshAllStatus();
@@ -209,7 +199,7 @@ function setMsg(id: string, text: string, color: string) {
 async function refreshAllStatus() {
   // Last.fm status
   try {
-    const sessionKey = await lastfmGetStatus();
+    const sessionKey = await scrobble.lastfmGetStatus();
     const badge = panel?.querySelector("#lastfm-status-badge") as HTMLSpanElement;
     if (badge) {
       if (sessionKey) {
@@ -226,7 +216,7 @@ async function refreshAllStatus() {
 
   // ListenBrainz status
   try {
-    const username = await listenbrainzGetStatus();
+    const username = await scrobble.listenbrainzGetStatus();
     const badge = panel?.querySelector("#lb-status-badge") as HTMLSpanElement;
     const logoutBtn = panel?.querySelector("#lb-logout") as HTMLButtonElement;
     if (badge) {
@@ -246,7 +236,7 @@ async function refreshAllStatus() {
 
   // Queue status
   try {
-    const status = await scrobbleGetStatus();
+    const status = await scrobble.getStatus();
     const text = panel?.querySelector("#scrobble-queue-text") as HTMLSpanElement;
     const flushBtn = panel?.querySelector("#scrobble-flush-btn") as HTMLButtonElement;
     if (text) {

@@ -1,11 +1,10 @@
 // src/bootstrap/AppBootstrap.ts
-import { convertFileSrc, invoke } from '@tauri-apps/api/core'
-import { open } from '@tauri-apps/plugin-dialog'
+import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { track, trackError } from '../lib/analytics'
-import { toWebampTracks } from '../webamp/tracks'
+import { track } from '../lib/analytics'
 import { setupWindowDrag, setupClickThrough } from '../webamp/window-drag'
+import { openFolder, openFiles, loadSkin } from '../webamp/file-actions'
 import { initSearchOverlay } from '../youtube/SearchOverlay'
 import { initPlaylistPanel } from '../playlists/PlaylistPanel'
 import { initAudioDevicePanel, restoreAudioDevice } from '../settings/AudioDevicePanel'
@@ -191,47 +190,12 @@ export async function setupApp(webamp: Webamp): Promise<void> {
     })
   }
 
-  // File helpers for keyboard shortcuts
-  const openFolder = async () => {
-    const selected = await open({ directory: true, multiple: false, title: 'Select music folder' })
-    if (!selected) return
-    const path = typeof selected === 'string' ? selected : selected[0]
-    if (!path) return
-    try {
-      const tracks = await settings.scanDirectory(path)
-      if (tracks.length === 0) return
-      webamp.setTracksToPlay(toWebampTracks(tracks))
-      track('folder_opened', { track_count: tracks.length })
-    } catch (e) { trackError(e, { action: 'open_folder' }) }
-  }
-
-  const openFiles = async () => {
-    const selected = await open({
-      multiple: true, title: 'Select audio files',
-      filters: [{ name: 'Audio', extensions: ['mp3', 'flac', 'ogg', 'wav', 'opus', 'm4a', 'aac'] }],
-    })
-    if (!selected) return
-    const paths = Array.isArray(selected) ? selected : [selected]
-    try {
-      const metas = await Promise.all(paths.map((p) => settings.readMetadata(p)))
-      webamp.setTracksToPlay(toWebampTracks(metas))
-      track('files_opened', { track_count: metas.length })
-    } catch (e) { trackError(e, { action: 'open_files' }) }
-  }
-
-  const loadSkin = async () => {
-    const selected = await open({
-      multiple: false, title: 'Select Winamp skin (.wsz)',
-      filters: [{ name: 'Winamp Skin', extensions: ['wsz', 'zip'] }],
-    })
-    if (!selected) return
-    const path = typeof selected === 'string' ? selected : selected[0]
-    if (!path) return
-    try { webamp.setSkinFromUrl(convertFileSrc(path)); track('skin_loaded') }
-    catch (e) { trackError(e, { action: 'load_skin' }) }
-  }
-
-  setupKeyboard(store, openFolder, openFiles, loadSkin)
+  setupKeyboard(
+    store,
+    () => openFolder(webamp),
+    () => openFiles(webamp),
+    () => loadSkin(webamp),
+  )
   setupWindowDrag()
   setupClickThrough()
 

@@ -3,7 +3,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: vi.fn(),
 }));
-vi.mock("./scrobble-service", () => ({
+
+const mockScrobble = {
   lastfmSaveSettings: vi.fn().mockResolvedValue(undefined),
   lastfmGetAuthUrl: vi.fn().mockResolvedValue("https://last.fm/auth?api_key=test"),
   lastfmAuth: vi.fn().mockResolvedValue({ name: "testuser", key: "sesskey" }),
@@ -11,8 +12,17 @@ vi.mock("./scrobble-service", () => ({
   listenbrainzSaveToken: vi.fn().mockResolvedValue("lb_user"),
   listenbrainzGetStatus: vi.fn().mockResolvedValue(null),
   listenbrainzLogout: vi.fn().mockResolvedValue(undefined),
-  scrobbleGetStatus: vi.fn().mockResolvedValue({ lastfm: false, listenbrainz: false, queue_count: 0 }),
-  scrobbleFlushQueue: vi.fn().mockResolvedValue(0),
+  getStatus: vi.fn().mockResolvedValue({ lastfm: false, listenbrainz: false, queue_count: 0 }),
+  flushQueue: vi.fn().mockResolvedValue(0),
+};
+
+vi.mock("../services/index", () => ({
+  scrobble: mockScrobble,
+  playlists: {},
+  history: {},
+  settings: {},
+  radio: {},
+  recommendations: {},
 }));
 
 async function freshModule() {
@@ -64,7 +74,6 @@ describe("ScrobbleSettings panel", () => {
 
   it("save keys button calls lastfmSaveSettings", async () => {
     const { initScrobbleSettings, toggleScrobbleSettings } = await freshModule();
-    const { lastfmSaveSettings } = await import("./scrobble-service");
 
     initScrobbleSettings();
     toggleScrobbleSettings();
@@ -74,7 +83,7 @@ describe("ScrobbleSettings panel", () => {
     document.getElementById("scrobble-save-keys")!.click();
 
     await vi.waitFor(() => {
-      expect(lastfmSaveSettings).toHaveBeenCalledWith("mykey", "mysecret");
+      expect(mockScrobble.lastfmSaveSettings).toHaveBeenCalledWith("mykey", "mysecret");
     });
   });
 

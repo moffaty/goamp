@@ -1,3 +1,4 @@
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { toggleSearchOverlay } from "../youtube/SearchOverlay";
 import { togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { toggleAudioDevicePanel } from "../settings/AudioDevicePanel";
@@ -7,8 +8,12 @@ import { toggleVisualizerPanel } from "./VisualizerPanel";
 import { toggleGenrePanel, toggleYouTubeSettings } from "../settings/GenrePanel";
 import { toggleRadioPanel } from "../radio/RadioPanel";
 import { toggleRecommendationPanel } from "../recommendations/RecommendationPanel";
-import { openFolder, openFiles, loadSkin } from "./bridge";
+import { openFolder, openFiles, loadSkin } from "./file-actions";
 import type Webamp from "webamp";
+
+const PLAYER_WIDTH = 275;
+const PLAYER_HEIGHT = 464;
+const MILKDROP_WIDTH = 525; // placed to the right of the player
 
 let menu: HTMLDivElement | null = null;
 let webampRef: Webamp | null = null;
@@ -60,6 +65,7 @@ function showGoampMenu(x: number, y: number) {
     { label: "Internet Radio", shortcut: "Ctrl+R", action: () => toggleRadioPanel() },
     { label: "Recommendations", shortcut: "Ctrl+Shift+R", action: () => toggleRecommendationPanel() },
     { label: "Playlists", shortcut: "Ctrl+P", action: () => togglePlaylistPanel() },
+    { label: "Visualizer", shortcut: "Ctrl+V", action: () => toggleMilkdropWindow(webampRef) },
     { label: "Visualizer Presets", shortcut: "V", action: () => toggleVisualizerPanel() },
     {
       label: "Open Folder",
@@ -145,5 +151,30 @@ function closeGoampMenu() {
   if (menu) {
     menu.remove();
     menu = null;
+  }
+}
+
+function toggleMilkdropWindow(webamp: Webamp | null) {
+  if (!webamp) return;
+  const store = (webamp as any).store;
+  if (!store) return;
+  const state = store.getState();
+  const isOpen = state?.windows?.genWindows?.milkdrop?.open ?? false;
+  const appWindow = getCurrentWindow();
+
+  if (isOpen) {
+    store.dispatch({ type: "CLOSE_MILKDROP_WINDOW" });
+    appWindow.setSize(new LogicalSize(PLAYER_WIDTH, PLAYER_HEIGHT)).catch(() => {});
+  } else {
+    store.dispatch({ type: "OPEN_MILKDROP_WINDOW" });
+    appWindow.setSize(new LogicalSize(PLAYER_WIDTH + MILKDROP_WIDTH, PLAYER_HEIGHT)).catch(() => {});
+    // Position Milkdrop to the right of the player after it's been created in the DOM
+    setTimeout(() => {
+      store.dispatch({
+        type: "UPDATE_WINDOW_POSITIONS",
+        positions: { milkdrop: { x: PLAYER_WIDTH, y: 0 } },
+        absolute: true,
+      });
+    }, 50);
   }
 }

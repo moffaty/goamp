@@ -1,8 +1,7 @@
-import Webamp from "webamp";
-import { setupBridge } from "./webamp/bridge";
-import { setupWindowDrag, setupClickThrough } from "./webamp/window-drag";
-import { getButterchurnOptions } from "./webamp/butterchurn";
-import { initAnalytics, track } from "./lib/analytics";
+import Webamp from 'webamp'
+import { setupApp } from './bootstrap/AppBootstrap'
+import { getButterchurnOptions } from './webamp/butterchurn'
+import { initAnalytics, track } from './lib/analytics'
 
 const webamp = new Webamp({
   __initialWindowLayout: {
@@ -12,24 +11,18 @@ const webamp = new Webamp({
   },
   initialTracks: [
     {
-      metaData: {
-        artist: "GOAMP",
-        title: "Press Ctrl+O to open a folder",
-      },
-      url: "",
+      metaData: { artist: 'GOAMP', title: 'Press Ctrl+O to open a folder' },
+      url: '',
       duration: 0,
     },
   ],
   __butterchurnOptions: getButterchurnOptions(),
-} as any);
+} as any)
 
-const container = document.getElementById("app")!;
-
-initAnalytics();
+const container = document.getElementById('app')!
+initAnalytics()
 
 webamp.renderWhenReady(container).then(() => {
-  setupBridge(webamp);
-  setupWindowDrag();
-  setupClickThrough();
-  track("app_launched");
-});
+  setupApp(webamp)
+  track('app_launched')
+})
