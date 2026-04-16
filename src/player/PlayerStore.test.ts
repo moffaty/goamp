@@ -57,4 +57,16 @@ describe('PlayerStore', () => {
     expect(tracks[0].id).toBe('b')
     expect(tracks[1].id).toBe('a')
   })
+
+  it('isMilkdropOpen returns true when milkdrop is open', () => {
+    const w = makeWebamp({ windows: { genWindows: { milkdrop: { open: true } } } })
+    const s = new PlayerStore(w)
+    expect(s.isMilkdropOpen()).toBe(true)
+  })
+
+  it('isMilkdropOpen returns false when no state', () => {
+    const w = makeWebamp({})
+    const s = new PlayerStore(w)
+    expect(s.isMilkdropOpen()).toBe(false)
+  })
 })

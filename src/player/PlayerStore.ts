@@ -44,7 +44,9 @@ export class PlayerStore {
   getTracks(): RawTrack[] {
     const tracks = this.state?.playlist?.tracks ?? {}
     const order: string[] = this.state?.playlist?.trackOrder ?? []
-    return order.map((id: string) => ({ id, ...tracks[id] })).filter(Boolean)
+    return order
+      .filter((id) => tracks[id] != null)
+      .map((id: string) => ({ id, ...tracks[id] }))
   }
 
   dispatch(action: PlayerAction): void {
@@ -56,6 +58,6 @@ export class PlayerStore {
   }
 
   onTrackChange(cb: (track: TrackInfo | null) => void): () => void {
-    return this.webamp.onTrackDidChange(cb as any) ?? (() => {})
+    return this.webamp.onTrackDidChange(cb)
   }
 }
