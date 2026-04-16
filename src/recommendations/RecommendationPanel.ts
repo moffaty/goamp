@@ -1,9 +1,4 @@
 import { recommendations } from '../services/index';
-import { listMoodChannels, syncProfile } from '../lib/tauri-ipc';
-
-const fetchRecommendations = (limit: number) => recommendations.getRecommendations(limit);
-const getMoodChannels = () => listMoodChannels();
-const syncWithServer = () => syncProfile();
 import { createSurveyWidget } from './SurveyWidget';
 import type Webamp from 'webamp';
 
@@ -61,7 +56,7 @@ function buildPanel(): HTMLElement {
   let activeChannel: string | null = null;
 
   async function loadChannels() {
-    const channels = await getMoodChannels();
+    const channels = await recommendations.listMoodChannels();
     channelsEl.innerHTML = '';
     const mkTab = (label: string, id: string | null) => {
       const tab = document.createElement('button');
@@ -76,7 +71,7 @@ function buildPanel(): HTMLElement {
 
   async function loadRecommendations() {
     listEl.innerHTML = '<div style="opacity:0.6;">Loading...</div>';
-    const recs = await fetchRecommendations(30);
+    const recs = await recommendations.getRecommendations(30);
     listEl.innerHTML = '';
     if (recs.length === 0) {
       listEl.innerHTML = '<div style="opacity:0.6;">Listen to more music to get recommendations!</div>';
@@ -97,7 +92,7 @@ function buildPanel(): HTMLElement {
     syncBtn.disabled = true;
     syncBtn.textContent = '...';
     try {
-      const count = await syncWithServer();
+      const count = await recommendations.syncProfile();
       syncBtn.textContent = `\u2713${count}`;
       await loadRecommendations();
     } catch {

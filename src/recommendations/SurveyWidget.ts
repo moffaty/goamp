@@ -1,8 +1,4 @@
-import { surveyGetPending, surveyRespond, surveySkip } from '../lib/tauri-ipc';
-
-const getNextSurvey = () => surveyGetPending();
-const answerSurvey = (id: number, response: string) => surveyRespond(id, response);
-const dismissSurvey = (id: number) => surveySkip(id);
+import { history } from '../services/index';
 
 export function createSurveyWidget(container: HTMLElement): { check: () => void } {
   const widget = document.createElement('div');
@@ -11,7 +7,7 @@ export function createSurveyWidget(container: HTMLElement): { check: () => void 
   container.appendChild(widget);
 
   async function check() {
-    const survey = await getNextSurvey();
+    const survey = await history.surveyGetPending();
     if (!survey) {
       widget.style.display = 'none';
       return;
@@ -25,7 +21,7 @@ export function createSurveyWidget(container: HTMLElement): { check: () => void 
     dismiss.className = 'survey-dismiss';
     dismiss.textContent = '\u00d7';
     dismiss.onclick = () => {
-      dismissSurvey(survey.id);
+      history.surveySkip(survey.id);
       widget.style.display = 'none';
     };
     widget.appendChild(dismiss);
@@ -38,7 +34,7 @@ export function createSurveyWidget(container: HTMLElement): { check: () => void 
         const btn = document.createElement('button');
         btn.className = 'survey-choice';
         btn.textContent = choice;
-        btn.onclick = () => { answerSurvey(survey.id, choice); widget.style.display = 'none'; };
+        btn.onclick = () => { history.surveyRespond(survey.id, choice); widget.style.display = 'none'; };
         widget.appendChild(btn);
       }
     } else if (survey.survey_type === 'genre') {
@@ -49,7 +45,7 @@ export function createSurveyWidget(container: HTMLElement): { check: () => void 
         const btn = document.createElement('button');
         btn.className = 'survey-choice';
         btn.textContent = option;
-        btn.onclick = () => { answerSurvey(survey.id, option); widget.style.display = 'none'; };
+        btn.onclick = () => { history.surveyRespond(survey.id, option); widget.style.display = 'none'; };
         widget.appendChild(btn);
       }
     } else if (survey.survey_type === 'similarity') {
@@ -62,7 +58,7 @@ export function createSurveyWidget(container: HTMLElement): { check: () => void 
           btn.className = 'survey-choice';
           btn.textContent = `${i + 1} & ${j + 1}`;
           btn.onclick = () => {
-            answerSurvey(survey.id, `${payload.tracks[i]}|${payload.tracks[j]}`);
+            history.surveyRespond(survey.id, `${payload.tracks[i]}|${payload.tracks[j]}`);
             widget.style.display = 'none';
           };
           widget.appendChild(btn);

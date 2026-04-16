@@ -50,8 +50,19 @@ export async function setupApp(webamp: Webamp): Promise<void> {
     playlists,
   ).catch((e) => console.error('[GOAMP] Failed to restore session:', e))
 
+  // Scrobbling state (declared early so handleClose can reference them)
+  let scrobbleTimer: ReturnType<typeof setInterval> | null = null
+  let currentTrackStart = 0
+  let currentTrackDuration = 0
+  let currentTrackScrobbled = false
+  let currentTrackArtist = ''
+  let currentTrackTitle = ''
+  const flushInterval = setInterval(() => { scrobble.flushQueue().catch(() => {}) }, 30000)
+
   // Close handler
   const handleClose = async () => {
+    clearInterval(flushInterval)
+    if (scrobbleTimer) clearInterval(scrobbleTimer)
     try { await saveSession(store, playlists) } catch (e) { console.error('[GOAMP] Failed to save session:', e) }
     appWindow.destroy()
   }
@@ -61,11 +72,11 @@ export async function setupApp(webamp: Webamp): Promise<void> {
   // Track analytics
   events.onTrackChange((trackInfo) => {
     if (!trackInfo) return
-    const url = trackInfo.url || ''
+    const url = trackInfo.url
     const source = url.startsWith('http') ? 'youtube' : 'local'
     const ext = url.split('.').pop()?.toLowerCase() || 'unknown'
     track('track_played', { source, format: source === 'local' ? ext : 'stream' })
-    const meta = (trackInfo as any).metaData
+    const meta = trackInfo.metaData
     const artist = (meta?.artist || 'Unknown').slice(0, 100)
     const title = (meta?.title || 'Unknown').slice(0, 100)
     if (meta?.artist || meta?.title) track('track_info', { artist, title, source })
@@ -106,14 +117,6 @@ export async function setupApp(webamp: Webamp): Promise<void> {
   })
 
   // Scrobbling
-  let scrobbleTimer: ReturnType<typeof setInterval> | null = null
-  let currentTrackStart = 0
-  let currentTrackDuration = 0
-  let currentTrackScrobbled = false
-  let currentTrackArtist = ''
-  let currentTrackTitle = ''
-
-  setInterval(() => { scrobble.flushQueue().catch(() => {}) }, 30000)
 
   events.onTrackChange(async (trackInfo) => {
     if (scrobbleTimer) clearInterval(scrobbleTimer)
@@ -121,10 +124,10 @@ export async function setupApp(webamp: Webamp): Promise<void> {
     currentTrackStart = Math.floor(Date.now() / 1000)
     if (!trackInfo) return
 
-    const meta = (trackInfo as any).metaData
+    const meta = trackInfo.metaData
     currentTrackArtist = meta?.artist || ''
-    currentTrackTitle = meta?.title || trackInfo.url?.split('/').pop() || ''
-    currentTrackDuration = (trackInfo as any).duration || 0
+    currentTrackTitle = meta?.title || trackInfo.url.split('/').pop() || ''
+    currentTrackDuration = trackInfo.duration || 0
     if (!currentTrackArtist && !currentTrackTitle) return
 
     if (!settings.isEnabled('auto_scrobble')) return
@@ -182,10 +185,10 @@ export async function setupApp(webamp: Webamp): Promise<void> {
         tracking = false
       }
       if (!trackInfo) return
-      const url = (trackInfo as any).url || ''
-      const meta = (trackInfo as any).metaData
+      const url = trackInfo.url
+      const meta = trackInfo.metaData
       const { source, sourceId } = extractSource(url)
-      historyTracker.onTrackStart(source, sourceId, meta?.artist || '', meta?.title || '', (trackInfo as any).duration ?? 0)
+      historyTracker.onTrackStart(source, sourceId, meta?.artist || '', meta?.title || '', trackInfo.duration ?? 0)
       tracking = true
     })
   }
