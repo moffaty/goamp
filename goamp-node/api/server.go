@@ -6,23 +6,20 @@ import (
 	"net/http"
 
 	"github.com/goamp/sdk/sdk"
-	"github.com/goamp/sdk/sdk/catalog"
 	"github.com/goamp/sdk/sdk/plugin"
-	"github.com/goamp/sdk/sdk/profiles"
 )
 
 // Server wires together all HTTP handlers and serves the API.
 type Server struct {
 	node     sdk.Node
-	catalog  *catalog.SQLCatalog
-	profiles *profiles.SQLProfileAggregator
+	catalog  sdk.Catalog
+	profiles sdk.ProfileAggregator
 	plugins  *plugin.Loader
 	hub      *WSHub
 }
 
 // New creates a Server. Call Start to begin accepting connections.
-// TODO(you): this constructor is done. Implement handlers in the other files.
-func New(node sdk.Node, cat *catalog.SQLCatalog, prof *profiles.SQLProfileAggregator, loader *plugin.Loader) *Server {
+func New(node sdk.Node, cat sdk.Catalog, prof sdk.ProfileAggregator, loader *plugin.Loader) *Server {
 	s := &Server{
 		node:     node,
 		catalog:  cat,
@@ -69,6 +66,9 @@ func (s *Server) Start(addr string) error {
 func (s *Server) Hub() *WSHub {
 	return s.hub
 }
+
+// Handler returns the Server as an http.Handler. Used in tests.
+func (s *Server) Handler() http.Handler { return s }
 
 // ServeHTTP builds the mux and serves a single request. Used in tests.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

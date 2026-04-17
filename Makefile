@@ -16,14 +16,42 @@ node-sidecar: ## Build goamp-node sidecar binary for current platform
 	cd goamp-node && go build -o ../$(NODE_BIN) ./cmd/goamp-node
 	@echo "Built sidecar: $(NODE_BIN)"
 
-test-node: ## Run goamp-node Go tests
+node-sidecar-win: ## Cross-compile goamp-node sidecar for Windows (GOOS=windows)
+	cd goamp-node && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 \
+		go build -o ../src-tauri/binaries/goamp-node-x86_64-pc-windows-msvc.exe ./cmd/goamp-node
+	@echo "Built Windows sidecar: src-tauri/binaries/goamp-node-x86_64-pc-windows-msvc.exe"
+
+test-node: ## Run all goamp-node Go tests
 	cd goamp-node && go test ./... -timeout 120s
 
-dev: node-sidecar ## Run in dev mode (hot-reload)
-	pnpm tauri dev
+# ─── P2P / Network Tests ──────────────────────────────────────
 
-dev-wsl: ## Run in dev mode on WSL (software rendering)
-	GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 pnpm tauri dev
+test-p2p: ## Run all P2P node tests (host + DHT + pubsub + catalog + integration)
+	cd goamp-node && go test ./sdk/node/... -timeout 120s -v
+
+test-p2p-host: ## Host connectivity tests (connect, stop, emit)
+	cd goamp-node && go test ./sdk/node/... -run 'TestHost' -timeout 30s -v
+
+test-p2p-dht: ## DHT announce / find-providers tests
+	cd goamp-node && go test ./sdk/node/... -run 'TestDHT' -timeout 60s -v
+
+test-p2p-pubsub: ## GossipSub profile publish / receive tests
+	cd goamp-node && go test ./sdk/node/... -run 'TestGossipSub' -timeout 60s -v
+
+test-p2p-catalog: ## Catalog protocol (remote search over libp2p stream) tests
+	cd goamp-node && go test ./sdk/node/... -run 'TestCatalogProtocol' -timeout 30s -v
+
+test-p2p-integration: ## Full end-to-end integration tests (announce→find, profile sync, health)
+	cd goamp-node && go test ./sdk/node/... -run 'TestIntegration' -timeout 120s -v
+
+test-p2p-race: ## All P2P tests with race detector (slower, catches data races)
+	cd goamp-node && go test ./sdk/node/... -race -timeout 180s -v
+
+dev: node-sidecar ## Run in dev mode (hot-reload)
+	GDK_SCALE=1 pnpm tauri dev
+
+dev-wsl: ## Run in dev mode on WSL (software rendering, 1x DPI)
+	GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 GDK_SCALE=1 pnpm tauri dev
 
 dev-android: ## Run on connected Android device (hot-reload)
 	pnpm tauri android dev
@@ -33,7 +61,7 @@ dev-android: ## Run on connected Android device (hot-reload)
 build: ## Build for Linux (deb + AppImage)
 	pnpm tauri build
 
-build-win: ## Cross-compile for Windows via cargo-xwin
+build-win: node-sidecar-win ## Cross-compile for Windows via cargo-xwin (builds Go sidecar first)
 	pnpm build:win
 
 build-android: ## Build APK for Android

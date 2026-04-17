@@ -54,8 +54,8 @@ func main() {
 		log.Fatalf("data dir: %v", err)
 	}
 
-	// 3. Load or generate identity key
-	_, err = identity.LoadOrGenerate(cfg.Identity.KeyPath)
+	// 3. Load or generate persistent identity key
+	privKey, err := identity.LoadOrGenerate(cfg.Identity.KeyPath)
 	if err != nil {
 		log.Fatalf("identity: %v", err)
 	}
@@ -67,31 +67,45 @@ func main() {
 	}
 	defer db.Close()
 
-	// 5. Build SDK modules
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Node stub (Plan 1 — no real libp2p yet)
-	// In Plan 2, replace with node.NewLibP2PNode(ctx, privKey, cfg)
-	var srv *api.Server
-	n := node.New(func(event goampsdk.Event) {
-		if srv != nil {
-			srv.Hub().Broadcast(event)
-		}
-	})
-
+	// 5. Build catalog + profiles
 	cat := catalog.New(db, "local")
 	prof := profiles.New(db)
 
 	// 6. Load plugins
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	loader := plugin.NewLoader(cfg.Plugins.Dir)
 	if cfg.Plugins.Enabled {
 		loader.LoadAll(ctx)
 	}
 	defer loader.Close()
 
-	// 7. Build and start HTTP server
+	// 7. Build P2P node (real libp2p, Plan 2)
+	var srv *api.Server
+	n, err := node.New(ctx, node.Config{
+		PrivKey:    privKey,
+		ListenAddr: "/ip4/0.0.0.0/tcp/0",
+		Catalog:    cat,
+		Profiles:   prof,
+		EmitFn: func(e goampsdk.Event) {
+			if srv != nil {
+				srv.Hub().Broadcast(e)
+			}
+		},
+	})
+	if err != nil {
+		log.Fatalf("node: %v", err)
+	}
+
+	// 8. Build HTTP server
 	srv = api.New(n, cat, prof, loader)
+
+	// 9. Start P2P node (mDNS, DHT, GossipSub)
+	if err := n.Start(ctx); err != nil {
+		log.Fatalf("node start: %v", err)
+	}
+	defer n.Stop()
 
 	// Signal handling — graceful shutdown on SIGTERM or SIGINT
 	sigCh := make(chan os.Signal, 1)
@@ -99,6 +113,7 @@ func main() {
 	go func() {
 		<-sigCh
 		log.Println("[goamp-node] shutting down…")
+		n.Stop()
 		cancel()
 		db.Close()
 		os.Exit(0)
@@ -110,7 +125,7 @@ func main() {
 	fmt.Printf("ready:%d\n", cfg.Node.APIPort)
 	os.Stdout.Sync()
 
-	log.Printf("[goamp-node] mode=%s api=%s", cfg.Node.Mode, addr)
+	log.Printf("[goamp-node] mode=%s peer=%s api=%s", cfg.Node.Mode, n.ID(), addr)
 	if err := srv.Start(addr); err != nil {
 		log.Fatalf("server: %v", err)
 	}

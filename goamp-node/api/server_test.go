@@ -23,7 +23,7 @@ func newTestServer(t *testing.T) *api.Server {
 	require.NoError(t, err)
 	t.Cleanup(func() { st.Close() })
 
-	n := node.New(nil)
+	n := node.NewStub(nil)
 	cat := catalog.New(st, "local")
 	prof := profiles.New(st)
 	loader := plugin.NewLoader(t.TempDir())

@@ -17,6 +17,17 @@ func (s *Server) handleProfileSync(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid profile: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Filter mood centroids: only sync moods with enough data
+	if len(profile.MoodCentroids) > 0 {
+		filtered := make(map[string]*proto.MoodCentroid)
+		for moodID, centroid := range profile.MoodCentroids {
+			if centroid.TrackCount >= 10 {
+				filtered[moodID] = centroid
+			}
+		}
+		profile.MoodCentroids = filtered
+	}
+
 	if err := s.profiles.Submit(r.Context(), &profile); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

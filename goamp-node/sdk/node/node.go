@@ -19,9 +19,9 @@ type LocalNode struct {
 	emitFn    func(sdk.Event)
 }
 
-// New creates a LocalNode stub.
-// emitFn is called when Emit is invoked — typically hub.Broadcast.
-func New(emitFn func(sdk.Event)) *LocalNode {
+// NewStub creates a LocalNode stub (Plan 1 only).
+// Use New(ctx, Config) for the real P2P node.
+func NewStub(emitFn func(sdk.Event)) *LocalNode {
 	return &LocalNode{emitFn: emitFn}
 }
 
