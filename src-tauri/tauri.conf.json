@@ -18,9 +18,11 @@
         "height": 464,
         "decorations": false,
         "transparent": true,
-        "resizable": false,
+        "resizable": true,
+        "alwaysOnTop": false,
         "shadow": false,
-        "backgroundColor": "#00000000"
+        "backgroundColor": "#00000000",
+        "additionalBrowserArgs": "--force-device-scale-factor=1"
       }
     ],
     "security": {

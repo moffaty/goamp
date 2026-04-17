@@ -41,13 +41,20 @@ message SyncBatch {
 
 // ─── Profiles ────────────────────────────────────────────────────────────────
 
+message MoodCentroid {
+  repeated float vec         = 1;  // ~30-dim normalized tag vector
+  int32          track_count = 2;  // number of tracks that contributed
+  int64          updated_at  = 3;
+}
+
 message TasteProfile {
-  uint32               version       = 1;
-  repeated string      liked_hashes  = 2;
-  repeated ListenPair  listen_pairs  = 3;
-  map<string, float>   genre_weights = 4;
-  uint32               total_listens = 5;
-  repeated ListeningProof proofs     = 6;
+  uint32               version        = 1;
+  repeated string      liked_hashes   = 2;
+  repeated ListenPair  listen_pairs   = 3;
+  map<string, float>   genre_weights  = 4;
+  uint32               total_listens  = 5;
+  repeated ListeningProof proofs      = 6;
+  map<string, MoodCentroid> mood_centroids = 7;
 }
 
 message ListenPair {

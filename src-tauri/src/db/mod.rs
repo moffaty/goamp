@@ -249,6 +249,73 @@ fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         ",
     )?;
 
+    // Migration: mood scoring tables (mood_track_scores, track_features, mood_centroids, track_signals, tag_weights)
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS mood_track_scores (
+            mood_id TEXT NOT NULL,
+            canonical_id TEXT NOT NULL,
+            play_count INTEGER DEFAULT 0,
+            completion_rate REAL DEFAULT 0.0,
+            skip_rate REAL DEFAULT 0.0,
+            last_played_at INTEGER,
+            PRIMARY KEY (mood_id, canonical_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS track_features (
+            canonical_id TEXT PRIMARY KEY,
+            tags_json TEXT NOT NULL DEFAULT '{}',
+            feature_vec TEXT NOT NULL DEFAULT '[]',
+            fetched_at INTEGER DEFAULT (unixepoch())
+        );
+
+        CREATE TABLE IF NOT EXISTS mood_centroids (
+            mood_id TEXT PRIMARY KEY,
+            centroid_vec TEXT NOT NULL DEFAULT '[]',
+            track_count INTEGER DEFAULT 0,
+            updated_at INTEGER DEFAULT (unixepoch())
+        );
+
+        CREATE TABLE IF NOT EXISTS track_signals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            canonical_id TEXT NOT NULL,
+            signal INTEGER NOT NULL,
+            scope TEXT NOT NULL,
+            tag_penalty_applied INTEGER DEFAULT 0,
+            created_at INTEGER DEFAULT (unixepoch())
+        );
+
+        CREATE TABLE IF NOT EXISTS tag_weights (
+            tag TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            weight REAL NOT NULL DEFAULT 1.0,
+            PRIMARY KEY (tag, scope)
+        );
+        ",
+    )?;
+
+    // Migration: add seed_tags to mood_channels (safe — only if column missing)
+    let has_seed_tags = conn
+        .prepare("SELECT seed_tags FROM mood_channels LIMIT 0")
+        .is_ok();
+    if !has_seed_tags {
+        conn.execute_batch(
+            "ALTER TABLE mood_channels ADD COLUMN seed_tags TEXT NOT NULL DEFAULT '[]';
+             UPDATE mood_channels SET seed_tags = '[\"chill\",\"ambient\",\"acoustic\",\"sleep\",\"relaxing\",\"meditation\"]' WHERE id = 'calm';
+             UPDATE mood_channels SET seed_tags = '[\"energetic\",\"workout\",\"upbeat\",\"dance\",\"hype\",\"party\"]' WHERE id = 'energetic';
+             UPDATE mood_channels SET seed_tags = '[\"focus\",\"concentration\",\"study\",\"instrumental\"]' WHERE id = 'focus';
+             UPDATE mood_channels SET seed_tags = '[\"obscure\",\"underground\",\"experimental\",\"rare\"]' WHERE id = 'discovery';",
+        )?;
+    }
+
+    // Migration: add source_mood to listen_history (safe — only if column missing)
+    let has_source_mood = conn
+        .prepare("SELECT source_mood FROM listen_history LIMIT 0")
+        .is_ok();
+    if !has_source_mood {
+        conn.execute_batch("ALTER TABLE listen_history ADD COLUMN source_mood TEXT NULL;")?;
+    }
+
     // Migration: aggregation tables
     conn.execute_batch(
         "
@@ -302,6 +369,96 @@ mod tests {
         assert!(tables.contains(&"peer_profiles".to_string()));
         assert!(tables.contains(&"recommendation_cache".to_string()));
         assert!(tables.contains(&"mood_channels".to_string()));
+        assert!(tables.contains(&"mood_track_scores".to_string()));
+        assert!(tables.contains(&"track_features".to_string()));
+        assert!(tables.contains(&"mood_centroids".to_string()));
+        assert!(tables.contains(&"track_signals".to_string()));
+        assert!(tables.contains(&"tag_weights".to_string()));
+    }
+
+    #[test]
+    fn test_mood_track_scores_table() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO mood_track_scores (mood_id, canonical_id, play_count, completion_rate, skip_rate)
+             VALUES ('calm', 'hash_abc', 3, 0.85, 0.1)",
+            [],
+        ).unwrap();
+        let rate: f64 = conn.query_row(
+            "SELECT completion_rate FROM mood_track_scores WHERE mood_id='calm' AND canonical_id='hash_abc'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert!((rate - 0.85).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_track_features_table() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO track_features (canonical_id, tags_json, feature_vec) VALUES ('h1', '{\"chill\":0.8}', '[0.1,0.2]')",
+            [],
+        ).unwrap();
+        let vec_str: String = conn
+            .query_row(
+                "SELECT feature_vec FROM track_features WHERE canonical_id='h1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(vec_str, "[0.1,0.2]");
+    }
+
+    #[test]
+    fn test_track_signals_table() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO track_signals (canonical_id, signal, scope) VALUES ('hash_abc', -1, 'global')",
+            [],
+        ).unwrap();
+        let sig: i32 = conn
+            .query_row(
+                "SELECT signal FROM track_signals WHERE canonical_id='hash_abc'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(sig, -1);
+    }
+
+    #[test]
+    fn test_tag_weights_table() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO tag_weights (tag, scope, weight) VALUES ('ambient', 'global', 0.2)",
+            [],
+        )
+        .unwrap();
+        let w: f64 = conn
+            .query_row(
+                "SELECT weight FROM tag_weights WHERE tag='ambient' AND scope='global'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!((w - 0.2).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_mood_channels_have_seed_tags() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        let seed_tags: String = conn
+            .query_row(
+                "SELECT seed_tags FROM mood_channels WHERE id='calm'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(seed_tags.contains("chill"));
     }
 
     #[test]

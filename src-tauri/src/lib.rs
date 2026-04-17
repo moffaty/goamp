@@ -11,6 +11,7 @@ mod http;
 mod md5;
 #[cfg(not(target_os = "android"))]
 mod media_keys;
+mod mood_engine;
 #[cfg(desktop)]
 mod node;
 mod radio;
@@ -19,6 +20,7 @@ mod scrobble;
 mod survey;
 mod sybil;
 mod taste_profile;
+mod track_features;
 mod track_id;
 #[cfg(desktop)]
 mod tray;
@@ -126,6 +128,14 @@ pub fn run() {
             recommend::create_mood_channel,
             recommend::add_seed_track,
             recommend::delete_mood_channel,
+            commands::mood::record_mood_play,
+            commands::mood::get_mood_track_scores,
+            commands::mood::record_track_signal,
+            commands::mood::delete_track_signal,
+            commands::mood::set_tag_weight,
+            commands::mood::get_tag_weight,
+            mood_engine::generate_mood_queue,
+            mood_engine::update_mood_centroid,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");

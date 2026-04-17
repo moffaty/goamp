@@ -371,10 +371,11 @@ type TasteProfile struct {
 	LikedHashes   []string               `protobuf:"bytes,2,rep,name=liked_hashes,json=likedHashes,proto3" json:"liked_hashes,omitempty"`
 	ListenPairs   []*ListenPair          `protobuf:"bytes,3,rep,name=listen_pairs,json=listenPairs,proto3" json:"listen_pairs,omitempty"`
 	GenreWeights  map[string]float32     `protobuf:"bytes,4,rep,name=genre_weights,json=genreWeights,proto3" json:"genre_weights,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"fixed32,2,opt,name=value"`
-	TotalListens  uint32                 `protobuf:"varint,5,opt,name=total_listens,json=totalListens,proto3" json:"total_listens,omitempty"`
-	Proofs        []*ListeningProof      `protobuf:"bytes,6,rep,name=proofs,proto3" json:"proofs,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	TotalListens   uint32                 `protobuf:"varint,5,opt,name=total_listens,json=totalListens,proto3" json:"total_listens,omitempty"`
+	Proofs         []*ListeningProof      `protobuf:"bytes,6,rep,name=proofs,proto3" json:"proofs,omitempty"`
+	MoodCentroids  map[string]*MoodCentroid `json:"mood_centroids,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *TasteProfile) Reset() {
@@ -445,6 +446,13 @@ func (x *TasteProfile) GetTotalListens() uint32 {
 func (x *TasteProfile) GetProofs() []*ListeningProof {
 	if x != nil {
 		return x.Proofs
+	}
+	return nil
+}
+
+func (x *TasteProfile) GetMoodCentroids() map[string]*MoodCentroid {
+	if x != nil {
+		return x.MoodCentroids
 	}
 	return nil
 }
