@@ -1,28 +1,114 @@
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 import { toggleSearchOverlay } from "../youtube/SearchOverlay";
 import { togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { toggleAudioDevicePanel } from "../settings/AudioDevicePanel";
 import { toggleScrobbleSettings } from "../scrobble/ScrobbleSettings";
 import { toggleFeatureFlagsPanel } from "../settings/FeatureFlagsPanel";
 import { toggleVisualizerPanel } from "./VisualizerPanel";
+import { toggleMilkdrop } from "./milkdrop-controller";
 import { toggleGenrePanel, toggleYouTubeSettings } from "../settings/GenrePanel";
 import { toggleRadioPanel } from "../radio/RadioPanel";
 import { toggleRecommendationPanel } from "../recommendations/RecommendationPanel";
 import { openFolder, openFiles, loadSkin } from "./file-actions";
+import { moodService } from "../recommendations/mood-service";
 import type Webamp from "webamp";
-
-const PLAYER_WIDTH = 275;
-const PLAYER_HEIGHT = 464;
-const MILKDROP_WIDTH = 525; // placed to the right of the player
-
 let menu: HTMLDivElement | null = null;
 let webampRef: Webamp | null = null;
+
+interface SubMenuItem {
+  label: string;
+  action: () => void;
+}
 
 interface MenuItem {
   label: string;
   shortcut?: string;
   action: () => void;
   separator?: boolean;
+}
+
+export function buildSignalMenuItems(
+  canonicalId: string,
+  _artist: string,
+  _title: string
+): MenuItem[] {
+  const activeMood = moodService.activeMood;
+
+  const boost = (scope: string) => {
+    invoke("record_track_signal", { canonicalId, signal: 1, scope }).catch(console.error);
+  };
+  const block = (scope: string) => {
+    invoke("record_track_signal", { canonicalId, signal: -1, scope }).catch(console.error);
+  };
+
+  if (activeMood) {
+    return [
+      {
+        label: "↑ Recommend similar",
+        action: () =>
+          showScopeSubmenu([
+            { label: `In ${activeMood} only`, action: () => boost(`mood:${activeMood}`) },
+            { label: "Globally (all moods)", action: () => boost("global") },
+          ]),
+      },
+      {
+        label: "✕ Don't recommend",
+        action: () =>
+          showScopeSubmenu([
+            { label: `In ${activeMood} only`, action: () => block(`mood:${activeMood}`) },
+            { label: "Globally (all moods)", action: () => block("global") },
+          ]),
+      },
+    ];
+  }
+
+  return [
+    { label: "↑ Recommend similar", action: () => boost("global") },
+    { label: "✕ Don't recommend", action: () => block("global") },
+  ];
+}
+
+let scopeSubmenu: HTMLDivElement | null = null;
+
+function showScopeSubmenu(items: SubMenuItem[]): void {
+  if (scopeSubmenu) scopeSubmenu.remove();
+  scopeSubmenu = document.createElement("div");
+  scopeSubmenu.style.cssText = `
+    position: fixed; background: #1a1a2e; border: 1px solid #444; z-index: 10002;
+    font-family: 'MS Sans Serif', Tahoma, sans-serif; font-size: 11px; color: #0f0;
+    min-width: 160px;
+  `;
+  items.forEach((item) => {
+    const row = document.createElement("div");
+    row.style.cssText = "padding: 4px 12px; cursor: pointer;";
+    row.textContent = item.label;
+    row.addEventListener("mouseenter", () => (row.style.background = "#2a2a4a"));
+    row.addEventListener("mouseleave", () => (row.style.background = ""));
+    row.addEventListener("click", () => {
+      item.action();
+      scopeSubmenu?.remove();
+      scopeSubmenu = null;
+      closeGoampMenu();
+    });
+    scopeSubmenu!.appendChild(row);
+  });
+  const menuEl = document.getElementById("goamp-context-menu");
+  if (menuEl) {
+    const rect = menuEl.getBoundingClientRect();
+    scopeSubmenu.style.left = `${rect.right + 2}px`;
+    scopeSubmenu.style.top = `${rect.top}px`;
+  }
+  document.body.appendChild(scopeSubmenu);
+  setTimeout(() => {
+    document.addEventListener(
+      "mousedown",
+      () => {
+        scopeSubmenu?.remove();
+        scopeSubmenu = null;
+      },
+      { once: true }
+    );
+  }, 0);
 }
 
 export function initGoampMenu(webamp: Webamp) {
@@ -65,7 +151,7 @@ function showGoampMenu(x: number, y: number) {
     { label: "Internet Radio", shortcut: "Ctrl+R", action: () => toggleRadioPanel() },
     { label: "Recommendations", shortcut: "Ctrl+Shift+R", action: () => toggleRecommendationPanel() },
     { label: "Playlists", shortcut: "Ctrl+P", action: () => togglePlaylistPanel() },
-    { label: "Visualizer", shortcut: "Ctrl+V", action: () => toggleMilkdropWindow(webampRef) },
+    { label: "Visualizer", shortcut: "Ctrl+V", action: () => toggleMilkdrop() },
     { label: "Visualizer Presets", shortcut: "V", action: () => toggleVisualizerPanel() },
     {
       label: "Open Folder",
@@ -98,6 +184,14 @@ function showGoampMenu(x: number, y: number) {
     },
     { label: "Feature Flags", shortcut: "Ctrl+Shift+`", action: () => toggleFeatureFlagsPanel() },
   ];
+
+  const state = (webampRef as any)?.store?.getState?.();
+  const currentTrack = state?.tracks?.[state?.playlist?.currentTrack];
+  if (currentTrack) {
+    const canonicalId = `${currentTrack.artist ?? ""}:${currentTrack.defaultName ?? ""}:${currentTrack.url ?? ""}`;
+    items.push({ label: "", action: () => {}, separator: true });
+    items.push(...buildSignalMenuItems(canonicalId, currentTrack.artist ?? "", currentTrack.defaultName ?? ""));
+  }
 
   menu = document.createElement("div");
   menu.id = "goamp-context-menu";
@@ -154,27 +248,3 @@ function closeGoampMenu() {
   }
 }
 
-function toggleMilkdropWindow(webamp: Webamp | null) {
-  if (!webamp) return;
-  const store = (webamp as any).store;
-  if (!store) return;
-  const state = store.getState();
-  const isOpen = state?.windows?.genWindows?.milkdrop?.open ?? false;
-  const appWindow = getCurrentWindow();
-
-  if (isOpen) {
-    store.dispatch({ type: "CLOSE_MILKDROP_WINDOW" });
-    appWindow.setSize(new LogicalSize(PLAYER_WIDTH, PLAYER_HEIGHT)).catch(() => {});
-  } else {
-    store.dispatch({ type: "OPEN_MILKDROP_WINDOW" });
-    appWindow.setSize(new LogicalSize(PLAYER_WIDTH + MILKDROP_WIDTH, PLAYER_HEIGHT)).catch(() => {});
-    // Position Milkdrop to the right of the player after it's been created in the DOM
-    setTimeout(() => {
-      store.dispatch({
-        type: "UPDATE_WINDOW_POSITIONS",
-        positions: { milkdrop: { x: PLAYER_WIDTH, y: 0 } },
-        absolute: true,
-      });
-    }, 50);
-  }
-}

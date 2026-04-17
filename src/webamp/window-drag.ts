@@ -10,25 +10,60 @@ const appWebview = getCurrentWebviewWindow();
  * the window ignores cursor events. Frontend toggles ignore on/off
  * based on whether the cursor is over Webamp content.
  */
+// Module-level state so resetClickThrough() can reach them.
+let _isIgnored: boolean | null = null;
+let _refreshWinPos: (() => void) | null = null;
+
+/**
+ * Call after programmatic window resize so the cached cursor state and
+ * window position are reset. Prevents setIgnoreCursorEvents getting stuck.
+ */
+export function resetClickThrough(): void {
+  _isIgnored = null;
+  appWindow.setIgnoreCursorEvents(false).catch(() => {});
+  _refreshWinPos?.();
+}
+
 export function setupClickThrough() {
-  let isIgnored: boolean | null = null;
+  // Use window.screenX/Y as synchronous initial value (works on Windows/WebView2).
+  // On Linux/WebKitGTK screenX may be 0, so also fetch via outerPosition() and
+  // keep updated on window move events.
+  let winScreenX = window.screenX;
+  let winScreenY = window.screenY;
+
+  const refreshWinPos = () => {
+    appWindow.outerPosition().then((pos) => {
+      winScreenX = pos.x;
+      winScreenY = pos.y;
+    }).catch(() => {
+      // outerPosition unavailable — keep window.screenX as fallback
+      winScreenX = window.screenX;
+      winScreenY = window.screenY;
+    });
+  };
+  _refreshWinPos = refreshWinPos;
+
+  refreshWinPos();
+  appWindow.listen("tauri://move", refreshWinPos).catch(() => {});
 
   appWebview.listen<{ x: number; y: number }>(
     "device-mouse-move",
     ({ payload }) => {
-      // rdev gives device pixels, DOM uses CSS pixels
+      // rdev gives global screen physical pixels; convert to viewport CSS coords.
+      // outerPosition() also returns physical pixels. With --force-device-scale-factor=1
+      // the ratio is 1, but we still apply it for correctness.
       const ratio = window.devicePixelRatio || 1;
-      const cssX = payload.x / ratio;
-      const cssY = payload.y / ratio;
+      const cssX = (payload.x - winScreenX) / ratio;
+      const cssY = (payload.y - winScreenY) / ratio;
 
       const el = document.elementFromPoint(cssX, cssY);
       const inContent = el !== null && isAppContent(el as HTMLElement);
 
       const shouldIgnore = !inContent;
 
-      if (shouldIgnore !== isIgnored) {
+      if (shouldIgnore !== _isIgnored) {
         appWindow.setIgnoreCursorEvents(shouldIgnore);
-        isIgnored = shouldIgnore;
+        _isIgnored = shouldIgnore;
       }
     }
   );
@@ -36,9 +71,9 @@ export function setupClickThrough() {
   // When WebView receives any mouse event, ensure ignore is off.
   // This catches edge cases like context menus appearing under cursor.
   document.addEventListener("mousemove", () => {
-    if (isIgnored) {
+    if (_isIgnored) {
       appWindow.setIgnoreCursorEvents(false);
-      isIgnored = false;
+      _isIgnored = false;
     }
   });
 }
@@ -51,6 +86,23 @@ function isAppContent(el: HTMLElement): boolean {
 }
 
 /**
- * No-op: Webamp handles its own internal window dragging.
+ * Make Webamp title bars draggable OS windows via Tauri's drag-region API.
+ * Runs after Webamp renders so the DOM elements exist.
  */
-export function setupWindowDrag() {}
+export function setupWindowDrag() {
+  // Webamp uses class "title-bar" for all draggable title areas.
+  // We also re-apply when the DOM changes (e.g. skin change) via MutationObserver.
+  const applyDragRegions = () => {
+    document.querySelectorAll<HTMLElement>("#webamp .title-bar").forEach((el) => {
+      el.dataset.tauriDragRegion = "";
+    });
+  };
+
+  applyDragRegions();
+
+  const observer = new MutationObserver(applyDragRegions);
+  const webampEl = document.getElementById("webamp");
+  if (webampEl) {
+    observer.observe(webampEl, { childList: true, subtree: true });
+  }
+}

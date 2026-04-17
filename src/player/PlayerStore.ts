@@ -57,6 +57,37 @@ export class PlayerStore {
     return this.state?.windows?.genWindows?.milkdrop?.open ?? false
   }
 
+  toggleMilkdrop(): void {
+    if (this.state?.windows?.genWindows?.milkdrop) {
+      // Already initialized — just flip open flag without reinitializing butterchurn
+      this.dispatch({ type: 'TOGGLE_WINDOW', windowId: 'milkdrop' })
+    } else {
+      // First open — must initialize
+      this.dispatch({ type: 'ENABLE_MILKDROP', open: true })
+    }
+  }
+
+  getMilkdropPresets(): string[] {
+    return (this.state?.milkdrop?.presets as Array<{ name: string }> | undefined)
+      ?.map((p) => p.name) ?? []
+  }
+
+  selectMilkdropPreset(index: number): void {
+    // TransitionType.IMMEDIATE = 0 — instant switch, no slow blend
+    this.dispatch({ type: 'SELECT_PRESET_AT_INDEX', index, transitionType: 0 })
+  }
+
+  onMilkdropChange(cb: (open: boolean) => void): () => void {
+    let lastOpen = this.isMilkdropOpen()
+    return this.store?.subscribe(() => {
+      const open = this.isMilkdropOpen()
+      if (open !== lastOpen) {
+        lastOpen = open
+        cb(open)
+      }
+    }) ?? (() => {})
+  }
+
   onTrackChange(cb: (track: TrackInfo | null) => void): () => void {
     return this.webamp.onTrackDidChange(cb)
   }

@@ -11,6 +11,8 @@ import { initAudioDevicePanel, restoreAudioDevice } from '../settings/AudioDevic
 import { initScrobbleSettings } from '../scrobble/ScrobbleSettings'
 import { initGoampMenu } from '../webamp/goamp-menu'
 import { initVisualizerPanel } from '../webamp/VisualizerPanel'
+import { initMilkdropController } from '../webamp/milkdrop-controller'
+import { renderMoodTabs } from '../webamp/bridge'
 import { initGenrePanel } from '../settings/GenrePanel'
 import { initRadioPanel } from '../radio/RadioPanel'
 import { initRecommendationPanel } from '../recommendations/RecommendationPanel'
@@ -35,11 +37,13 @@ export async function setupApp(webamp: Webamp): Promise<void> {
   initPlaylistPanel(webamp)
   initAudioDevicePanel(webamp)
   initScrobbleSettings()
-  initVisualizerPanel(webamp)
+  initVisualizerPanel(webamp, store)
   initGenrePanel(webamp)
   initRadioPanel(webamp)
   initRecommendationPanel(webamp)
   initGoampMenu(webamp)
+  initMilkdropController(store)
+  renderMoodTabs().catch(() => {})
   restoreAudioDevice()
   settings.refreshFlagCache().catch(() => {})
 
@@ -194,7 +198,6 @@ export async function setupApp(webamp: Webamp): Promise<void> {
   }
 
   setupKeyboard(
-    store,
     () => openFolder(webamp),
     () => openFiles(webamp),
     () => loadSkin(webamp),

@@ -5,6 +5,8 @@ import {
   type FeatureFlag,
 } from "./feature-flags-service";
 import { escapeHtml } from "../lib/ui-utils";
+import { invoke } from "@tauri-apps/api/core";
+import type { TagWeight } from "../recommendations/mood-service";
 
 let panel: HTMLDivElement | null = null;
 let visible = false;
@@ -48,7 +50,10 @@ async function loadFlags() {
     renderFlags(list, flags);
   } catch (e) {
     list.innerHTML = `<div style="color:#f00;">Error: ${e}</div>`;
+    return;
   }
+  // Rec settings are non-fatal — run separately so errors don't clear the flag list
+  renderRecSettings(list).catch(() => {});
 }
 
 function renderFlags(el: HTMLDivElement, flags: FeatureFlag[]) {
@@ -84,5 +89,82 @@ function renderFlags(el: HTMLDivElement, flags: FeatureFlag[]) {
       }
     });
   });
+}
+
+async function renderRecSettings(container: HTMLDivElement): Promise<void> {
+  const section = document.createElement("div");
+  section.style.cssText = "padding: 8px 4px; border-top: 1px solid #333; margin-top: 8px;";
+  section.innerHTML = `
+    <div style="color:#fc0; font-weight:bold; margin-bottom:6px;">Recommendations</div>
+    <div style="margin-bottom:6px;">
+      <div style="color:#888; font-size:10px; margin-bottom:3px;">BOOSTED TAGS</div>
+      <div id="rec-boosted-tags" style="display:flex; flex-wrap:wrap; gap:3px;"></div>
+    </div>
+    <div style="margin-bottom:8px;">
+      <div style="color:#888; font-size:10px; margin-bottom:3px;">BLOCKED TAGS</div>
+      <div id="rec-blocked-tags" style="display:flex; flex-wrap:wrap; gap:3px;"></div>
+    </div>
+    <div style="margin-bottom:6px;">
+      <div style="color:#888; font-size:10px; margin-bottom:3px;">MOOD INFLUENCE</div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span style="color:#555; font-size:9px;">weak</span>
+        <input type="range" id="rec-mood-influence" min="1" max="7" step="1" value="4" style="flex:1; accent-color:#0f0;" />
+        <span style="color:#555; font-size:9px;">strong</span>
+      </div>
+    </div>
+    <div style="margin-bottom:6px;">
+      <div style="color:#888; font-size:10px; margin-bottom:3px;">DISCOVERY RATIO (tracks per batch)</div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span style="color:#555; font-size:9px;">0</span>
+        <input type="range" id="rec-discovery" min="0" max="10" step="1" value="5" style="flex:1; accent-color:#0f0;" />
+        <span style="color:#555; font-size:9px;">10</span>
+      </div>
+    </div>
+  `;
+  container.appendChild(section);
+
+  try {
+    const weights: TagWeight[] = await invoke("list_tag_weights", { scope: "global" });
+    const boostedEl = section.querySelector("#rec-boosted-tags") as HTMLDivElement;
+    const blockedEl = section.querySelector("#rec-blocked-tags") as HTMLDivElement;
+
+    const renderChip = (tw: TagWeight, parent: HTMLDivElement) => {
+      const chip = document.createElement("span");
+      const isBoost = tw.weight > 1.0;
+      chip.style.cssText = `
+        padding: 1px 6px; border: 1px solid; cursor: pointer; font-size: 10px;
+        border-color: ${isBoost ? "#0f0" : "#f44"};
+        background: ${isBoost ? "#1a3a1a" : "#3a1a1a"};
+        color: ${isBoost ? "#0f0" : "#f44"};
+      `;
+      chip.textContent = `${tw.tag} ×`;
+      chip.title = "Click to remove";
+      chip.addEventListener("click", async () => {
+        await invoke("delete_tag_weight", { tag: tw.tag, scope: tw.scope });
+        chip.remove();
+      });
+      parent.appendChild(chip);
+    };
+
+    weights.filter((w) => w.weight > 1.0).forEach((w) => renderChip(w, boostedEl));
+    weights.filter((w) => w.weight < 1.0).forEach((w) => renderChip(w, blockedEl));
+  } catch {
+    // Non-fatal if rec tables not ready
+  }
+
+  const moodSlider = section.querySelector("#rec-mood-influence") as HTMLInputElement;
+  const discoverySlider = section.querySelector("#rec-discovery") as HTMLInputElement;
+
+  const savedMood = await invoke("get_setting", { key: "rec_mood_influence" }).catch(() => "4");
+  const savedDisc = await invoke("get_setting", { key: "rec_discovery_count" }).catch(() => "5");
+  moodSlider.value = String(savedMood ?? "4");
+  discoverySlider.value = String(savedDisc ?? "5");
+
+  moodSlider.addEventListener("change", () =>
+    invoke("set_setting", { key: "rec_mood_influence", value: moodSlider.value }).catch(() => {})
+  );
+  discoverySlider.addEventListener("change", () =>
+    invoke("set_setting", { key: "rec_discovery_count", value: discoverySlider.value }).catch(() => {})
+  );
 }
 

@@ -45,6 +45,7 @@ export async function restoreSession(
       if (valid.length > 0) {
         setTracksToPlay(valid)
         dispatchStop()
+        setTimeout(dispatchStop, 300)
         return
       }
     }
@@ -56,4 +57,6 @@ export async function restoreSession(
   if (valid.length === 0) return
   setTracksToPlay(valid)
   dispatchStop()
+  // setTracksToPlay uses LOAD_STYLE.PLAY and may trigger async autoplay after file loading
+  setTimeout(dispatchStop, 300)
 }

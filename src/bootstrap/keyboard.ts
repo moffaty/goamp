@@ -1,18 +1,15 @@
 // src/bootstrap/keyboard.ts
-import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
 import { toggleSearchOverlay } from '../youtube/SearchOverlay'
 import { togglePlaylistPanel } from '../playlists/PlaylistPanel'
 import { toggleAudioDevicePanel } from '../settings/AudioDevicePanel'
 import { toggleScrobbleSettings } from '../scrobble/ScrobbleSettings'
 import { toggleFeatureFlagsPanel } from '../settings/FeatureFlagsPanel'
 import { toggleVisualizerPanel } from '../webamp/VisualizerPanel'
+import { toggleMilkdrop } from '../webamp/milkdrop-controller'
 import { toggleGenrePanel, toggleYouTubeSettings } from '../settings/GenrePanel'
 import { toggleRadioPanel } from '../radio/RadioPanel'
 import { toggleRecommendationPanel } from '../recommendations/RecommendationPanel'
-import type { PlayerStore } from '../player/PlayerStore'
-
 export function setupKeyboard(
-  store: PlayerStore,
   openFolder: () => Promise<void>,
   openFiles: () => Promise<void>,
   loadSkin: () => Promise<void>,
@@ -66,17 +63,7 @@ export function setupKeyboard(
     }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === 'KeyV') {
       e.preventDefault()
-      const appWindow = getCurrentWindow()
-      if (store.isMilkdropOpen()) {
-        store.dispatch({ type: 'CLOSE_MILKDROP_WINDOW' })
-        appWindow.setSize(new LogicalSize(275, 464)).catch(() => {})
-      } else {
-        store.dispatch({ type: 'OPEN_MILKDROP_WINDOW' })
-        appWindow.setSize(new LogicalSize(800, 464)).catch(() => {})
-        setTimeout(() => {
-          store.dispatch({ type: 'UPDATE_WINDOW_POSITIONS', positions: { milkdrop: { x: 275, y: 0 } }, absolute: true })
-        }, 50)
-      }
+      toggleMilkdrop()
     }
     if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === 'KeyV' && !isTyping) {
       toggleVisualizerPanel()

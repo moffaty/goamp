@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+vi.mock("../recommendations/mood-service", () => ({
+  moodService: { activeMood: "calm" },
+}));
+
 // Mock all panel imports before importing the module
 vi.mock("../youtube/SearchOverlay", () => ({
   toggleSearchOverlay: vi.fn(),
@@ -25,8 +30,9 @@ vi.mock("./bridge", () => ({
   loadSkin: vi.fn(),
 }));
 
-import { initGoampMenu } from "./goamp-menu";
+import { initGoampMenu, buildSignalMenuItems } from "./goamp-menu";
 import { toggleSearchOverlay } from "../youtube/SearchOverlay";
+
 
 describe("initGoampMenu", () => {
   let webampEl: HTMLDivElement;
@@ -48,8 +54,7 @@ describe("initGoampMenu", () => {
   });
 
   it("creates context menu on right-click within webamp", () => {
-    const fakeWebamp = { store: { getState: () => ({}) } } as any;
-    initGoampMenu(fakeWebamp);
+    initGoampMenu({} as any);
 
     const inner = webampEl.querySelector(".webamp-inner")!;
     const event = new MouseEvent("contextmenu", { bubbles: true, clientX: 100, clientY: 100 });
@@ -60,8 +65,7 @@ describe("initGoampMenu", () => {
   });
 
   it("menu contains expected items", () => {
-    const fakeWebamp = { store: { getState: () => ({}) } } as any;
-    initGoampMenu(fakeWebamp);
+    initGoampMenu({} as any);
 
     const inner = webampEl.querySelector(".webamp-inner")!;
     inner.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 100, clientY: 100 }));
@@ -76,8 +80,7 @@ describe("initGoampMenu", () => {
   });
 
   it("clicking menu item triggers action", () => {
-    const fakeWebamp = { store: { getState: () => ({}) } } as any;
-    initGoampMenu(fakeWebamp);
+    initGoampMenu({} as any);
 
     const inner = webampEl.querySelector(".webamp-inner")!;
     inner.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 100, clientY: 100 }));
@@ -98,8 +101,7 @@ describe("initGoampMenu", () => {
   });
 
   it("closes menu on Escape key", () => {
-    const fakeWebamp = { store: { getState: () => ({}) } } as any;
-    initGoampMenu(fakeWebamp);
+    initGoampMenu({} as any);
 
     const inner = webampEl.querySelector(".webamp-inner")!;
     inner.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 100, clientY: 100 }));
@@ -110,8 +112,7 @@ describe("initGoampMenu", () => {
   });
 
   it("does not show menu on right-click outside webamp", () => {
-    const fakeWebamp = { store: { getState: () => ({}) } } as any;
-    initGoampMenu(fakeWebamp);
+    initGoampMenu({} as any);
 
     const outsideEl = document.createElement("div");
     document.body.appendChild(outsideEl);
@@ -122,5 +123,14 @@ describe("initGoampMenu", () => {
     expect(menu).toBeNull();
 
     outsideEl.remove();
+  });
+});
+
+describe("buildSignalMenuItems", () => {
+  it("returns boost and block items", () => {
+    const items = buildSignalMenuItems("hash_abc", "Rick Astley", "Never Gonna Give You Up");
+    const labels = items.map((i) => i.label);
+    expect(labels).toContain("↑ Recommend similar");
+    expect(labels).toContain("✕ Don't recommend");
   });
 });

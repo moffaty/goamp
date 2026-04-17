@@ -69,4 +69,47 @@ describe('PlayerStore', () => {
     const s = new PlayerStore(w)
     expect(s.isMilkdropOpen()).toBe(false)
   })
+
+  it('onMilkdropChange calls callback when milkdrop state changes', () => {
+    let milkdropOpen = false
+    let subscriber: (() => void) | null = null
+    const mockStore = {
+      getState: () => ({ windows: { genWindows: { milkdrop: { open: milkdropOpen } } } }),
+      dispatch: vi.fn(),
+      subscribe: vi.fn((cb: () => void) => { subscriber = cb; return vi.fn() }),
+    }
+    const w = { store: mockStore, onTrackDidChange: vi.fn(() => vi.fn()) } as any
+    const s = new PlayerStore(w)
+    const cb = vi.fn()
+    s.onMilkdropChange(cb)
+
+    expect(cb).not.toHaveBeenCalled()
+
+    milkdropOpen = true
+    subscriber!()
+    expect(cb).toHaveBeenCalledWith(true)
+    expect(cb).toHaveBeenCalledTimes(1)
+
+    subscriber!()
+    expect(cb).toHaveBeenCalledTimes(1) // no change, no call
+
+    milkdropOpen = false
+    subscriber!()
+    expect(cb).toHaveBeenCalledWith(false)
+    expect(cb).toHaveBeenCalledTimes(2)
+  })
+
+  it('onMilkdropChange returns unsubscribe function', () => {
+    const unsubscribe = vi.fn()
+    const mockStore = {
+      getState: () => ({}),
+      dispatch: vi.fn(),
+      subscribe: vi.fn(() => unsubscribe),
+    }
+    const w = { store: mockStore, onTrackDidChange: vi.fn(() => vi.fn()) } as any
+    const s = new PlayerStore(w)
+    const unsub = s.onMilkdropChange(() => {})
+    unsub()
+    expect(unsubscribe).toHaveBeenCalled()
+  })
 })
