@@ -1,4 +1,4 @@
-use tauri::Manager;
+use tauri::{Listener, Manager};
 
 mod aggregator;
 mod commands;
@@ -14,6 +14,8 @@ mod media_keys;
 mod mood_engine;
 #[cfg(desktop)]
 mod node;
+#[cfg(desktop)]
+mod node_client;
 mod radio;
 mod recommend;
 mod scrobble;
@@ -148,6 +150,11 @@ pub fn run() {
 
             #[cfg(desktop)]
             {
+                let node_app = app.handle().clone();
+                app.handle().listen("goamp-node:ready", move |_event| {
+                    node_client::start(node_app.clone());
+                });
+
                 let handle = app.handle();
                 tray::setup(handle).expect("failed to setup tray");
 
