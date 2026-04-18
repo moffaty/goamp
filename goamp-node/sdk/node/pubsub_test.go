@@ -9,6 +9,7 @@ import (
 	"github.com/goamp/sdk/proto"
 	"github.com/goamp/sdk/sdk"
 	"github.com/goamp/sdk/sdk/node"
+	"github.com/goamp/sdk/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,6 +21,9 @@ type mockProfiles struct {
 
 func (m *mockProfiles) Submit(_ context.Context, _ *proto.TasteProfile) error { return nil }
 func (m *mockProfiles) GetRecommendations(_ context.Context, _ []string) ([]sdk.Recommendation, error) {
+	return nil, nil
+}
+func (m *mockProfiles) GetPeerProfiles(_ context.Context, _ int) ([]store.PeerProfileRow, error) {
 	return nil, nil
 }
 func (m *mockProfiles) StorePeer(_ context.Context, p sdk.PeerProfile) error {
@@ -152,8 +156,10 @@ func TestGossipSubEmitsProfileSynced(t *testing.T) {
 	}, 5*time.Second, 50*time.Millisecond, "profile:synced event not emitted")
 
 	var payload struct {
-		Hash string `json:"hash"`
+		Hash      string `json:"hash"`
+		PeerCount int    `json:"peer_count"`
 	}
 	require.NoError(t, json.Unmarshal(gotEvent.Payload, &payload))
 	assert.NotEmpty(t, payload.Hash)
+	assert.GreaterOrEqual(t, payload.PeerCount, 0, "peer_count must be present")
 }

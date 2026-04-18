@@ -62,7 +62,11 @@ func (n *P2PNode) handleProfileMessage(ctx context.Context, data []byte) {
 		})
 	}
 
-	payload, _ := json.Marshal(map[string]string{"hash": hash})
+	peerCount := len(n.host.Network().Conns())
+	payload, _ := json.Marshal(map[string]any{
+		"hash":       hash,
+		"peer_count": peerCount,
+	})
 	n.Emit(sdk.Event{Type: sdk.EventProfileSynced, Payload: payload})
 }
 
