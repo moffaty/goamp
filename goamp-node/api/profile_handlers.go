@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	goampsdk "github.com/goamp/sdk/sdk"
 
@@ -32,7 +33,41 @@ func (s *Server) handleProfileSync(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if s.node != nil {
+		_ = s.node.PublishProfile(r.Context(), &profile)
+	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleGetPeerProfiles handles GET /profiles/peers?limit=N
+// Returns peer taste profiles stored from gossip, newest first.
+func (s *Server) handleGetPeerProfiles(w http.ResponseWriter, r *http.Request) {
+	limit := 100
+	if n, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && n > 0 {
+		limit = n
+	}
+	rows, err := s.profiles.GetPeerProfiles(r.Context(), limit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	type profileEntry struct {
+		Hash       string          `json:"hash"`
+		Data       json.RawMessage `json:"data"`
+		ReceivedAt int64           `json:"received_at"`
+	}
+	entries := make([]profileEntry, 0, len(rows))
+	for _, row := range rows {
+		entries = append(entries, profileEntry{
+			Hash:       row.Hash,
+			Data:       json.RawMessage(row.Data),
+			ReceivedAt: row.ReceivedAt,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"profiles": entries})
 }
 
 // handleRecommendations handles GET /recommendations

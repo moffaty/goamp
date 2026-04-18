@@ -99,6 +99,54 @@ func TestRecommendationsEmpty(t *testing.T) {
 	assert.Contains(t, body, "recommendations")
 }
 
+func TestProfileSyncReturns204(t *testing.T) {
+	srv := newTestServer(t)
+	body := `{"version":1,"liked_hashes":["h1","h2"],"total_listens":5}`
+	req := httptest.NewRequest(http.MethodPost, "/profiles/sync", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNoContent, w.Code)
+}
+
+func TestGetPeerProfilesEmpty(t *testing.T) {
+	srv := newTestServer(t)
+	req := httptest.NewRequest(http.MethodGet, "/profiles/peers", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Contains(t, body, "profiles")
+}
+
+func TestGetPeerProfilesReturnsStored(t *testing.T) {
+	srv := newTestServer(t)
+
+	p := `{"version":1,"liked_hashes":["hash1"],"total_listens":3}`
+	req := httptest.NewRequest(http.MethodPost, "/profiles/sync", strings.NewReader(p))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	require.Equal(t, http.StatusNoContent, w.Code)
+
+	req2 := httptest.NewRequest(http.MethodGet, "/profiles/peers?limit=10", nil)
+	w2 := httptest.NewRecorder()
+	srv.ServeHTTP(w2, req2)
+	assert.Equal(t, http.StatusOK, w2.Code)
+
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(w2.Body).Decode(&body))
+	profiles, ok := body["profiles"].([]any)
+	require.True(t, ok)
+	assert.Len(t, profiles, 1)
+
+	first := profiles[0].(map[string]any)
+	assert.NotEmpty(t, first["hash"])
+	assert.NotNil(t, first["data"])
+	assert.NotZero(t, first["received_at"])
+}
+
 func TestPeersEndpoint(t *testing.T) {
 	srv := newTestServer(t)
 
