@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 
 	"github.com/goamp/sdk/proto"
+	"github.com/goamp/sdk/store"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	libp2pprotocol "github.com/libp2p/go-libp2p/core/protocol"
@@ -24,6 +25,9 @@ type Node interface {
 	Peers() []peer.AddrInfo
 	RegisterProtocol(p Protocol)
 	Emit(event Event)
+	// PublishProfile broadcasts a taste profile to all peers via GossipSub.
+	// Returns nil on the LocalNode stub (no-op).
+	PublishProfile(ctx context.Context, profile *proto.TasteProfile) error
 }
 
 // Protocol is a libp2p stream handler with an ID.
@@ -71,6 +75,7 @@ type ProfileAggregator interface {
 	Submit(ctx context.Context, profile *proto.TasteProfile) error
 	GetRecommendations(ctx context.Context, likes []string) ([]Recommendation, error)
 	StorePeer(ctx context.Context, p PeerProfile) error
+	GetPeerProfiles(ctx context.Context, limit int) ([]store.PeerProfileRow, error)
 }
 
 // ─── Archive ─────────────────────────────────────────────────────────────────
