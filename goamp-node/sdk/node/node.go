@@ -7,6 +7,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/goamp/sdk/proto"
 	"github.com/goamp/sdk/sdk"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -47,4 +48,9 @@ func (n *LocalNode) Emit(event sdk.Event) {
 	if n.emitFn != nil {
 		n.emitFn(event)
 	}
+}
+
+// PublishProfile is a no-op on the stub — used in tests only.
+func (n *LocalNode) PublishProfile(_ context.Context, _ *proto.TasteProfile) error {
+	return nil
 }

@@ -32,6 +32,22 @@ func TestSubmitProfile(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestGetPeerProfiles(t *testing.T) {
+	a := newAgg(t)
+	ctx := context.Background()
+
+	p1 := &proto.TasteProfile{Version: 1, LikedHashes: []string{"h1"}, TotalListens: 10}
+	p2 := &proto.TasteProfile{Version: 1, LikedHashes: []string{"h2"}, TotalListens: 20}
+	require.NoError(t, a.Submit(ctx, p1))
+	require.NoError(t, a.Submit(ctx, p2))
+
+	rows, err := a.GetPeerProfiles(ctx, 10)
+	require.NoError(t, err)
+	assert.Len(t, rows, 2)
+	assert.NotEmpty(t, rows[0].Hash)
+	assert.NotEmpty(t, rows[0].Data)
+}
+
 func TestGetRecommendationsEmpty(t *testing.T) {
 	a := newAgg(t)
 	recs, err := a.GetRecommendations(context.Background(), nil)

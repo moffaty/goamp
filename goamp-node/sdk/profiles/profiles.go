@@ -54,6 +54,11 @@ func (p *SQLProfileAggregator) GetRecommendations(ctx context.Context, likes []s
 	return result, nil
 }
 
+// GetPeerProfiles returns the most recent peer profiles from the store.
+func (p *SQLProfileAggregator) GetPeerProfiles(ctx context.Context, limit int) ([]store.PeerProfileRow, error) {
+	return p.store.GetPeerProfiles(ctx, limit)
+}
+
 // StorePeer stores a profile received from a remote peer.
 // TODO(you): marshal PeerProfile.Profile to JSON, store with PeerProfile.Hash.
 func (p *SQLProfileAggregator) StorePeer(ctx context.Context, profile sdk.PeerProfile) error {
