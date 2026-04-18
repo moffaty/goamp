@@ -1,13 +1,10 @@
 // src-tauri/src/aggregator.rs
 
 use rusqlite::Connection;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tauri::Manager;
 
-use crate::sybil::ListeningProof;
 use crate::taste_profile::TasteProfile;
-
-const DEFAULT_AGGREGATOR: &str = "https://api.goamp.app/v1";
 
 type RecEntry = (String, f64, String, String, String);
 
@@ -56,46 +53,57 @@ pub fn get_cached_recommendations(conn: &Connection, limit: usize) -> Vec<RecEnt
     .collect()
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProfileSubmission {
-    pub profile: TasteProfile,
-    pub proofs: Vec<ListeningProof>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AggregatorResponse {
-    pub recommendations: Vec<RecommendedTrack>,
-    pub peer_count: u32,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RecommendedTrack {
-    pub canonical_id: String,
-    pub score: f64,
-    pub source: String,
-    pub artist: String,
-    pub title: String,
-}
-
-pub async fn submit_to_aggregator(
-    client: &reqwest::Client,
-    base_url: &str,
-    submission: &ProfileSubmission,
-) -> Result<AggregatorResponse, String> {
-    let resp = client
-        .post(format!("{}/profiles/submit", base_url))
-        .json(submission)
+/// POST the local taste profile to the goamp-node sidecar for GossipSub broadcast.
+pub async fn sync_to_node(profile: &TasteProfile, port: u16) -> Result<(), String> {
+    let resp = crate::http::CLIENT
+        .post(format!("http://localhost:{port}/profiles/sync"))
+        .json(profile)
         .header("User-Agent", "GOAMP/1.0")
         .send()
         .await
-        .map_err(|e| format!("aggregator request failed: {e}"))?;
+        .map_err(|e| format!("node sync failed: {e}"))?;
 
     if !resp.status().is_success() {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("aggregator error: {body}"));
+        return Err(format!("node error: {body}"));
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct PeerProfileEntry {
+    hash: String,
+    data: serde_json::Value,
+}
+
+#[derive(Deserialize)]
+struct PeersResponse {
+    profiles: Vec<PeerProfileEntry>,
+}
+
+/// Fetch peer taste profiles from the goamp-node sidecar.
+/// Returns (profile_hash, profile_data_json) ready to insert into Tauri SQLite.
+pub async fn fetch_peer_profiles(port: u16) -> Result<Vec<(String, String)>, String> {
+    let resp = crate::http::CLIENT
+        .get(format!("http://localhost:{port}/profiles/peers?limit=100"))
+        .send()
+        .await
+        .map_err(|e| format!("fetch peers failed: {e}"))?;
+
+    if !resp.status().is_success() {
+        return Ok(vec![]);
     }
 
-    resp.json().await.map_err(|e| format!("parse error: {e}"))
+    let body: PeersResponse = resp.json().await.map_err(|e| format!("parse error: {e}"))?;
+    Ok(body
+        .profiles
+        .into_iter()
+        .filter_map(|e| {
+            serde_json::to_string(&e.data)
+                .ok()
+                .map(|data| (e.hash, data))
+        })
+        .collect())
 }
 
 // ─── Tauri commands ───
@@ -103,45 +111,15 @@ pub async fn submit_to_aggregator(
 #[tauri::command]
 pub async fn sync_profile(app: tauri::AppHandle) -> Result<u32, String> {
     let db = app.state::<crate::db::Db>();
-    let (base_url, profile, proofs) = {
+    let profile = {
         let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
-        let base_url = conn
-            .query_row(
-                "SELECT value FROM settings WHERE key = 'aggregator_url'",
-                [],
-                |row| row.get::<_, String>(0),
-            )
-            .unwrap_or_else(|_| DEFAULT_AGGREGATOR.to_string());
-        let profile = crate::taste_profile::build_taste_profile(&conn, 200);
-        let proofs = crate::sybil::generate_proofs(&conn, 200);
-        (base_url, profile, proofs)
+        crate::taste_profile::build_taste_profile(&conn, 200)
     };
 
-    let submission = ProfileSubmission { profile, proofs };
-    let response = submit_to_aggregator(&crate::http::CLIENT, &base_url, &submission).await?;
-
-    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
-    let recs: Vec<RecEntry> = response
-        .recommendations
-        .iter()
-        .map(|r| {
-            (
-                r.canonical_id.clone(),
-                r.score,
-                r.source.clone(),
-                r.artist.clone(),
-                r.title.clone(),
-            )
-        })
-        .collect();
-    cache_recommendations(&conn, &recs);
-
-    eprintln!(
-        "[GOAMP] Synced profile, received {} recommendations from {} peers",
-        response.recommendations.len(),
-        response.peer_count
-    );
-    Ok(response.recommendations.len() as u32)
+    let count = profile.liked_hashes.len() as u32;
+    sync_to_node(&profile, 7472).await?;
+    eprintln!("[GOAMP] Profile synced to node ({count} liked tracks)");
+    Ok(count)
 }
 
 #[tauri::command]
