@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/goamp/sdk/proto"
@@ -75,6 +76,33 @@ func TestUpsertPeer(t *testing.T) {
 	require.Len(t, peers, 1)
 	assert.Equal(t, "peer-x", peers[0].PeerID)
 	assert.Equal(t, []string{"/ip4/127.0.0.1/tcp/4001"}, peers[0].Addrs)
+}
+
+func TestGetPeerProfiles(t *testing.T) {
+	s := openMemory(t)
+	ctx := context.Background()
+
+	require.NoError(t, s.StorePeerProfile(ctx, "hash1", []byte(`{"version":1}`)))
+	require.NoError(t, s.StorePeerProfile(ctx, "hash2", []byte(`{"version":2}`)))
+
+	rows, err := s.GetPeerProfiles(ctx, 10)
+	require.NoError(t, err)
+	assert.Len(t, rows, 2)
+	assert.NotEmpty(t, rows[0].Hash)
+	assert.NotEmpty(t, rows[0].Data)
+	assert.Greater(t, rows[0].ReceivedAt, int64(0))
+}
+
+func TestGetPeerProfilesLimit(t *testing.T) {
+	s := openMemory(t)
+	ctx := context.Background()
+	for i := 0; i < 5; i++ {
+		require.NoError(t, s.StorePeerProfile(ctx, fmt.Sprintf("hash%d", i), []byte(`{}`)))
+	}
+
+	rows, err := s.GetPeerProfiles(ctx, 3)
+	require.NoError(t, err)
+	assert.Len(t, rows, 3)
 }
 
 func TestRecommendations(t *testing.T) {

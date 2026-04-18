@@ -171,6 +171,34 @@ func (s *SQLiteStore) StorePeerProfile(ctx context.Context, hash string, data []
 	return err
 }
 
+// GetPeerProfiles returns the most recent peer profiles, newest first.
+func (s *SQLiteStore) GetPeerProfiles(ctx context.Context, limit int) ([]PeerProfileRow, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT profile_hash, profile_data, received_at
+		 FROM peer_profiles
+		 ORDER BY received_at DESC
+		 LIMIT ?`,
+		limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []PeerProfileRow
+	for rows.Next() {
+		var r PeerProfileRow
+		var data string
+		if err := rows.Scan(&r.Hash, &data, &r.ReceivedAt); err != nil {
+			return nil, err
+		}
+		r.Data = []byte(data)
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
 // CacheRecommendation stores a recommendation score for a track.
 func (s *SQLiteStore) CacheRecommendation(ctx context.Context, trackID string, score float64, source string) error {
 	_, err := s.db.ExecContext(ctx,

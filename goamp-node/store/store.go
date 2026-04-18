@@ -26,6 +26,13 @@ type Recommendation struct {
 	CachedAt int64
 }
 
+// PeerProfileRow is a taste profile received from a remote peer.
+type PeerProfileRow struct {
+	Hash       string
+	Data       []byte
+	ReceivedAt int64
+}
+
 // Store is the persistence layer for the GOAMP node.
 // Implemented by SQLiteStore in sqlite.go.
 type Store interface {
@@ -43,6 +50,7 @@ type Store interface {
 
 	// Profiles
 	StorePeerProfile(ctx context.Context, hash string, data []byte) error
+	GetPeerProfiles(ctx context.Context, limit int) ([]PeerProfileRow, error)
 
 	// Recommendations cache
 	CacheRecommendation(ctx context.Context, trackID string, score float64, source string) error
