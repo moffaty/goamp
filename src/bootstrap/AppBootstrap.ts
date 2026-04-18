@@ -120,6 +120,11 @@ export async function setupApp(webamp: Webamp): Promise<void> {
     }
   })
 
+  webview.listen<number>('goamp-node:profile-synced', ({ payload: peerCount }) => {
+    const text = `${peerCount} peer${peerCount !== 1 ? 's' : ''} · synced just now`
+    invoke('update_tray_tooltip', { text }).catch(() => {})
+  })
+
   // Scrobbling
 
   events.onTrackChange(async (trackInfo) => {
