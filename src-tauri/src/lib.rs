@@ -29,9 +29,11 @@ mod tray;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let dsn = option_env!("GOAMP_SENTRY_DSN")
+        .filter(|s| !s.is_empty())
+        .and_then(|s| s.parse().ok());
     let _sentry_guard = sentry::init(sentry::ClientOptions {
-        // TODO: set your Sentry DSN
-        // dsn: "https://...@sentry.io/...".parse().ok(),
+        dsn,
         release: Some("goamp@0.1.0".into()),
         ..Default::default()
     });

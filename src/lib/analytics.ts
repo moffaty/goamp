@@ -1,7 +1,9 @@
 import { trackEvent, init as initAptabase } from "@aptabase/web";
 import * as Sentry from "@sentry/browser";
 
-const SENTRY_DSN = ""; // TODO: set your Sentry DSN
+const SENTRY_DSN =
+  ((import.meta as unknown as { env?: Record<string, string | undefined> }).env
+    ?.VITE_GOAMP_SENTRY_DSN) ?? "";
 
 const APTABASE_KEY = "A-EU-4215436752";
 
