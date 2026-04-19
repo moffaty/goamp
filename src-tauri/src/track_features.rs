@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::db::Db;
 use serde::Deserialize;
 use std::collections::HashMap;

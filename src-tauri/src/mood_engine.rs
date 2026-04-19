@@ -1,6 +1,4 @@
-use crate::commands::mood::{
-    get_mood_track_scores_internal, record_mood_play_internal, MoodTrackScore,
-};
+use crate::commands::mood::{get_mood_track_scores_internal, MoodTrackScore};
 use crate::db::Db;
 use crate::track_features::{cosine_similarity, load_track_features_internal, seed_tags_vec};
 use serde::{Deserialize, Serialize};

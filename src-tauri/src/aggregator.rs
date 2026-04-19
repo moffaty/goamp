@@ -17,6 +17,7 @@ pub fn store_peer_profile(conn: &Connection, profile_hash: &str, profile_data: &
     );
 }
 
+#[allow(dead_code)]
 pub fn cache_recommendations(conn: &Connection, recs: &[RecEntry]) {
     // tuple: (canonical_id, score, source, artist, title)
     for (canonical_id, score, source, artist, title) in recs {
