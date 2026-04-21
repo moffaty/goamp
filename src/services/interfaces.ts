@@ -187,6 +187,26 @@ export interface IRecommendationService {
   deleteMoodChannel(channelId: string): Promise<void>
 }
 
+export interface CreatedAccount {
+  mnemonic: string;
+  accountPub: string;
+  quizPositions: number[];
+}
+
+export interface CurrentAccount {
+  accountPub: string;
+  subPub: string;
+  provisioned: boolean;
+}
+
+export interface IAccountService {
+  create(deviceName: string, os: string): Promise<CreatedAccount>;
+  current(): Promise<CurrentAccount | null>;
+  forget(accountPub: string): Promise<void>;
+  /** Pure helper — case-insensitive, whitespace-trimmed. */
+  verifyQuiz(mnemonic: string[], positions: number[], answers: string[]): boolean;
+}
+
 export interface ISettingsService {
   listFlags(): Promise<FeatureFlag[]>
   setFlag(key: string, enabled: boolean): Promise<void>
