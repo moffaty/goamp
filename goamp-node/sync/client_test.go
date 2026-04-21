@@ -54,3 +54,34 @@ func TestPutAndGetState(t *testing.T) {
 		t.Fatalf("got %q", blob)
 	}
 }
+
+func TestSyncUpDownForRoundTrip(t *testing.T) {
+	c, sub, _ := bootstrap(t)
+	var key [32]byte
+	for i := range key {
+		key[i] = byte(i)
+	}
+	plain := []byte("state-blob")
+	if err := c.SyncUpFor(c.lastAccountPub(), key[:], sub, plain); err != nil {
+		t.Fatal(err)
+	}
+	got, err := c.SyncDownFor(c.lastAccountPub(), key[:], sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "state-blob" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestSyncDownForMissingReturnsNil(t *testing.T) {
+	c, sub, _ := bootstrap(t)
+	var key [32]byte
+	got, err := c.SyncDownFor(c.lastAccountPub(), key[:], sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Fatal("expected nil on missing blob")
+	}
+}

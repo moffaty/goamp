@@ -12,6 +12,7 @@ import (
 
 	"github.com/goamp/sdk/account"
 	"github.com/goamp/sdk/relay"
+	"github.com/goamp/sdk/userstate"
 )
 
 type Client struct {
@@ -126,4 +127,26 @@ func (c *Client) GetState(accountPub string, sub *account.SubKey) ([]byte, error
 		return nil, fmt.Errorf("get state: %d %s", resp.StatusCode, msg)
 	}
 	return io.ReadAll(resp.Body)
+}
+
+// SyncUpFor encrypts plaintext and uploads to /state for the given accountPub.
+func (c *Client) SyncUpFor(accountPub string, stateKey []byte, sub *account.SubKey, plaintext []byte) error {
+	ct, err := userstate.Seal(stateKey, plaintext)
+	if err != nil {
+		return err
+	}
+	return c.PutState(accountPub, sub, ct)
+}
+
+// SyncDownFor fetches the latest state blob and decrypts it. Returns nil,nil
+// if no blob exists yet.
+func (c *Client) SyncDownFor(accountPub string, stateKey []byte, sub *account.SubKey) ([]byte, error) {
+	blob, err := c.GetState(accountPub, sub)
+	if err != nil {
+		return nil, err
+	}
+	if blob == nil {
+		return nil, nil
+	}
+	return userstate.Open(stateKey, blob)
 }
