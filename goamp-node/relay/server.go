@@ -60,8 +60,8 @@ func (h *handlers) putManifest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		subPubHex := hex.EncodeToString(subPub)
-		if !isActiveInManifest(prev, subPubHex) {
-			http.Error(w, "signing sub-key not active in previous manifest", http.StatusUnauthorized)
+		if !isActiveInManifest(prev, subPubHex) && !isActiveInManifest(&mf, subPubHex) {
+			http.Error(w, "signing sub-key not active in previous or new manifest", http.StatusUnauthorized)
 			return
 		}
 	}

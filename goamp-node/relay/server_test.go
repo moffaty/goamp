@@ -178,6 +178,28 @@ func TestPutStateRejectsRevokedDevice(t *testing.T) {
 	}
 }
 
+func TestPutManifestAcceptsSignerActiveInNewManifest(t *testing.T) {
+	srv, store := newTestServer()
+	defer srv.Close()
+	fx := newAccountFixture(t)
+	_ = store.PutManifest(fx.manifest)
+
+	m, _ := account.MasterFromMnemonic(fx.mnemonic)
+	defer m.Wipe()
+	newSub, _ := account.NewSubKey()
+	oldEntry := fx.manifest.Devices[0]
+	newEntry, _ := account.BuildDeviceEntry(m, newSub.PublicKey, "Phone", "ios", time.Now().UTC())
+	mf2, _ := account.BuildManifest(m, []account.DeviceEntry{oldEntry, newEntry}, nil, 2, time.Now().UTC())
+	body, _ := json.Marshal(mf2)
+	hdr, _ := SignRequest(newSub, "PUT", "/manifest/"+fx.pub, body, time.Now().UnixNano())
+	resp, _ := putJSON(srv.URL+"/manifest/"+fx.pub, body, hdr)
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		msg, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d: %s", resp.StatusCode, msg)
+	}
+}
+
 func TestGetStateRoundTrip(t *testing.T) {
 	srv, store := newTestServer()
 	defer srv.Close()
