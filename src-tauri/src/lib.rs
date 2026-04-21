@@ -1,5 +1,6 @@
 use tauri::{Listener, Manager};
 
+pub mod account;
 mod aggregator;
 mod commands;
 mod db;
@@ -54,6 +55,9 @@ pub fn run() {
 
     builder
         .invoke_handler(tauri::generate_handler![
+            commands::account::account_create,
+            commands::account::account_current,
+            commands::account::account_forget,
             commands::files::scan_directory,
             commands::files::read_metadata,
             commands::youtube::search_youtube,
