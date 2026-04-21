@@ -54,6 +54,9 @@ func (s *Server) Start(addr string) error {
 	// WebSocket events
 	mux.HandleFunc("GET /events", s.hub.ServeWS)
 
+	// Account (identity & keys)
+	s.RegisterAccountRoutes(mux)
+
 	// Plugins
 	mux.HandleFunc("GET /plugins", s.handlePluginList)
 	// Wildcard for plugin proxy — must be last
