@@ -199,12 +199,33 @@ export interface CurrentAccount {
   provisioned: boolean;
 }
 
+export interface RecoveredAccount {
+  accountPub: string;
+  subPub: string;
+  manifestVersion: number;
+}
+
+export interface DeviceInfo {
+  subPub: string;
+  name: string;
+  os: string;
+  addedAt: string;
+}
+
+export interface DevicesList {
+  devices: DeviceInfo[];
+  version: number;
+}
+
 export interface IAccountService {
   create(deviceName: string, os: string): Promise<CreatedAccount>;
   current(): Promise<CurrentAccount | null>;
   forget(accountPub: string): Promise<void>;
   /** Pure helper — case-insensitive, whitespace-trimmed. */
   verifyQuiz(mnemonic: string[], positions: number[], answers: string[]): boolean;
+  recover(mnemonic: string, deviceName: string, os: string, relayUrl: string): Promise<RecoveredAccount>;
+  listDevices(accountPub: string, relayUrl: string): Promise<DevicesList>;
+  revokeDevice(mnemonic: string, accountPub: string, subPubToRevoke: string, reason: string, relayUrl: string): Promise<number>;
 }
 
 export interface ISettingsService {

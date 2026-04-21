@@ -54,4 +54,39 @@ describe("AccountService", () => {
     await svc.forget("abc");
     expect(calls).toEqual([`{"accountPub":"abc"}`]);
   });
+
+  it("recover maps snake_case response to camelCase", async () => {
+    const t = mockTransport({
+      account_recover: () => ({ account_pub: "abc", sub_pub: "def", manifest_version: 2 }),
+    });
+    const svc = new AccountService(t);
+    const r = await svc.recover("words words", "Phone", "ios", "http://r");
+    expect(r.accountPub).toBe("abc");
+    expect(r.subPub).toBe("def");
+    expect(r.manifestVersion).toBe(2);
+  });
+
+  it("listDevices maps device fields to camelCase", async () => {
+    const t = mockTransport({
+      account_list_devices: () => ({
+        devices: [{ sub_pub: "p1", name: "Mac", os: "darwin", added_at: "2026-04-22T00:00:00Z" }],
+        version: 1,
+      }),
+    });
+    const svc = new AccountService(t);
+    const r = await svc.listDevices("abc", "http://r");
+    expect(r.version).toBe(1);
+    expect(r.devices).toEqual([
+      { subPub: "p1", name: "Mac", os: "darwin", addedAt: "2026-04-22T00:00:00Z" },
+    ]);
+  });
+
+  it("revokeDevice returns new manifest version", async () => {
+    const t = mockTransport({
+      account_revoke_device: () => 3,
+    });
+    const svc = new AccountService(t);
+    const v = await svc.revokeDevice("words", "abc", "lost-pub", "lost", "http://r");
+    expect(v).toBe(3);
+  });
 });
