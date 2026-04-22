@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"bytes"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -83,5 +84,29 @@ func TestSyncDownForMissingReturnsNil(t *testing.T) {
 	}
 	if got != nil {
 		t.Fatal("expected nil on missing blob")
+	}
+}
+
+func TestSessionAndCommandsRoundTrip(t *testing.T) {
+	c, sub, _ := bootstrap(t)
+	if err := c.PutSession(c.lastAccountPub(), sub, []byte(`{"version":1,"active_device_id":"d"}`)); err != nil {
+		t.Fatal(err)
+	}
+	got, err := c.GetSession(c.lastAccountPub(), sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(got, []byte("active_device_id")) {
+		t.Fatal("session body wrong")
+	}
+	if err := c.PostCommand(c.lastAccountPub(), sub, []byte(`{"op":"pause"}`)); err != nil {
+		t.Fatal(err)
+	}
+	cmds, err := c.PullCommands(c.lastAccountPub(), sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cmds) != 1 || !bytes.Contains(cmds[0], []byte("pause")) {
+		t.Fatalf("got %d cmds: %v", len(cmds), cmds)
 	}
 }

@@ -150,3 +150,98 @@ func (c *Client) SyncDownFor(accountPub string, stateKey []byte, sub *account.Su
 	}
 	return userstate.Open(stateKey, blob)
 }
+
+// PutSession uploads JSON-encoded session bytes to the relay.
+func (c *Client) PutSession(accountPub string, sub *account.SubKey, sessionJSON []byte) error {
+	path := "/session/" + accountPub
+	req, _ := http.NewRequest(http.MethodPut, c.baseURL+path, bytes.NewReader(sessionJSON))
+	hdr, err := relay.SignRequest(sub, req.Method, path, sessionJSON, time.Now().UnixNano())
+	if err != nil {
+		return err
+	}
+	req.Header.Set("X-GOAMP-Sig", hdr)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		msg, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("put session: %d %s", resp.StatusCode, msg)
+	}
+	return nil
+}
+
+func (c *Client) GetSession(accountPub string, sub *account.SubKey) ([]byte, error) {
+	path := "/session/" + accountPub
+	req, _ := http.NewRequest(http.MethodGet, c.baseURL+path, nil)
+	hdr, err := relay.SignRequest(sub, req.Method, path, nil, time.Now().UnixNano())
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-GOAMP-Sig", hdr)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 404 {
+		return nil, nil
+	}
+	if resp.StatusCode/100 != 2 {
+		msg, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get session: %d %s", resp.StatusCode, msg)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+func (c *Client) PostCommand(accountPub string, sub *account.SubKey, cmdJSON []byte) error {
+	path := "/commands/" + accountPub
+	req, _ := http.NewRequest(http.MethodPost, c.baseURL+path, bytes.NewReader(cmdJSON))
+	hdr, err := relay.SignRequest(sub, req.Method, path, cmdJSON, time.Now().UnixNano())
+	if err != nil {
+		return err
+	}
+	req.Header.Set("X-GOAMP-Sig", hdr)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		msg, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("post command: %d %s", resp.StatusCode, msg)
+	}
+	return nil
+}
+
+// PullCommands drains and returns pending commands.
+func (c *Client) PullCommands(accountPub string, sub *account.SubKey) ([][]byte, error) {
+	path := "/commands/" + accountPub + "/pull"
+	req, _ := http.NewRequest(http.MethodPost, c.baseURL+path, nil)
+	hdr, err := relay.SignRequest(sub, req.Method, path, nil, time.Now().UnixNano())
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-GOAMP-Sig", hdr)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		msg, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("pull commands: %d %s", resp.StatusCode, msg)
+	}
+	var out struct {
+		Commands []json.RawMessage `json:"commands"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	res := make([][]byte, len(out.Commands))
+	for i, cmd := range out.Commands {
+		res[i] = []byte(cmd)
+	}
+	return res, nil
+}
