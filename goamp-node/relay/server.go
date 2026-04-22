@@ -20,6 +20,10 @@ func NewServer(store *MemStore) http.Handler {
 	mux.HandleFunc("GET /manifest/{account_pub}", h.getManifest)
 	mux.HandleFunc("PUT /state/{account_pub}", h.putState)
 	mux.HandleFunc("GET /state/{account_pub}", h.getState)
+	mux.HandleFunc("PUT /session/{account_pub}", h.putSession)
+	mux.HandleFunc("GET /session/{account_pub}", h.getSession)
+	mux.HandleFunc("POST /commands/{account_pub}", h.postCommand)
+	mux.HandleFunc("POST /commands/{account_pub}/pull", h.pullCommands)
 	return mux
 }
 
