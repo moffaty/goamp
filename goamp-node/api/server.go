@@ -60,6 +60,9 @@ func (s *Server) Start(addr string) error {
 	// State sync
 	s.RegisterStateSyncRoutes(mux)
 
+	// Session & commands
+	s.RegisterSessionRoutes(mux)
+
 	// Plugins
 	mux.HandleFunc("GET /plugins", s.handlePluginList)
 	// Wildcard for plugin proxy — must be last
