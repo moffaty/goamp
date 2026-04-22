@@ -7,6 +7,7 @@ import { RadioService } from './RadioService'
 import { RecommendationService } from './RecommendationService'
 import { SettingsService } from './SettingsService'
 import { AccountService } from './AccountService'
+import { RemoteService } from './RemoteService'
 
 const transport = new TauriTransport()
 
@@ -17,5 +18,7 @@ export const radio = new RadioService(transport)
 export const recommendations = new RecommendationService(transport)
 export const settings = new SettingsService(transport)
 export const account = new AccountService(transport)
+export const remote = new RemoteService(transport)
 
 export { AccountService } from './AccountService'
+export { RemoteService } from './RemoteService'

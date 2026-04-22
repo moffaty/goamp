@@ -228,6 +228,58 @@ export interface IAccountService {
   revokeDevice(mnemonic: string, accountPub: string, subPubToRevoke: string, reason: string, relayUrl: string): Promise<number>;
 }
 
+export interface RemoteTrackRef {
+  track_id: string;
+  source: string;
+  title?: string;
+  artist?: string;
+  url?: string;
+}
+
+export interface RemoteSession {
+  version: number;
+  active_device_id: string;
+  track?: RemoteTrackRef;
+  position_ms?: number;
+  position_updated_at_ns?: number;
+  playback_state?: "playing" | "paused" | "buffering" | "stopped";
+  queue?: RemoteTrackRef[];
+  queue_position?: number;
+  shuffle?: boolean;
+  repeat?: "off" | "one" | "all";
+  last_heartbeat_ns?: number;
+}
+
+export interface RemoteCommand {
+  op: "play" | "pause" | "seek" | "next" | "prev" | "add_to_queue" | "set_shuffle" | "set_repeat" | "play_track" | "takeover";
+  arg_int?: number;
+  arg_str?: string;
+  arg_track?: RemoteTrackRef;
+  issued_by: string;
+  issued_at_ns: number;
+  nonce: string;
+}
+
+export interface RemotePoller {
+  stop(): void;
+}
+
+export interface IRemoteService {
+  putSession(accountPub: string, relayUrl: string, session: RemoteSession): Promise<void>;
+  getSession(accountPub: string, relayUrl: string): Promise<RemoteSession | null>;
+  sendCommand(accountPub: string, relayUrl: string, cmd: RemoteCommand): Promise<void>;
+  pullCommands(accountPub: string, relayUrl: string): Promise<RemoteCommand[]>;
+  startPoller(opts: {
+    accountPub: string;
+    relayUrl: string;
+    onCommand: (cmd: RemoteCommand) => void;
+    onSession?: (session: RemoteSession | null) => void;
+    sessionProvider?: () => RemoteSession | null;
+    commandsIntervalMs?: number;
+    sessionIntervalMs?: number;
+  }): RemotePoller;
+}
+
 export interface ISettingsService {
   listFlags(): Promise<FeatureFlag[]>
   setFlag(key: string, enabled: boolean): Promise<void>
