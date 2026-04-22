@@ -223,3 +223,95 @@ pub fn account_revoke_device(
     let body: Value = resp.json().map_err(|e| format!("decode: {}", e))?;
     Ok(body["manifest_version"].as_u64().unwrap_or(0))
 }
+
+#[tauri::command]
+pub fn remote_put_session(
+    account_pub: String,
+    relay_url: String,
+    session_json: String,
+) -> Result<(), String> {
+    let a = acct::load_account(&account_pub).map_err(|e| format!("keychain: {}", e))?;
+    let resp = http()
+        .post(format!("{}/session/put", NODE_BASE))
+        .json(&serde_json::json!({
+            "account_pub": account_pub,
+            "sub_sk_b64": a.sub_sk_b64,
+            "relay_url": relay_url,
+            "session_json": session_json,
+        }))
+        .send()
+        .map_err(|e| format!("node request: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("node status: {}", resp.status()));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn remote_get_session(account_pub: String, relay_url: String) -> Result<String, String> {
+    let a = acct::load_account(&account_pub).map_err(|e| format!("keychain: {}", e))?;
+    let resp = http()
+        .post(format!("{}/session/get", NODE_BASE))
+        .json(&serde_json::json!({
+            "account_pub": account_pub,
+            "sub_sk_b64": a.sub_sk_b64,
+            "relay_url": relay_url,
+        }))
+        .send()
+        .map_err(|e| format!("node request: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("node status: {}", resp.status()));
+    }
+    let body: Value = resp.json().map_err(|e| format!("decode: {}", e))?;
+    Ok(body["session_json"].as_str().unwrap_or("").to_string())
+}
+
+#[tauri::command]
+pub fn remote_send_command(
+    account_pub: String,
+    relay_url: String,
+    command_json: String,
+) -> Result<(), String> {
+    let a = acct::load_account(&account_pub).map_err(|e| format!("keychain: {}", e))?;
+    let resp = http()
+        .post(format!("{}/commands/post", NODE_BASE))
+        .json(&serde_json::json!({
+            "account_pub": account_pub,
+            "sub_sk_b64": a.sub_sk_b64,
+            "relay_url": relay_url,
+            "command_json": command_json,
+        }))
+        .send()
+        .map_err(|e| format!("node request: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("node status: {}", resp.status()));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn remote_pull_commands(account_pub: String, relay_url: String) -> Result<Vec<String>, String> {
+    let a = acct::load_account(&account_pub).map_err(|e| format!("keychain: {}", e))?;
+    let resp = http()
+        .post(format!("{}/commands/pull", NODE_BASE))
+        .json(&serde_json::json!({
+            "account_pub": account_pub,
+            "sub_sk_b64": a.sub_sk_b64,
+            "relay_url": relay_url,
+        }))
+        .send()
+        .map_err(|e| format!("node request: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("node status: {}", resp.status()));
+    }
+    let body: Value = resp.json().map_err(|e| format!("decode: {}", e))?;
+    let mut out = Vec::new();
+    if let Some(arr) = body["commands"].as_array() {
+        for c in arr {
+            if let Some(s) = c.as_str() {
+                out.push(s.to_string());
+            }
+        }
+    }
+    Ok(out)
+}
