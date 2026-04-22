@@ -28,7 +28,9 @@ sentry = "0.42"
 tokio = { version = "1", features = ["process", "time", "rt"] }
 tokio-tungstenite = "0.24"
 rusqlite = { version = "0.32", features = ["bundled"] }
-reqwest = { version = "0.12", features = ["rustls-tls", "stream"], default-features = false }
+reqwest = { version = "0.12", features = ["rustls-tls", "stream", "blocking", "json"], default-features = false }
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+rand = "0.8"
 chrono = "0.4"
 urlencoding = "2"
 futures-util = "0.3"
