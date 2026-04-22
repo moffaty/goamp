@@ -76,3 +76,33 @@ func TestGetBlobMissing(t *testing.T) {
 		t.Fatal("expected missing")
 	}
 }
+
+func TestSessionMonotonic(t *testing.T) {
+	s := NewMemStore()
+	if err := s.PutSession("a", 1, []byte("v1")); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PutSession("a", 1, []byte("v1b")); err == nil {
+		t.Fatal("expected stale rejection")
+	}
+	if err := s.PutSession("a", 2, []byte("v2")); err != nil {
+		t.Fatal(err)
+	}
+	data, v, ok := s.GetSession("a")
+	if !ok || v != 2 || string(data) != "v2" {
+		t.Fatalf("got v=%d data=%q", v, data)
+	}
+}
+
+func TestCommandQueueDrain(t *testing.T) {
+	s := NewMemStore()
+	s.EnqueueCommand("a", []byte("c1"))
+	s.EnqueueCommand("a", []byte("c2"))
+	got := s.DrainCommands("a")
+	if len(got) != 2 || string(got[0]) != "c1" || string(got[1]) != "c2" {
+		t.Fatalf("drain wrong: %q", got)
+	}
+	if len(s.DrainCommands("a")) != 0 {
+		t.Fatal("queue not cleared after drain")
+	}
+}

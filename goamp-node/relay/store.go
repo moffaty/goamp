@@ -15,17 +15,26 @@ type blobSnapshot struct {
 	StoredAt time.Time
 }
 
+type sessionEntry struct {
+	Data    []byte
+	Version uint64
+}
+
 // MemStore is an in-memory MVP backend. Prod will swap for S3 + Redis.
 type MemStore struct {
 	mu        sync.RWMutex
 	manifests map[string]*account.Manifest
 	blobs     map[string][]blobSnapshot
+	sessions  map[string]sessionEntry
+	commands  map[string][][]byte
 }
 
 func NewMemStore() *MemStore {
 	return &MemStore{
 		manifests: map[string]*account.Manifest{},
 		blobs:     map[string][]blobSnapshot{},
+		sessions:  map[string]sessionEntry{},
+		commands:  map[string][][]byte{},
 	}
 }
 
@@ -110,5 +119,43 @@ func (s *MemStore) ListBlobs(accountPub string) []blobSnapshot {
 	buf := s.blobs[accountPub]
 	out := make([]blobSnapshot, len(buf))
 	copy(out, buf)
+	return out
+}
+
+// PutSession accepts only newer Lamport versions.
+func (s *MemStore) PutSession(accountPub string, version uint64, data []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if cur, ok := s.sessions[accountPub]; ok {
+		if version <= cur.Version {
+			return fmt.Errorf("stale session version %d (current %d)", version, cur.Version)
+		}
+	}
+	s.sessions[accountPub] = sessionEntry{Data: append([]byte(nil), data...), Version: version}
+	return nil
+}
+
+func (s *MemStore) GetSession(accountPub string) ([]byte, uint64, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	cur, ok := s.sessions[accountPub]
+	if !ok {
+		return nil, 0, false
+	}
+	return append([]byte(nil), cur.Data...), cur.Version, true
+}
+
+func (s *MemStore) EnqueueCommand(accountPub string, raw []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.commands[accountPub] = append(s.commands[accountPub], append([]byte(nil), raw...))
+}
+
+// DrainCommands returns and clears the queue for accountPub.
+func (s *MemStore) DrainCommands(accountPub string) [][]byte {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := s.commands[accountPub]
+	delete(s.commands, accountPub)
 	return out
 }
