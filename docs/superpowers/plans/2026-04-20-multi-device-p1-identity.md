@@ -1,6 +1,6 @@
 # Multi-Device Sync — Plan 1: Identity & Keys
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Implement the cryptographic foundation for multi-device accounts — ed25519 master key from BIP39 mnemonic, device sub-keys signed by master, signed Device Manifests, state-key derivation, and OS-keychain persistence. No network, no UI; leaves APIs ready for Plans 2–5.
 
@@ -63,19 +63,19 @@
 **Files:**
 - Modify: `goamp-node/go.mod`
 
-- [ ] **Step 1: Add dependency**
+- [x] **Step 1: Add dependency**
 
 Run: `cd goamp-node && go get github.com/tyler-smith/go-bip39@v1.1.0 && go mod tidy`
 
 Expected: `go.mod` gains `github.com/tyler-smith/go-bip39 v1.1.0`; `go.sum` updated.
 
-- [ ] **Step 2: Verify compile**
+- [x] **Step 2: Verify compile**
 
 Run: `cd goamp-node && go build ./...`
 
 Expected: exit 0, no output.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add goamp-node/go.mod goamp-node/go.sum
@@ -90,7 +90,7 @@ git commit -m "chore(node): add go-bip39 dependency for account mnemonics"
 - Create: `goamp-node/account/mnemonic.go`
 - Create: `goamp-node/account/mnemonic_test.go`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `goamp-node/account/mnemonic_test.go`:
 
@@ -144,12 +144,12 @@ func TestMnemonicValidateRejectsTypo(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run to confirm FAIL**
+- [x] **Step 2: Run to confirm FAIL**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: build error — package does not compile (Mnemonic type undefined).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `goamp-node/account/mnemonic.go`:
 
@@ -206,12 +206,12 @@ func (m Mnemonic) Seed() ([]byte, error) {
 }
 ```
 
-- [ ] **Step 4: Run to confirm PASS**
+- [x] **Step 4: Run to confirm PASS**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: `ok  github.com/goamp/sdk/account` with 3 tests passing.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add goamp-node/account/mnemonic.go goamp-node/account/mnemonic_test.go
@@ -226,7 +226,7 @@ git commit -m "feat(node/account): BIP39 mnemonic generate/validate/seed"
 - Create: `goamp-node/account/master.go`
 - Create: `goamp-node/account/master_test.go`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `goamp-node/account/master_test.go`:
 
@@ -292,12 +292,12 @@ func TestWipeMaster(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run to confirm FAIL**
+- [x] **Step 2: Run to confirm FAIL**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: compile error — `MasterKey`, `MasterFromMnemonic` undefined.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `goamp-node/account/master.go`:
 
@@ -348,12 +348,12 @@ func (k *MasterKey) Wipe() {
 }
 ```
 
-- [ ] **Step 4: Run to confirm PASS**
+- [x] **Step 4: Run to confirm PASS**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: 4 new tests pass, total 7.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add goamp-node/account/master.go goamp-node/account/master_test.go
@@ -368,7 +368,7 @@ git commit -m "feat(node/account): derive ed25519 master key from BIP39 mnemonic
 - Create: `goamp-node/account/subkey.go`
 - Create: `goamp-node/account/subkey_test.go`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `goamp-node/account/subkey_test.go`:
 
@@ -442,12 +442,12 @@ func TestVerifySubKeyRejectsWrongMaster(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run to confirm FAIL**
+- [x] **Step 2: Run to confirm FAIL**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: compile error — `SubKey`, `NewSubKey`, `SignSubKey`, `VerifySubKey` undefined.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `goamp-node/account/subkey.go`:
 
@@ -516,12 +516,12 @@ func VerifySubKey(masterPub, subPub ed25519.PublicKey, deviceID string, createdA
 }
 ```
 
-- [ ] **Step 4: Run to confirm PASS**
+- [x] **Step 4: Run to confirm PASS**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: 4 new tests pass, total 11.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add goamp-node/account/subkey.go goamp-node/account/subkey_test.go
@@ -536,7 +536,7 @@ git commit -m "feat(node/account): sub-key generation + master attestation sign/
 - Create: `goamp-node/account/manifest.go`
 - Create: `goamp-node/account/manifest_test.go`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `goamp-node/account/manifest_test.go`:
 
@@ -655,12 +655,12 @@ func contains(s, sub string) bool {
 }
 ```
 
-- [ ] **Step 2: Run to confirm FAIL**
+- [x] **Step 2: Run to confirm FAIL**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: compile error — manifest types undefined.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `goamp-node/account/manifest.go`:
 
@@ -845,12 +845,12 @@ func VerifyManifest(m *Manifest) error {
 }
 ```
 
-- [ ] **Step 4: Run to confirm PASS**
+- [x] **Step 4: Run to confirm PASS**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: 4 new tests pass, total 15.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add goamp-node/account/manifest.go goamp-node/account/manifest_test.go
@@ -865,7 +865,7 @@ git commit -m "feat(node/account): Device Manifest with canonical-JSON sign/veri
 - Create: `goamp-node/account/statekey.go`
 - Create: `goamp-node/account/statekey_test.go`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `goamp-node/account/statekey_test.go`:
 
@@ -922,12 +922,12 @@ func TestDeriveStateKeyRejectsInvalidMnemonic(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run to confirm FAIL**
+- [x] **Step 2: Run to confirm FAIL**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: compile error — `DeriveStateKey`, `StateKeyV1` undefined.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `goamp-node/account/statekey.go`:
 
@@ -965,12 +965,12 @@ func DeriveStateKey(m Mnemonic, info string) ([]byte, error) {
 }
 ```
 
-- [ ] **Step 4: Run to confirm PASS**
+- [x] **Step 4: Run to confirm PASS**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: 4 new tests pass, total 19.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add goamp-node/account/statekey.go goamp-node/account/statekey_test.go
@@ -985,7 +985,7 @@ git commit -m "feat(node/account): HKDF-SHA256 state-key derivation"
 - Create: `goamp-node/account/quiz.go`
 - Create: `goamp-node/account/quiz_test.go`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `goamp-node/account/quiz_test.go`:
 
@@ -1049,12 +1049,12 @@ func TestQuizCheckRejectsWrongArity(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run to confirm FAIL**
+- [x] **Step 2: Run to confirm FAIL**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: compile error — `Quiz`, `NewQuiz` undefined.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `goamp-node/account/quiz.go`:
 
@@ -1137,12 +1137,12 @@ func (q *Quiz) Check(answers []string) error {
 }
 ```
 
-- [ ] **Step 4: Run to confirm PASS**
+- [x] **Step 4: Run to confirm PASS**
 
 Run: `cd goamp-node && go test ./account/...`
 Expected: 4 new tests pass, total 23.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add goamp-node/account/quiz.go goamp-node/account/quiz_test.go
@@ -1158,7 +1158,7 @@ git commit -m "feat(node/account): mnemonic verification quiz"
 - Create: `goamp-node/api/account_handlers_test.go`
 - Modify: `goamp-node/api/server.go` (register routes)
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `goamp-node/api/account_handlers_test.go`:
 
@@ -1294,12 +1294,12 @@ func TestAccountVerifyManifestAcceptsGood(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run to confirm FAIL**
+- [x] **Step 2: Run to confirm FAIL**
 
 Run: `cd goamp-node && go test ./api/... -run TestAccount`
 Expected: compile error — `RegisterAccountRoutes` undefined.
 
-- [ ] **Step 3: Implement handlers**
+- [x] **Step 3: Implement handlers**
 
 Create `goamp-node/api/account_handlers.go`:
 
@@ -1481,7 +1481,7 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 }
 ```
 
-- [ ] **Step 4: Wire routes in server.go**
+- [x] **Step 4: Wire routes in server.go**
 
 Edit `goamp-node/api/server.go`: in `Start`, after the existing `mux.HandleFunc` lines and before the plugin wildcard line, insert:
 
@@ -1490,17 +1490,17 @@ Edit `goamp-node/api/server.go`: in `Start`, after the existing `mux.HandleFunc`
 	s.RegisterAccountRoutes(mux)
 ```
 
-- [ ] **Step 5: Run to confirm PASS**
+- [x] **Step 5: Run to confirm PASS**
 
 Run: `cd goamp-node && go test ./api/... -run TestAccount -v`
 Expected: 4 new tests pass.
 
-- [ ] **Step 6: Full-package check**
+- [x] **Step 6: Full-package check**
 
 Run: `cd goamp-node && go test ./...`
 Expected: all tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add goamp-node/api/account_handlers.go goamp-node/api/account_handlers_test.go goamp-node/api/server.go
@@ -1514,7 +1514,7 @@ git commit -m "feat(node/api): /account/{create,load,sign-manifest,verify-manife
 **Files:**
 - Modify: `src-tauri/Cargo.toml`
 
-- [ ] **Step 1: Add dependency**
+- [x] **Step 1: Add dependency**
 
 In `src-tauri/Cargo.toml`, under `[dependencies]`, add:
 
@@ -1522,12 +1522,12 @@ In `src-tauri/Cargo.toml`, under `[dependencies]`, add:
 keyring = "3.6"
 ```
 
-- [ ] **Step 2: Verify compile**
+- [x] **Step 2: Verify compile**
 
 Run: `cd src-tauri && cargo check`
 Expected: exit 0; `keyring` appears in `Cargo.lock`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src-tauri/Cargo.toml src-tauri/Cargo.lock
@@ -1541,7 +1541,7 @@ git commit -m "chore(tauri): add keyring crate for OS credential storage"
 **Files:**
 - Create: `src-tauri/src/account.rs`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Append at the bottom of `src-tauri/src/account.rs` (create the file):
 
@@ -1581,12 +1581,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run to confirm FAIL**
+- [x] **Step 2: Run to confirm FAIL**
 
 Run: `cd src-tauri && cargo test --lib account::`
 Expected: compile error — `StoredAccount`, `save_account`, `load_account` undefined.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Replace the whole file `src-tauri/src/account.rs` with:
 
@@ -1703,18 +1703,18 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Register module**
+- [x] **Step 4: Register module**
 
 Edit `src-tauri/src/lib.rs`: add `pub mod account;` alongside other `pub mod ...;` lines near the top.
 
-- [ ] **Step 5: Run to confirm PASS**
+- [x] **Step 5: Run to confirm PASS**
 
 Run: `cd src-tauri && cargo test --lib account::`
 Expected: 2 tests pass.
 
 Note: if the `mock` module is gated behind a Cargo feature in the installed `keyring` version, enable it in Task 9: `keyring = { version = "3.6", features = ["mock"] }`. If that feature does not exist, remove the two tests and rely on Task 12's end-to-end test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/account.rs src-tauri/src/lib.rs
@@ -1730,12 +1730,12 @@ git commit -m "feat(tauri): account module — OS-keychain sub-key + state-key s
 - Modify: `src-tauri/src/commands/mod.rs`
 - Modify: `src-tauri/src/lib.rs` (register handlers)
 
-- [ ] **Step 1: Locate invoke_handler site**
+- [x] **Step 1: Locate invoke_handler site**
 
 Run: `grep -n "invoke_handler" src-tauri/src/lib.rs`
 Record the line number — the list ends with either `])` or `]).build(...)`. You'll insert the new commands into that list in Step 4.
 
-- [ ] **Step 2: Implement commands**
+- [x] **Step 2: Implement commands**
 
 Create `src-tauri/src/commands/account.rs`:
 
@@ -1842,11 +1842,11 @@ pub fn account_forget(account_pub: String) -> Result<(), String> {
 }
 ```
 
-- [ ] **Step 3: Wire module**
+- [x] **Step 3: Wire module**
 
 Edit `src-tauri/src/commands/mod.rs`: add `pub mod account;` alongside other `pub mod ...;` lines.
 
-- [ ] **Step 4: Register invoke handlers**
+- [x] **Step 4: Register invoke handlers**
 
 In `src-tauri/src/lib.rs`, inside the `tauri::generate_handler![...]` list, append:
 
@@ -1856,14 +1856,14 @@ In `src-tauri/src/lib.rs`, inside the `tauri::generate_handler![...]` list, appe
         commands::account::account_forget,
 ```
 
-- [ ] **Step 5: Compile check**
+- [x] **Step 5: Compile check**
 
 Run: `cd src-tauri && cargo check`
 Expected: exit 0.
 
 Note on deps: if `rand` is not already in `Cargo.toml`, add `rand = "0.8"` under `[dependencies]` and commit alongside. If `reqwest` is not yet a direct dep, add `reqwest = { version = "0.12", features = ["blocking", "json"] }`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/commands/account.rs src-tauri/src/commands/mod.rs src-tauri/src/lib.rs src-tauri/Cargo.toml src-tauri/Cargo.lock
@@ -1880,7 +1880,7 @@ git commit -m "feat(tauri): account_create/current/forget commands via goamp-nod
 - Modify: `src/services/interfaces.ts`
 - Modify: `src/services/index.ts`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `src/services/AccountService.test.ts`:
 
@@ -1942,12 +1942,12 @@ describe("AccountService", () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm FAIL**
+- [x] **Step 2: Run to confirm FAIL**
 
 Run: `pnpm test src/services/AccountService.test.ts`
 Expected: fail — `AccountService` not found.
 
-- [ ] **Step 3: Add interface**
+- [x] **Step 3: Add interface**
 
 Edit `src/services/interfaces.ts` to append:
 
@@ -1973,7 +1973,7 @@ export interface IAccountService {
 }
 ```
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Create `src/services/AccountService.ts`:
 
@@ -2038,21 +2038,21 @@ export class AccountService implements IAccountService {
 }
 ```
 
-- [ ] **Step 5: Export**
+- [x] **Step 5: Export**
 
 Edit `src/services/index.ts`: add `export { AccountService } from "./AccountService";` and re-export new interface types.
 
-- [ ] **Step 6: Run to confirm PASS**
+- [x] **Step 6: Run to confirm PASS**
 
 Run: `pnpm test src/services/AccountService.test.ts`
 Expected: 4 tests pass.
 
-- [ ] **Step 7: Full TS test suite**
+- [x] **Step 7: Full TS test suite**
 
 Run: `pnpm test`
 Expected: all previous tests still pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/services/AccountService.ts src/services/AccountService.test.ts src/services/interfaces.ts src/services/index.ts
@@ -2066,28 +2066,28 @@ git commit -m "feat(services): AccountService — create/current/forget + quiz v
 **Files:**
 - None (smoke test only)
 
-- [ ] **Step 1: Go tests**
+- [x] **Step 1: Go tests**
 
 Run: `cd goamp-node && go test ./...`
 Expected: all tests pass, no new regressions.
 
-- [ ] **Step 2: Rust build + tests**
+- [x] **Step 2: Rust build + tests**
 
 Run: `cd src-tauri && cargo check && cargo test --lib`
 Expected: exit 0; account tests pass.
 
-- [ ] **Step 3: TypeScript tests**
+- [x] **Step 3: TypeScript tests**
 
 Run: `pnpm test`
 Expected: all green.
 
-- [ ] **Step 4: Tag the milestone**
+- [x] **Step 4: Tag the milestone**
 
 ```bash
 git tag -a multi-device-p1-identity -m "Multi-device Plan 1 complete: identity primitives wired through Go/Rust/TS"
 ```
 
-- [ ] **Step 5: Done**
+- [x] **Step 5: Done**
 
 Plan 1 delivers working primitives. Next: Plan 2 (Relay MVP) uses `AccountService.create` output + `sub_sk` from keychain to sign relay requests.
 

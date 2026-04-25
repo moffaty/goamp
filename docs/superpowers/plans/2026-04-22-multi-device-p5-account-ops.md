@@ -44,7 +44,7 @@ Decision recorded: **relax relay's manifest-update auth to allow the signing sub
 
 List devices: GET `/account/list-devices?account_pub=<hex>` → fetches manifest from relay, returns device list (no secrets).
 
-- [ ] **Step 1 — modify relay server.go**
+- [x] **Step 1 — modify relay server.go**
 
 In `goamp-node/relay/server.go`, inside `putManifest`, replace the existing `isActiveInManifest(prev, subPubHex)` check with:
 
@@ -83,9 +83,9 @@ func TestPutManifestAcceptsSignerActiveInNewManifest(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2** — confirm new test fails before relaxation, passes after.
+- [x] **Step 2** — confirm new test fails before relaxation, passes after.
 
-- [ ] **Step 3 — write handler tests** — append to `goamp-node/api/account_handlers_test.go`:
+- [x] **Step 3 — write handler tests** — append to `goamp-node/api/account_handlers_test.go`:
 
 ```go
 func TestAccountRecoverAddsDevice(t *testing.T) {
@@ -181,7 +181,7 @@ func TestAccountListDevices(t *testing.T) {
 
 Add necessary imports to the test file (bytes, io, strings, time, github.com/goamp/sdk/account, github.com/goamp/sdk/relay).
 
-- [ ] **Step 4 — impl handlers** — append to `goamp-node/api/account_handlers.go`:
+- [x] **Step 4 — impl handlers** — append to `goamp-node/api/account_handlers.go`:
 
 ```go
 import (
@@ -313,9 +313,9 @@ func (s *Server) RegisterAccountRoutes(mux *http.ServeMux) {
 }
 ```
 
-- [ ] **Step 5** — test suite passes.
+- [x] **Step 5** — test suite passes.
 
-- [ ] **Step 6 — commit** — `feat(node/api): /account/recover + /account/list-devices; relax relay auth for new-manifest signer`.
+- [x] **Step 6 — commit** — `feat(node/api): /account/recover + /account/list-devices; relax relay auth for new-manifest signer`.
 
 ---
 
@@ -323,7 +323,7 @@ func (s *Server) RegisterAccountRoutes(mux *http.ServeMux) {
 
 Revoke moves a sub_pub into the `revoked` list, drops it from `devices`, bumps version, signs, pushes.
 
-- [ ] **Step 1 — test** — append to `account_handlers_test.go`:
+- [x] **Step 1 — test** — append to `account_handlers_test.go`:
 
 ```go
 func TestAccountRevokeDevice(t *testing.T) {
@@ -379,7 +379,7 @@ func TestAccountRevokeDevice(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2 — impl** — append to `account_handlers.go`:
+- [x] **Step 2 — impl** — append to `account_handlers.go`:
 
 ```go
 type revokeReq struct {
@@ -496,7 +496,7 @@ type revokeReq struct {
 
 And in the handler, decode sub_sk and pass to `client.PutManifest(mf, &callerSub)`. Update the test to pass `sub_sk_b64` of sub1 (not sub2 since we're revoking sub2).
 
-- [ ] **Step 3** — adjust the test to pass sub1's sub_sk_b64:
+- [x] **Step 3** — adjust the test to pass sub1's sub_sk_b64:
 
 ```go
 	sub2Hex := hex.EncodeToString(sub2.PublicKey)
@@ -536,9 +536,9 @@ func (s *Server) handleAccountRevoke(w http.ResponseWriter, r *http.Request) {
 
 Add `"crypto/ed25519"` import if needed.
 
-- [ ] **Step 4** — 3 new tests (revoke + 2 from Task 1) pass.
+- [x] **Step 4** — 3 new tests (revoke + 2 from Task 1) pass.
 
-- [ ] **Step 5 — commit** — `feat(node/api): /account/revoke with caller sub-key auth`.
+- [x] **Step 5 — commit** — `feat(node/api): /account/revoke with caller sub-key auth`.
 
 ---
 
@@ -546,7 +546,7 @@ Add `"crypto/ed25519"` import if needed.
 
 Add commands wrapping the new HTTP endpoints. Loads mnemonic from user input (passed as argument, never stored), uses sub_sk from keychain for revoke.
 
-- [ ] **Append to `src-tauri/src/commands/account.rs`:**
+- [x] **Append to `src-tauri/src/commands/account.rs`:**
 
 ```rust
 #[derive(Debug, Serialize)]
@@ -667,7 +667,7 @@ pub fn account_revoke_device(
 }
 ```
 
-- [ ] **Register handlers in `src-tauri/src/lib.rs`** — append to the existing `tauri::generate_handler!` list:
+- [x] **Register handlers in `src-tauri/src/lib.rs`** — append to the existing `tauri::generate_handler!` list:
 
 ```rust
         commands::account::account_recover,
@@ -675,15 +675,15 @@ pub fn account_revoke_device(
         commands::account::account_revoke_device,
 ```
 
-- [ ] **Compile** — `cargo check` inside `src-tauri/`.
+- [x] **Compile** — `cargo check` inside `src-tauri/`.
 
-- [ ] **Commit** — `feat(tauri): account_recover/list_devices/revoke_device commands`.
+- [x] **Commit** — `feat(tauri): account_recover/list_devices/revoke_device commands`.
 
 ---
 
 ## Task 4: TS — AccountService extension
 
-- [ ] **Extend `src/services/interfaces.ts`:**
+- [x] **Extend `src/services/interfaces.ts`:**
 
 ```ts
 export interface RecoveredAccount {
@@ -712,7 +712,7 @@ export interface IAccountService {
 }
 ```
 
-- [ ] **Extend `src/services/AccountService.ts`:**
+- [x] **Extend `src/services/AccountService.ts`:**
 
 ```ts
 async recover(mnemonic: string, deviceName: string, os: string, relayUrl: string): Promise<RecoveredAccount> {
@@ -750,19 +750,19 @@ async revokeDevice(mnemonic: string, accountPub: string, subPubToRevoke: string,
 
 (Use `this.t.call<T>(...)` following the existing AccountService pattern — service adapter already uses `call` not `invoke`.)
 
-- [ ] **Extend `src/services/AccountService.test.ts`** — add 3 tests covering mock responses for recover/listDevices/revokeDevice. Follow the existing pattern in the file.
+- [x] **Extend `src/services/AccountService.test.ts`** — add 3 tests covering mock responses for recover/listDevices/revokeDevice. Follow the existing pattern in the file.
 
-- [ ] **Run** — `pnpm test src/services/AccountService.test.ts` all green.
+- [x] **Run** — `pnpm test src/services/AccountService.test.ts` all green.
 
-- [ ] **Commit** — `feat(services): AccountService — recover/list-devices/revoke`.
+- [x] **Commit** — `feat(services): AccountService — recover/list-devices/revoke`.
 
 ---
 
 ## Task 5: Milestone
 
-- [ ] `go test ./...` from `goamp-node/` — green.
-- [ ] `pnpm test` — green (165+ tests).
-- [ ] `git tag -a multi-device-p5-account-ops -m "Plan 5: account operations (headless) — recover, list, revoke"`.
+- [x] `go test ./...` from `goamp-node/` — green.
+- [x] `pnpm test` — green (165+ tests).
+- [x] `git tag -a multi-device-p5-account-ops -m "Plan 5: account operations (headless) — recover, list, revoke"`.
 
 ---
 
