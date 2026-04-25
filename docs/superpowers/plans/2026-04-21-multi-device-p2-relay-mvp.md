@@ -39,7 +39,7 @@ Canonical message: `HTTP_METHOD || "\n" || PATH || "\n" || TIMESTAMP_UNIX_NS || 
 
 **Files:** `goamp-node/relay/signer.go`, `signer_test.go`.
 
-- [ ] **Step 1 — failing test** — `signer_test.go`:
+- [x] **Step 1 — failing test** — `signer_test.go`:
 
 ```go
 package relay
@@ -93,9 +93,9 @@ func TestVerifyRejectsMalformedHeader(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2** — confirm FAIL.
+- [x] **Step 2** — confirm FAIL.
 
-- [ ] **Step 3 — implement** — `signer.go`:
+- [x] **Step 3 — implement** — `signer.go`:
 
 ```go
 // Package relay provides signed-request primitives shared by the GOAMP
@@ -196,11 +196,11 @@ func VerifyRequest(hdr, method, path string, body []byte) (ed25519.PublicKey, er
 }
 ```
 
-- [ ] **Step 4** — confirm PASS. 4 tests.
+- [x] **Step 4** — confirm PASS. 4 tests.
 
-- [ ] **Step 5 — build** — `go build ./...`.
+- [x] **Step 5 — build** — `go build ./...`.
 
-- [ ] **Step 6 — commit** — `feat(node/relay): signed-request canonical format + ed25519 sign/verify`.
+- [x] **Step 6 — commit** — `feat(node/relay): signed-request canonical format + ed25519 sign/verify`.
 
 ---
 
@@ -210,7 +210,7 @@ Manifest cache keyed by account_pub (hex). Monotonic version enforcement: `PutMa
 
 **Files:** `goamp-node/relay/store.go`, `store_test.go`.
 
-- [ ] **Step 1 — failing test** — `store_test.go`:
+- [x] **Step 1 — failing test** — `store_test.go`:
 
 ```go
 package relay
@@ -300,9 +300,9 @@ func TestGetBlobMissing(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2** — confirm FAIL.
+- [x] **Step 2** — confirm FAIL.
 
-- [ ] **Step 3 — implement** — `store.go`:
+- [x] **Step 3 — implement** — `store.go`:
 
 ```go
 package relay
@@ -425,9 +425,9 @@ func (s *MemStore) ListBlobs(accountPub string) []blobSnapshot {
 }
 ```
 
-- [ ] **Step 4** — confirm PASS. 5 tests.
+- [x] **Step 4** — confirm PASS. 5 tests.
 
-- [ ] **Step 5 — commit** — `feat(node/relay): in-memory manifest + blob store with monotonic version + retention`.
+- [x] **Step 5 — commit** — `feat(node/relay): in-memory manifest + blob store with monotonic version + retention`.
 
 ---
 
@@ -443,7 +443,7 @@ Clock-skew tolerance: 30 s.
 
 **Files:** `goamp-node/relay/server.go`, `server_test.go`.
 
-- [ ] **Step 1 — failing test** — `server_test.go`:
+- [x] **Step 1 — failing test** — `server_test.go`:
 
 ```go
 package relay
@@ -639,9 +639,9 @@ func TestGetStateRoundTrip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2** — confirm FAIL.
+- [x] **Step 2** — confirm FAIL.
 
-- [ ] **Step 3 — implement** — `server.go`:
+- [x] **Step 3 — implement** — `server.go`:
 
 ```go
 package relay
@@ -820,11 +820,11 @@ type httpErr struct {
 func (e *httpErr) Error() string { return e.msg }
 ```
 
-- [ ] **Step 4** — confirm PASS. 7 tests.
+- [x] **Step 4** — confirm PASS. 7 tests.
 
-- [ ] **Step 5 — build** — `go build ./...`.
+- [x] **Step 5 — build** — `go build ./...`.
 
-- [ ] **Step 6 — commit** — `feat(node/relay): HTTP server — manifest + state endpoints with signed-request auth`.
+- [x] **Step 6 — commit** — `feat(node/relay): HTTP server — manifest + state endpoints with signed-request auth`.
 
 ---
 
@@ -832,7 +832,7 @@ func (e *httpErr) Error() string { return e.msg }
 
 **Files:** `goamp-node/cmd/goamp-relay/main.go`.
 
-- [ ] **Step 1 — implement** (no tests — binary wiring):
+- [x] **Step 1 — implement** (no tests — binary wiring):
 
 ```go
 // goamp-relay — minimal HTTP relay for multi-device manifest + state blobs.
@@ -859,9 +859,9 @@ func main() {
 }
 ```
 
-- [ ] **Step 2 — build** — `go build ./cmd/goamp-relay/` must produce an executable.
+- [x] **Step 2 — build** — `go build ./cmd/goamp-relay/` must produce an executable.
 
-- [ ] **Step 3 — commit** — `feat(node): goamp-relay binary`.
+- [x] **Step 3 — commit** — `feat(node): goamp-relay binary`.
 
 ---
 
@@ -869,7 +869,7 @@ func main() {
 
 **Files:** `goamp-node/sync/client.go`, `client_test.go`.
 
-- [ ] **Step 1 — failing test** — `client_test.go`:
+- [x] **Step 1 — failing test** — `client_test.go`:
 
 ```go
 package sync
@@ -930,9 +930,9 @@ func TestPutAndGetState(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2** — confirm FAIL.
+- [x] **Step 2** — confirm FAIL.
 
-- [ ] **Step 3 — implement** — `client.go`:
+- [x] **Step 3 — implement** — `client.go`:
 
 ```go
 // Package sync is the client library goamp-node uses to talk to a GOAMP
@@ -1066,9 +1066,9 @@ func (c *Client) GetState(accountPub string, sub *account.SubKey) ([]byte, error
 }
 ```
 
-- [ ] **Step 2 — confirm PASS.** 2 tests.
+- [x] **Step 2 — confirm PASS.** 2 tests.
 
-- [ ] **Step 3 — commit** — `feat(node/sync): relay client — manifest + state round-trip`.
+- [x] **Step 3 — commit** — `feat(node/sync): relay client — manifest + state round-trip`.
 
 ---
 
@@ -1078,7 +1078,7 @@ func (c *Client) GetState(accountPub string, sub *account.SubKey) ([]byte, error
 
 Exercises: bootstrap manifest v1 (unsigned) → push state blob (signed) → read it back → push manifest v2 with added device signed by v1 sub-key.
 
-- [ ] **Step 1 — write test:**
+- [x] **Step 1 — write test:**
 
 ```go
 package sync
@@ -1142,17 +1142,17 @@ func TestE2EBootstrapThenAddDevice(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2 — confirm PASS.**
+- [x] **Step 2 — confirm PASS.**
 
-- [ ] **Step 3 — full build + test** — `go test ./...`.
+- [x] **Step 3 — full build + test** — `go test ./...`.
 
-- [ ] **Step 4 — commit** — `test(node/sync): e2e — bootstrap, state round-trip, add device`.
+- [x] **Step 4 — commit** — `test(node/sync): e2e — bootstrap, state round-trip, add device`.
 
 ---
 
 ## Task 7: Milestone
 
-- [ ] `git tag -a multi-device-p2-relay-mvp -m "Multi-device Plan 2 complete: relay MVP (storage + auth) + goamp-node client"`
+- [x] `git tag -a multi-device-p2-relay-mvp -m "Multi-device Plan 2 complete: relay MVP (storage + auth) + goamp-node client"`
 
 ---
 

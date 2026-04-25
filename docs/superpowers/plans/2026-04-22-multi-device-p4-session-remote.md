@@ -40,7 +40,7 @@
 
 **Files:** `goamp-node/session/session.go`, `session_test.go`.
 
-- [ ] **Test** — `session_test.go`:
+- [x] **Test** — `session_test.go`:
 
 ```go
 package session
@@ -96,7 +96,7 @@ func TestCommandJSONRoundTrip(t *testing.T) {
 }
 ```
 
-- [ ] **Impl** — `session.go`:
+- [x] **Impl** — `session.go`:
 
 ```go
 // Package session defines the cross-device playback session and remote
@@ -168,9 +168,9 @@ type Command struct {
 }
 ```
 
-- [ ] **Verify** — 2 tests pass.
+- [x] **Verify** — 2 tests pass.
 
-- [ ] **Commit** — `feat(node/session): Session + Command types`.
+- [x] **Commit** — `feat(node/session): Session + Command types`.
 
 ---
 
@@ -273,9 +273,9 @@ func TestCommandQueueDrain(t *testing.T) {
 }
 ```
 
-- [ ] **Verify** — extended tests pass.
+- [x] **Verify** — extended tests pass.
 
-- [ ] **Commit** — `feat(node/relay): MemStore session + commands queue`.
+- [x] **Commit** — `feat(node/relay): MemStore session + commands queue`.
 
 ---
 
@@ -293,7 +293,7 @@ func TestCommandQueueDrain(t *testing.T) {
 
 (Implementation pattern matches existing `state` handlers — auth via `authorizeActive`. See task 3 of Plan 2 for the pattern.)
 
-- [ ] **Implement** — `session_handlers.go`:
+- [x] **Implement** — `session_handlers.go`:
 
 ```go
 package relay
@@ -483,9 +483,9 @@ func TestCommandPostAndPull(t *testing.T) {
 }
 ```
 
-- [ ] **Verify** — full test suite green.
+- [x] **Verify** — full test suite green.
 
-- [ ] **Commit** — `feat(node/relay): /session and /commands HTTP endpoints`.
+- [x] **Commit** — `feat(node/relay): /session and /commands HTTP endpoints`.
 
 ---
 
@@ -622,7 +622,7 @@ func TestSessionAndCommandsRoundTrip(t *testing.T) {
 
 (Add `bytes` import if needed.)
 
-- [ ] **Commit** — `feat(node/sync): PutSession/GetSession/PostCommand/PullCommands`.
+- [x] **Commit** — `feat(node/sync): PutSession/GetSession/PostCommand/PullCommands`.
 
 ---
 
@@ -763,15 +763,15 @@ Register in `server.go` Start: `s.RegisterSessionRoutes(mux)`.
 
 **Test** — `session_handlers_test.go`: end-to-end (spawn relay httptest, spawn node httptest with these routes, bootstrap account, run put/get/post/pull cycle). Pattern matches existing `state_handlers_test.go`.
 
-- [ ] **Verify** — `go test ./...` green.
+- [x] **Verify** — `go test ./...` green.
 
-- [ ] **Commit** — `feat(node/api): /session and /commands Tauri-facing endpoints`.
+- [x] **Commit** — `feat(node/api): /session and /commands Tauri-facing endpoints`.
 
 ---
 
 ## Task 6: Milestone
 
-- [ ] `git tag -a multi-device-p4-session-remote -m "Plan 4: session + remote commands via HTTP relay"`.
+- [x] `git tag -a multi-device-p4-session-remote -m "Plan 4: session + remote commands via HTTP relay"`.
 
 ---
 

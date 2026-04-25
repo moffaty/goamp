@@ -38,7 +38,7 @@
 
 Wire format per blob: `nonce(12) || ciphertext(...) || tag(16)`. Key must be 32 bytes (matches `account.DeriveStateKey` output).
 
-- [ ] **Step 1 — failing test:**
+- [x] **Step 1 — failing test:**
 
 ```go
 package userstate
@@ -113,9 +113,9 @@ func TestKeySizeValidated(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2** — confirm FAIL.
+- [x] **Step 2** — confirm FAIL.
 
-- [ ] **Step 3 — impl:**
+- [x] **Step 3 — impl:**
 
 ```go
 // Package userstate manages per-account encrypted user state and LWW
@@ -166,9 +166,9 @@ func Open(key, blob []byte) ([]byte, error) {
 }
 ```
 
-- [ ] **Step 4** — `cd goamp-node && go get golang.org/x/crypto && go mod tidy && go test ./userstate/... -v` → 5 tests pass.
+- [x] **Step 4** — `cd goamp-node && go get golang.org/x/crypto && go mod tidy && go test ./userstate/... -v` → 5 tests pass.
 
-- [ ] **Step 5 — commit** — `feat(node/userstate): ChaCha20-Poly1305 seal/open for state blobs`.
+- [x] **Step 5 — commit** — `feat(node/userstate): ChaCha20-Poly1305 seal/open for state blobs`.
 
 ---
 
@@ -178,7 +178,7 @@ func Open(key, blob []byte) ([]byte, error) {
 
 MVP schema: playlists (map of id → playlist), liked/disliked tracks (maps of track_id → addedAt), settings (map of key → {value, updated_at}). No history/subscriptions/taste_profile in P3 — those are P5 extensions.
 
-- [ ] **Step 1 — failing test:**
+- [x] **Step 1 — failing test:**
 
 ```go
 package userstate
@@ -293,9 +293,9 @@ func TestJSONRoundTrip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2** — confirm FAIL.
+- [x] **Step 2** — confirm FAIL.
 
-- [ ] **Step 3 — impl** — `state.go`:
+- [x] **Step 3 — impl** — `state.go`:
 
 ```go
 package userstate
@@ -447,9 +447,9 @@ func mergePlaylists(out, a, b map[string]Playlist) {
 }
 ```
 
-- [ ] **Step 4** — 7 tests pass.
+- [x] **Step 4** — 7 tests pass.
 
-- [ ] **Step 5 — commit** — `feat(node/userstate): UserState schema + LWW merge + JSON`.
+- [x] **Step 5 — commit** — `feat(node/userstate): UserState schema + LWW merge + JSON`.
 
 ---
 
@@ -459,7 +459,7 @@ func mergePlaylists(out, a, b map[string]Playlist) {
 
 Add methods: `(c *Client) SyncUp(stateKey []byte, sub *account.SubKey, plaintext []byte) error` — seals, calls `PutState`. `SyncDown(stateKey []byte, sub *account.SubKey) ([]byte, error)` — calls `GetState`, opens. Returns `nil, nil` for missing blob.
 
-- [ ] **Step 1 — append test** to `client_test.go`:
+- [x] **Step 1 — append test** to `client_test.go`:
 
 ```go
 func TestSyncUpDownRoundTrip(t *testing.T) {
@@ -494,9 +494,9 @@ func TestSyncDownMissingReturnsNil(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2** — confirm FAIL (undefined SyncUp/SyncDown).
+- [x] **Step 2** — confirm FAIL (undefined SyncUp/SyncDown).
 
-- [ ] **Step 3 — append to `client.go`:**
+- [x] **Step 3 — append to `client.go`:**
 
 ```go
 import (
@@ -527,9 +527,9 @@ func (c *Client) SyncDown(stateKey []byte, sub *account.SubKey) ([]byte, error) 
 }
 ```
 
-- [ ] **Step 4** — 2 new tests pass, total sync/ = 5.
+- [x] **Step 4** — 2 new tests pass, total sync/ = 5.
 
-- [ ] **Step 5 — commit** — `feat(node/sync): SyncUp/SyncDown — encrypted state wrapper`.
+- [x] **Step 5 — commit** — `feat(node/sync): SyncUp/SyncDown — encrypted state wrapper`.
 
 ---
 
@@ -543,7 +543,7 @@ Endpoints:
 - `POST /state/sync-up` body: `{"account_pub", "sub_sk_b64", "state_key_b64", "plaintext_b64", "relay_url"}` → status 200.
 - `POST /state/sync-down` body: `{"account_pub", "sub_sk_b64", "state_key_b64", "relay_url"}` → `{"plaintext_b64"}` or `{"plaintext_b64": ""}` if missing.
 
-- [ ] **Step 1 — test:**
+- [x] **Step 1 — test:**
 
 ```go
 package api
@@ -633,9 +633,9 @@ func TestStateSyncUpDown(t *testing.T) {
 
 Add helper `timeNowUTC()` at the top of the test file (or just inline `time.Now().UTC()`).
 
-- [ ] **Step 2** — FAIL.
+- [x] **Step 2** — FAIL.
 
-- [ ] **Step 3 — impl `state_handlers.go`:**
+- [x] **Step 3 — impl `state_handlers.go`:**
 
 ```go
 package api
@@ -747,20 +747,20 @@ func (c *Client) SyncDownFor(accountPub string, stateKey []byte, sub *account.Su
 }
 ```
 
-- [ ] **Step 4** — register routes in `server.go` inside `Start` after account routes: `s.RegisterStateSyncRoutes(mux)`.
+- [x] **Step 4** — register routes in `server.go` inside `Start` after account routes: `s.RegisterStateSyncRoutes(mux)`.
 
-- [ ] **Step 5** — test passes.
+- [x] **Step 5** — test passes.
 
-- [ ] **Step 6** — `go test ./...` all green.
+- [x] **Step 6** — `go test ./...` all green.
 
-- [ ] **Step 7 — commit** — `feat(node/api): /state/sync-up and /state/sync-down endpoints`.
+- [x] **Step 7 — commit** — `feat(node/api): /state/sync-up and /state/sync-down endpoints`.
 
 ---
 
 ## Task 5: Milestone
 
-- [ ] Run `go test ./...` (root: `goamp-node/`). Confirm green.
-- [ ] `git tag -a multi-device-p3-state-sync -m "Plan 3: encrypted state sync (LWW, MVP)"`.
+- [x] Run `go test ./...` (root: `goamp-node/`). Confirm green.
+- [x] `git tag -a multi-device-p3-state-sync -m "Plan 3: encrypted state sync (LWW, MVP)"`.
 
 ---
 

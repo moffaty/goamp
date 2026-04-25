@@ -136,9 +136,9 @@ Register in `src-tauri/src/lib.rs` `generate_handler!`:
         commands::account::remote_pull_commands,
 ```
 
-- [ ] **Verify** — `cd src-tauri && cargo check && cargo fmt`.
+- [x] **Verify** — `cd src-tauri && cargo check && cargo fmt`.
 
-- [ ] **Commit** — `feat(tauri): remote session/commands proxy commands`.
+- [x] **Commit** — `feat(tauri): remote session/commands proxy commands`.
 
 ---
 
@@ -404,15 +404,15 @@ describe("RemoteService", () => {
 });
 ```
 
-- [ ] **Verify** — `pnpm test src/services/RemoteService.test.ts` all pass. Then `pnpm test` full suite green.
+- [x] **Verify** — `pnpm test src/services/RemoteService.test.ts` all pass. Then `pnpm test` full suite green.
 
-- [ ] **Commit** — `feat(services): RemoteService — put/get session, send/pull commands, polling`.
+- [x] **Commit** — `feat(services): RemoteService — put/get session, send/pull commands, polling`.
 
 ---
 
 ## Task 3: Milestone
 
-- [ ] `git tag -a multi-device-p4-5-remote-wiring -m "Plan 4.5: client wiring for P4 session/remote"`.
+- [x] `git tag -a multi-device-p4-5-remote-wiring -m "Plan 4.5: client wiring for P4 session/remote"`.
 
 ---
 

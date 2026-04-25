@@ -1,6 +1,6 @@
 # P2P Taste Profile Gossip Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Wire the existing GossipSub infrastructure so GOAMP peers automatically exchange taste profiles every 5 minutes, feeding collaborative filtering with real peer data and updating the tray tooltip with live peer count.
 
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS peer_profiles (
 );
 ```
 
-- [ ] **Write failing test** — add to `goamp-node/store/sqlite_test.go`:
+- [x] **Write failing test** — add to `goamp-node/store/sqlite_test.go`:
 
 ```go
 func TestGetPeerProfiles(t *testing.T) {
@@ -88,14 +88,14 @@ func TestGetPeerProfilesLimit(t *testing.T) {
 }
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```bash
 cd goamp-node && go test ./store/... -run TestGetPeerProfiles -v
 ```
 Expected: FAIL — `GetPeerProfiles` not found on `Store` interface.
 
-- [ ] **Add PeerProfileRow + GetPeerProfiles to store/store.go**
+- [x] **Add PeerProfileRow + GetPeerProfiles to store/store.go**
 
 In `store/store.go`, add after the `Recommendation` struct:
 
@@ -114,7 +114,7 @@ Add `GetPeerProfiles` to the `Store` interface, after `StorePeerProfile`:
 GetPeerProfiles(ctx context.Context, limit int) ([]PeerProfileRow, error)
 ```
 
-- [ ] **Implement GetPeerProfiles in store/sqlite.go**
+- [x] **Implement GetPeerProfiles in store/sqlite.go**
 
 Add after `StorePeerProfile`:
 
@@ -148,14 +148,14 @@ func (s *SQLiteStore) GetPeerProfiles(ctx context.Context, limit int) ([]PeerPro
 }
 ```
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```bash
 cd goamp-node && go test ./store/... -run TestGetPeerProfiles -v
 ```
 Expected: PASS.
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add goamp-node/store/store.go goamp-node/store/sqlite.go goamp-node/store/sqlite_test.go
@@ -171,7 +171,7 @@ git commit -m "feat(node): add GetPeerProfiles to store — return recent peer t
 
 No tests — pure interface declaration. Compile-checked by subsequent tasks.
 
-- [ ] **Add to sdk/sdk.go**
+- [x] **Add to sdk/sdk.go**
 
 At the top of `sdk.go`, the import block already exists. Add `"github.com/goamp/sdk/proto"` if not present, and `"github.com/goamp/sdk/store"`.
 
@@ -205,14 +205,14 @@ import (
 )
 ```
 
-- [ ] **Verify compile**
+- [x] **Verify compile**
 
 ```bash
 cd goamp-node && go build ./sdk/...
 ```
 Expected: compile errors in `node.go` (LocalNode missing `PublishProfile`) and `profiles.go` (missing `GetPeerProfiles`) — that is expected. Fix in next tasks.
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add goamp-node/sdk/sdk.go
@@ -228,7 +228,7 @@ git commit -m "feat(node): extend Node + ProfileAggregator interfaces with Publi
 - Modify: `goamp-node/sdk/profiles/profiles.go`
 - Modify: `goamp-node/sdk/profiles/profiles_test.go`
 
-- [ ] **Write failing test** — add to `goamp-node/sdk/profiles/profiles_test.go`:
+- [x] **Write failing test** — add to `goamp-node/sdk/profiles/profiles_test.go`:
 
 ```go
 func TestGetPeerProfiles(t *testing.T) {
@@ -249,14 +249,14 @@ func TestGetPeerProfiles(t *testing.T) {
 }
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```bash
 cd goamp-node && go test ./sdk/profiles/... -run TestGetPeerProfiles -v
 ```
 Expected: FAIL — method not found.
 
-- [ ] **Add PublishProfile no-op to LocalNode (sdk/node/node.go)**
+- [x] **Add PublishProfile no-op to LocalNode (sdk/node/node.go)**
 
 Add after `Emit`:
 
@@ -279,7 +279,7 @@ import (
 )
 ```
 
-- [ ] **Implement GetPeerProfiles on SQLProfileAggregator (sdk/profiles/profiles.go)**
+- [x] **Implement GetPeerProfiles on SQLProfileAggregator (sdk/profiles/profiles.go)**
 
 Add after `StorePeer`:
 
@@ -292,21 +292,21 @@ func (p *SQLProfileAggregator) GetPeerProfiles(ctx context.Context, limit int) (
 
 Add `"github.com/goamp/sdk/store"` to the import block in profiles.go.
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```bash
 cd goamp-node && go test ./sdk/profiles/... -run TestGetPeerProfiles -v
 ```
 Expected: PASS.
 
-- [ ] **Full build check**
+- [x] **Full build check**
 
 ```bash
 cd goamp-node && go build ./...
 ```
 Expected: no errors.
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add goamp-node/sdk/node/node.go goamp-node/sdk/profiles/profiles.go goamp-node/sdk/profiles/profiles_test.go
@@ -321,7 +321,7 @@ git commit -m "feat(node): implement PublishProfile stub + GetPeerProfiles on ag
 - Modify: `goamp-node/sdk/node/pubsub.go`
 - Modify: `goamp-node/sdk/node/pubsub_test.go`
 
-- [ ] **Update existing test** — in `pubsub_test.go`, find `TestGossipSubEmitsProfileSynced` and update the payload struct:
+- [x] **Update existing test** — in `pubsub_test.go`, find `TestGossipSubEmitsProfileSynced` and update the payload struct:
 
 ```go
 // Replace the existing payload struct in TestGossipSubEmitsProfileSynced:
@@ -334,7 +334,7 @@ assert.NotEmpty(t, payload.Hash)
 assert.GreaterOrEqual(t, payload.PeerCount, 0, "peer_count must be present and non-negative")
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```bash
 cd goamp-node && go test ./sdk/node/... -run TestGossipSubEmitsProfileSynced -v
@@ -348,7 +348,7 @@ cd goamp-node && go test ./sdk/node/... -run TestGossipSubEmitsProfileSynced -v
 ```
 Expected: PASS (test does not yet fail — we'll verify the fix is applied correctly after implementation).
 
-- [ ] **Update handleProfileMessage in pubsub.go**
+- [x] **Update handleProfileMessage in pubsub.go**
 
 Replace:
 ```go
@@ -366,14 +366,14 @@ payload, _ := json.Marshal(map[string]any{
 n.Emit(sdk.Event{Type: sdk.EventProfileSynced, Payload: payload})
 ```
 
-- [ ] **Run all pubsub tests to confirm PASS**
+- [x] **Run all pubsub tests to confirm PASS**
 
 ```bash
 cd goamp-node && go test ./sdk/node/... -v -timeout 30s
 ```
 Expected: all PASS.
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add goamp-node/sdk/node/pubsub.go goamp-node/sdk/node/pubsub_test.go
@@ -389,7 +389,7 @@ git commit -m "feat(node): add peer_count to profile:synced WS payload"
 - Modify: `goamp-node/api/server.go`
 - Modify: `goamp-node/api/server_test.go`
 
-- [ ] **Write failing tests** — add to `goamp-node/api/server_test.go`:
+- [x] **Write failing tests** — add to `goamp-node/api/server_test.go`:
 
 ```go
 func TestProfileSyncReturns204(t *testing.T) {
@@ -443,14 +443,14 @@ func TestGetPeerProfilesReturnsStored(t *testing.T) {
 }
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```bash
 cd goamp-node && go test ./api/... -run "TestGetPeerProfiles|TestProfileSyncReturns204" -v
 ```
 Expected: `TestGetPeerProfilesReturnsStored` FAIL — route not registered. `TestProfileSyncReturns204` may pass (it already returns 204).
 
-- [ ] **Add handleGetPeerProfiles to api/profile_handlers.go**
+- [x] **Add handleGetPeerProfiles to api/profile_handlers.go**
 
 Add after `handleRecommendations`:
 
@@ -489,7 +489,7 @@ func (s *Server) handleGetPeerProfiles(w http.ResponseWriter, r *http.Request) {
 
 Add `"strconv"` to the import block in `profile_handlers.go`.
 
-- [ ] **Update handleProfileSync to call PublishProfile**
+- [x] **Update handleProfileSync to call PublishProfile**
 
 In `handleProfileSync`, after `s.profiles.Submit(ctx, &profile)` succeeds, add:
 
@@ -528,7 +528,7 @@ func (s *Server) handleProfileSync(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-- [ ] **Register route in api/server.go**
+- [x] **Register route in api/server.go**
 
 In `Start`, add after `mux.HandleFunc("GET /recommendations", s.handleRecommendations)`:
 
@@ -538,14 +538,14 @@ mux.HandleFunc("GET /profiles/peers", s.handleGetPeerProfiles)
 
 In `ServeHTTP`, add the same line in the same position.
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```bash
 cd goamp-node && go test ./api/... -v
 ```
 Expected: all tests PASS.
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add goamp-node/api/profile_handlers.go goamp-node/api/server.go goamp-node/api/server_test.go
@@ -556,14 +556,14 @@ git commit -m "feat(node): handleProfileSync publishes to GossipSub + add GET /p
 
 ## Task 6: Go — full test suite
 
-- [ ] **Run all goamp-node tests**
+- [x] **Run all goamp-node tests**
 
 ```bash
 cd goamp-node && go test ./... -timeout 60s
 ```
 Expected: all PASS.
 
-- [ ] **Commit if any fixes needed**, otherwise proceed.
+- [x] **Commit if any fixes needed**, otherwise proceed.
 
 ---
 
@@ -572,7 +572,7 @@ Expected: all PASS.
 **Files:**
 - Modify: `src-tauri/Cargo.toml`
 
-- [ ] **Add dependencies**
+- [x] **Add dependencies**
 
 In `src-tauri/Cargo.toml`, under `[dependencies]`, add:
 
@@ -587,14 +587,14 @@ Also update `tokio` to include the `time` and `rt` features needed for `interval
 tokio = { version = "1", features = ["process", "time", "rt"] }
 ```
 
-- [ ] **Verify compile**
+- [x] **Verify compile**
 
 ```bash
 cd src-tauri && cargo check 2>&1 | head -20
 ```
 Expected: no errors (new deps download and resolve).
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src-tauri/Cargo.toml
@@ -610,7 +610,7 @@ git commit -m "chore(tauri): add tokio-tungstenite + futures-util for P2P node c
 
 Replace the existing `submit_to_aggregator` + `sync_profile` with a version that targets the local node.
 
-- [ ] **Replace submit_to_aggregator with sync_to_node**
+- [x] **Replace submit_to_aggregator with sync_to_node**
 
 In `src-tauri/src/aggregator.rs`, replace:
 
@@ -658,7 +658,7 @@ pub async fn sync_to_node(profile: &crate::taste_profile::TasteProfile, port: u1
 }
 ```
 
-- [ ] **Add fetch_peer_profiles after sync_to_node**
+- [x] **Add fetch_peer_profiles after sync_to_node**
 
 ```rust
 #[derive(serde::Deserialize)]
@@ -698,7 +698,7 @@ pub async fn fetch_peer_profiles(port: u16) -> Result<Vec<(String, String)>, Str
 }
 ```
 
-- [ ] **Update sync_profile Tauri command** — replace the body with the new function:
+- [x] **Update sync_profile Tauri command** — replace the body with the new function:
 
 ```rust
 #[tauri::command]
@@ -716,14 +716,14 @@ pub async fn sync_profile(app: tauri::AppHandle) -> Result<u32, String> {
 }
 ```
 
-- [ ] **Compile check**
+- [x] **Compile check**
 
 ```bash
 cd src-tauri && cargo check 2>&1 | grep "^error" | head -20
 ```
 Expected: no errors.
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src-tauri/src/aggregator.rs
@@ -737,7 +737,7 @@ git commit -m "feat(tauri): replace central aggregator with local node sync — 
 **Files:**
 - Create: `src-tauri/src/node_client.rs`
 
-- [ ] **Create node_client.rs**
+- [x] **Create node_client.rs**
 
 ```rust
 // src-tauri/src/node_client.rs
@@ -829,14 +829,14 @@ async fn handle_ws_message(app: &AppHandle, text: &str) {
 }
 ```
 
-- [ ] **Compile check**
+- [x] **Compile check**
 
 ```bash
 cd src-tauri && cargo check 2>&1 | grep "^error" | head -20
 ```
 Expected: `node_client` module not found (not wired yet — expected).
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src-tauri/src/node_client.rs
@@ -850,7 +850,7 @@ git commit -m "feat(tauri): add node_client — 5-min sync timer + WS listener f
 **Files:**
 - Modify: `src-tauri/src/lib.rs`
 
-- [ ] **Add mod declaration**
+- [x] **Add mod declaration**
 
 In `src-tauri/src/lib.rs`, find the block of `mod` declarations and add:
 
@@ -858,7 +858,7 @@ In `src-tauri/src/lib.rs`, find the block of `mod` declarations and add:
 mod node_client;
 ```
 
-- [ ] **Wire in setup hook**
+- [x] **Wire in setup hook**
 
 In the setup hook, after the `node::start_node` block, add:
 
@@ -892,21 +892,21 @@ if let Err(e) = node::start_node(app.handle()) {
 }
 ```
 
-- [ ] **Full compile check**
+- [x] **Full compile check**
 
 ```bash
 cd src-tauri && cargo check 2>&1 | grep "^error" | head -20
 ```
 Expected: no errors.
 
-- [ ] **Rust tests**
+- [x] **Rust tests**
 
 ```bash
 cd src-tauri && cargo test 2>&1 | tail -10
 ```
 Expected: all tests PASS.
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src-tauri/src/lib.rs
@@ -920,7 +920,7 @@ git commit -m "feat(tauri): wire node_client in setup hook — start after goamp
 **Files:**
 - Modify: `src/bootstrap/AppBootstrap.ts`
 
-- [ ] **Add listener**
+- [x] **Add listener**
 
 In `AppBootstrap.ts`, find the `webview.listen<string>('media-action', ...)` block. Directly after it, add:
 
@@ -932,14 +932,14 @@ webview.listen<number>('goamp-node:profile-synced', ({ payload: peerCount }) => 
 })
 ```
 
-- [ ] **Run TypeScript tests**
+- [x] **Run TypeScript tests**
 
 ```bash
 pnpm test
 ```
 Expected: all PASS (listener is wiring only, no new logic to test).
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/bootstrap/AppBootstrap.ts
@@ -950,25 +950,25 @@ git commit -m "feat: update tray tooltip on P2P profile:synced — shows peer co
 
 ## Task 12: End-to-end build verification
 
-- [ ] **Go tests pass**
+- [x] **Go tests pass**
 
 ```bash
 cd goamp-node && go test ./... -timeout 60s
 ```
 
-- [ ] **Rust build succeeds**
+- [x] **Rust build succeeds**
 
 ```bash
 cd src-tauri && cargo build 2>&1 | grep "^error" | head -10
 ```
 
-- [ ] **TypeScript tests pass**
+- [x] **TypeScript tests pass**
 
 ```bash
 pnpm test
 ```
 
-- [ ] **All green — done.**
+- [x] **All green — done.**
 
 ---
 

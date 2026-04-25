@@ -1,6 +1,6 @@
 # Mood-Based Recommendations — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build mood-aware recommendation radio (calm / energetic / focus / discovery + custom) with three-stage scoring (cold start → context learning → centroid), explicit ↑/✕ signals with scope, and P2P centroid sharing.
 
@@ -36,7 +36,7 @@
 **Files:**
 - Modify: `src-tauri/src/db/mod.rs:136-165` (after radio tables migration)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```rust
 // Add to #[cfg(test)] mod tests in src-tauri/src/db/mod.rs:
@@ -109,12 +109,12 @@ fn test_tag_weights_table_exists() {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd src-tauri && cargo test test_mood_channels_table_exists test_mood_track_scores_table_exists test_track_features_table_exists test_track_signals_table_exists test_tag_weights_table_exists -- --nocapture 2>&1`
 Expected: FAIL — tables don't exist yet
 
-- [ ] **Step 3: Add migration block in `src-tauri/src/db/mod.rs`**
+- [x] **Step 3: Add migration block in `src-tauri/src/db/mod.rs`**
 
 Add after the radio tables migration block (after line 152, before `Ok(())`):
 
@@ -188,12 +188,12 @@ Add after the radio tables migration block (after line 152, before `Ok(())`):
     }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd src-tauri && cargo test test_mood_channels_table_exists test_mood_track_scores_table_exists test_track_features_table_exists test_track_signals_table_exists test_tag_weights_table_exists -- --nocapture 2>&1`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src-tauri/src/db/mod.rs
@@ -209,7 +209,7 @@ git commit -m "feat: mood recommendation tables migration"
 - Modify: `src-tauri/src/commands/mod.rs` (add `pub mod mood;`)
 - Modify: `src-tauri/src/lib.rs` (register commands)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // Create src-tauri/src/commands/mood.rs with just the test module first:
@@ -277,12 +277,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd src-tauri && cargo test test_record_mood_play test_list_moods test_create_and_delete -- --nocapture 2>&1`
 Expected: FAIL — functions not defined
 
-- [ ] **Step 3: Implement `src-tauri/src/commands/mood.rs`**
+- [x] **Step 3: Implement `src-tauri/src/commands/mood.rs`**
 
 ```rust
 use crate::db::Db;
@@ -487,11 +487,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Add module to `src-tauri/src/commands/mod.rs`**
+- [x] **Step 4: Add module to `src-tauri/src/commands/mod.rs`**
 
 Add line: `pub mod mood;`
 
-- [ ] **Step 5: Register commands in `src-tauri/src/lib.rs`**
+- [x] **Step 5: Register commands in `src-tauri/src/lib.rs`**
 
 Add to `invoke_handler` list:
 ```rust
@@ -502,12 +502,12 @@ commands::mood::record_mood_play,
 commands::mood::get_mood_track_scores,
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cd src-tauri && cargo test test_record_mood_play test_list_moods test_create_and_delete -- --nocapture 2>&1`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src-tauri/src/commands/mood.rs src-tauri/src/commands/mod.rs src-tauri/src/lib.rs
@@ -524,7 +524,7 @@ git commit -m "feat: mood CRUD + play recording commands"
 - Create: `src-tauri/src/track_features.rs`
 - Modify: `src-tauri/src/lib.rs` (add `mod track_features;`, register command)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```rust
 // Will go in src-tauri/src/track_features.rs #[cfg(test)] block:
@@ -584,12 +584,12 @@ fn test_store_and_load_features(db: &crate::db::Db) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd src-tauri && cargo test test_tags_to_vec test_cosine_similarity test_seed_tags test_store_and_load -- --nocapture 2>&1`
 Expected: FAIL
 
-- [ ] **Step 3: Implement `src-tauri/src/track_features.rs`**
+- [x] **Step 3: Implement `src-tauri/src/track_features.rs`**
 
 ```rust
 use crate::db::Db;
@@ -799,7 +799,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Register in `src-tauri/src/lib.rs`**
+- [x] **Step 4: Register in `src-tauri/src/lib.rs`**
 
 Add before `use tauri::Manager;`:
 ```rust
@@ -811,12 +811,12 @@ Add to invoke_handler:
 track_features::get_track_features,
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cd src-tauri && cargo test test_tags_to_vec test_cosine_similarity test_seed_tags test_store_and_load -- --nocapture 2>&1`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/track_features.rs src-tauri/src/lib.rs
@@ -833,7 +833,7 @@ git commit -m "feat: track feature vectors + Last.fm tag fetching"
 - Create: `src-tauri/src/mood_engine.rs`
 - Modify: `src-tauri/src/lib.rs` (add `mod mood_engine;`, register command)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```rust
 // Will go in src-tauri/src/mood_engine.rs #[cfg(test)] block:
@@ -888,12 +888,12 @@ fn test_apply_signal_multipliers_boost() {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd src-tauri && cargo test test_determine_stage test_apply_signal -- --nocapture 2>&1`
 Expected: FAIL
 
-- [ ] **Step 3: Implement `src-tauri/src/mood_engine.rs`**
+- [x] **Step 3: Implement `src-tauri/src/mood_engine.rs`**
 
 ```rust
 use crate::commands::mood::{MoodChannel, MoodTrackScore};
@@ -1193,23 +1193,23 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Register in `src-tauri/src/lib.rs`**
+- [x] **Step 4: Register in `src-tauri/src/lib.rs`**
 
 Add: `mod mood_engine;`
 
 Add to invoke_handler: `mood_engine::generate_mood_queue,`
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cd src-tauri && cargo test test_determine_stage test_apply_signal -- --nocapture 2>&1`
 Expected: PASS
 
-- [ ] **Step 6: Verify it compiles**
+- [x] **Step 6: Verify it compiles**
 
 Run: `cd src-tauri && cargo check 2>&1`
 Expected: no errors
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src-tauri/src/mood_engine.rs src-tauri/src/lib.rs
@@ -1224,7 +1224,7 @@ git commit -m "feat: mood scoring engine + queue generation"
 - Modify: `src-tauri/src/mood_engine.rs` (add centroid functions)
 - Modify: `src-tauri/src/lib.rs` (register new command)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // Add to mood_engine.rs tests block:
@@ -1262,12 +1262,12 @@ fn test_update_centroid_averages_vectors() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd src-tauri && cargo test test_update_centroid -- --nocapture 2>&1`
 Expected: FAIL
 
-- [ ] **Step 3: Add `update_centroid` to `src-tauri/src/mood_engine.rs`**
+- [x] **Step 3: Add `update_centroid` to `src-tauri/src/mood_engine.rs`**
 
 Add these functions after `generate_mood_queue_internal`:
 
@@ -1330,16 +1330,16 @@ pub fn update_mood_centroid(db: State<Db>, mood_id: String) -> Result<(), String
 }
 ```
 
-- [ ] **Step 4: Register command in `src-tauri/src/lib.rs`**
+- [x] **Step 4: Register command in `src-tauri/src/lib.rs`**
 
 Add to invoke_handler: `mood_engine::update_mood_centroid,`
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `cd src-tauri && cargo test test_update_centroid -- --nocapture 2>&1`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/mood_engine.rs src-tauri/src/lib.rs
@@ -1356,7 +1356,7 @@ git commit -m "feat: mood centroid computation"
 - Modify: `src-tauri/src/commands/mood.rs` (add signal functions)
 - Modify: `src-tauri/src/lib.rs` (register new commands)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```rust
 // Add to commands/mood.rs tests block:
@@ -1396,12 +1396,12 @@ fn test_upsert_tag_weight() {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd src-tauri && cargo test test_record_global_block test_delete_signal test_upsert_tag -- --nocapture 2>&1`
 Expected: FAIL
 
-- [ ] **Step 3: Add signal functions to `src-tauri/src/commands/mood.rs`**
+- [x] **Step 3: Add signal functions to `src-tauri/src/commands/mood.rs`**
 
 Add these internal helpers and Tauri commands:
 
@@ -1504,7 +1504,7 @@ pub fn upsert_tag_weight(db: State<Db>, tag: String, scope: String, weight: f64)
 }
 ```
 
-- [ ] **Step 4: Register in `src-tauri/src/lib.rs`**
+- [x] **Step 4: Register in `src-tauri/src/lib.rs`**
 
 Add to invoke_handler:
 ```rust
@@ -1515,12 +1515,12 @@ commands::mood::delete_tag_weight,
 commands::mood::upsert_tag_weight,
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cd src-tauri && cargo test test_record_global_block test_delete_signal test_upsert_tag -- --nocapture 2>&1`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/commands/mood.rs src-tauri/src/lib.rs
@@ -1537,7 +1537,7 @@ git commit -m "feat: explicit signal commands (boost/block + tag weights)"
 - Create: `src/recommendations/mood-service.ts`
 - Create: `src/recommendations/mood-service.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```typescript
 // src/recommendations/mood-service.test.ts
@@ -1611,12 +1611,12 @@ describe("MoodService", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test src/recommendations/mood-service.test.ts 2>&1`
 Expected: FAIL — module not found
 
-- [ ] **Step 3: Implement `src/recommendations/mood-service.ts`**
+- [x] **Step 3: Implement `src/recommendations/mood-service.ts`**
 
 ```typescript
 import { invoke } from "@tauri-apps/api/core";
@@ -1726,12 +1726,12 @@ export class MoodService {
 export const moodService = new MoodService();
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test src/recommendations/mood-service.test.ts 2>&1`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/recommendations/mood-service.ts src/recommendations/mood-service.test.ts
@@ -1745,7 +1745,7 @@ git commit -m "feat: MoodService frontend — mood state, queue, signals"
 **Files:**
 - Modify: `src/webamp/bridge.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // Add to src/webamp/goamp-menu.test.ts or create src/webamp/bridge.test.ts:
@@ -1789,12 +1789,12 @@ describe("renderMoodTabs", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm test src/webamp/bridge.test.ts 2>&1`
 Expected: FAIL — `renderMoodTabs` not exported
 
-- [ ] **Step 3: Add `renderMoodTabs` to `src/webamp/bridge.ts`**
+- [x] **Step 3: Add `renderMoodTabs` to `src/webamp/bridge.ts`**
 
 Add at the end of bridge.ts:
 
@@ -1880,12 +1880,12 @@ webamp.onReady(() => {
 });
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test src/webamp/bridge.test.ts 2>&1`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/webamp/bridge.ts
@@ -1900,7 +1900,7 @@ git commit -m "feat: mood tabs in Winamp player window"
 - Modify: `src/webamp/goamp-menu.ts`
 - Modify: `src/settings/FeatureFlagsPanel.ts`
 
-- [ ] **Step 1: Write the failing test for context menu**
+- [x] **Step 1: Write the failing test for context menu**
 
 ```typescript
 // Add to src/webamp/goamp-menu.test.ts:
@@ -1923,12 +1923,12 @@ describe("buildSignalMenuItems", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm test src/webamp/goamp-menu.test.ts 2>&1`
 Expected: FAIL — `buildSignalMenuItems` not exported
 
-- [ ] **Step 3: Add signal menu items to `src/webamp/goamp-menu.ts`**
+- [x] **Step 3: Add signal menu items to `src/webamp/goamp-menu.ts`**
 
 Add these functions and update `showGoampMenu`:
 
@@ -2038,7 +2038,7 @@ In `showGoampMenu`, after the existing items array, add the signal items (with s
   }
 ```
 
-- [ ] **Step 4: Add Rec Settings section to `src/settings/FeatureFlagsPanel.ts`**
+- [x] **Step 4: Add Rec Settings section to `src/settings/FeatureFlagsPanel.ts`**
 
 Find `renderFlags` function and add after the existing flags rendering:
 
@@ -2132,12 +2132,12 @@ In `loadFlags()`, after `renderFlags(list, flags)`, add:
     await renderRecSettings(list);
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `pnpm test src/webamp/goamp-menu.test.ts 2>&1`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/webamp/goamp-menu.ts src/settings/FeatureFlagsPanel.ts
@@ -2155,7 +2155,7 @@ git commit -m "feat: signal context menu + rec settings in feature flags panel"
 - Modify: `goamp-node/proto/goamp.pb.go` (regenerate or edit manually)
 - Modify: `goamp-node/api/profile_handlers.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 // Add to goamp-node/sdk/profiles/profiles_test.go:
@@ -2176,12 +2176,12 @@ func TestMoodCentroidsInProfile(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd goamp-node && go test ./sdk/profiles/... 2>&1`
 Expected: FAIL — MoodCentroid not defined
 
-- [ ] **Step 3: Update `goamp-node/proto/goamp.proto`**
+- [x] **Step 3: Update `goamp-node/proto/goamp.proto`**
 
 Add after the existing `TasteProfile` message:
 
@@ -2202,7 +2202,7 @@ message TasteProfile {
 }
 ```
 
-- [ ] **Step 4: Update generated `goamp-node/proto/goamp.pb.go`**
+- [x] **Step 4: Update generated `goamp-node/proto/goamp.pb.go`**
 
 Add the `MoodCentroid` struct and update `TasteProfile`. Since we commit generated files, add manually:
 
@@ -2237,12 +2237,12 @@ func (x *TasteProfile) GetMoodCentroids() map[string]*MoodCentroid {
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `cd goamp-node && go test ./sdk/profiles/... 2>&1`
 Expected: PASS
 
-- [ ] **Step 6: Update `goamp-node/api/profile_handlers.go`**
+- [x] **Step 6: Update `goamp-node/api/profile_handlers.go`**
 
 In the `POST /profiles/sync` handler body, when building the profile response, include mood centroids filter (only include moods with track_count >= 10):
 
@@ -2257,12 +2257,12 @@ for moodID, centroid := range profile.MoodCentroids {
 profile.MoodCentroids = filteredCentroids
 ```
 
-- [ ] **Step 7: Verify goamp-node compiles**
+- [x] **Step 7: Verify goamp-node compiles**
 
 Run: `cd goamp-node && go build ./... 2>&1`
 Expected: no errors
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add goamp-node/proto/ goamp-node/api/profile_handlers.go
@@ -2275,21 +2275,21 @@ git commit -m "feat: mood centroids in TasteProfile proto + P2P sync filter"
 
 After all tasks complete:
 
-- [ ] **Run all Rust tests**
+- [x] **Run all Rust tests**
 
 ```bash
 cd src-tauri && cargo test 2>&1
 ```
 Expected: all pass
 
-- [ ] **Run all TypeScript tests**
+- [x] **Run all TypeScript tests**
 
 ```bash
 pnpm test 2>&1
 ```
 Expected: all pass
 
-- [ ] **Manual smoke test (dev mode)**
+- [x] **Manual smoke test (dev mode)**
 
 ```bash
 GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 pnpm tauri dev
@@ -2301,7 +2301,7 @@ GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 pnpm tauri dev
 4. Open Feature Flags panel (`Ctrl+Shift+\``) → "Recommendations" section at bottom with sliders
 5. Invoke `generate_mood_queue` from browser console: `window.__TAURI__.core.invoke("generate_mood_queue", {moodId: "calm", limit: 5})` → returns array
 
-- [ ] **Final commit**
+- [x] **Final commit**
 
 ```bash
 git add .

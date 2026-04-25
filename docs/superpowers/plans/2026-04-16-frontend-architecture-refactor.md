@@ -1,6 +1,6 @@
 # Frontend Architecture Refactor Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace the monolithic `bridge.ts` / flat `tauri-ipc.ts` pattern with a typed service layer so frontend changes are isolated, testable without Tauri, and ready for HTTP transport.
 
@@ -53,7 +53,7 @@
 - Create: `src/player/PlayerStore.ts`
 - Create: `src/player/PlayerStore.test.ts`
 
-- [ ] **Write failing test**
+- [x] **Write failing test**
 
 ```ts
 // src/player/PlayerStore.test.ts
@@ -119,14 +119,14 @@ describe('PlayerStore', () => {
 })
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```
 pnpm test src/player/PlayerStore.test.ts
 ```
 Expected: FAIL — `PlayerStore` not found.
 
-- [ ] **Implement PlayerStore**
+- [x] **Implement PlayerStore**
 
 ```ts
 // src/player/PlayerStore.ts
@@ -193,14 +193,14 @@ export class PlayerStore {
 }
 ```
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```
 pnpm test src/player/PlayerStore.test.ts
 ```
 Expected: PASS (5 tests).
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/player/PlayerStore.ts src/player/PlayerStore.test.ts
@@ -215,7 +215,7 @@ git commit -m "feat: add PlayerStore — single owner of webamp internal store a
 - Create: `src/player/PlayerEvents.ts`
 - Create: `src/player/PlayerEvents.test.ts`
 
-- [ ] **Write failing test**
+- [x] **Write failing test**
 
 ```ts
 // src/player/PlayerEvents.test.ts
@@ -271,13 +271,13 @@ describe('PlayerEvents', () => {
 })
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```
 pnpm test src/player/PlayerEvents.test.ts
 ```
 
-- [ ] **Implement PlayerEvents**
+- [x] **Implement PlayerEvents**
 
 ```ts
 // src/player/PlayerEvents.ts
@@ -303,13 +303,13 @@ export class PlayerEvents {
 }
 ```
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```
 pnpm test src/player/PlayerEvents.test.ts
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/player/PlayerEvents.ts src/player/PlayerEvents.test.ts
@@ -324,7 +324,7 @@ git commit -m "feat: add PlayerEvents — typed event bus over webamp.onTrackDid
 - Create: `src/services/transport.ts`
 - Create: `src/services/transport.test.ts`
 
-- [ ] **Write failing test**
+- [x] **Write failing test**
 
 ```ts
 // src/services/transport.test.ts
@@ -362,13 +362,13 @@ describe('MockTransport', () => {
 })
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```
 pnpm test src/services/transport.test.ts
 ```
 
-- [ ] **Implement transport**
+- [x] **Implement transport**
 
 ```ts
 // src/services/transport.ts
@@ -410,13 +410,13 @@ export class MockTransport implements ITransport {
 }
 ```
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```
 pnpm test src/services/transport.test.ts
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/services/transport.ts src/services/transport.test.ts
@@ -432,7 +432,7 @@ git commit -m "feat: add ITransport + TauriTransport + MockTransport"
 
 No tests — pure type declarations.
 
-- [ ] **Write interfaces.ts**
+- [x] **Write interfaces.ts**
 
 ```ts
 // src/services/interfaces.ts
@@ -642,7 +642,7 @@ export interface ISettingsService {
 }
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/services/interfaces.ts
@@ -657,7 +657,7 @@ git commit -m "feat: add service interfaces — typed contracts for all domains"
 - Create: `src/services/PlaylistService.ts`
 - Create: `src/services/PlaylistService.test.ts`
 
-- [ ] **Write failing test**
+- [x] **Write failing test**
 
 ```ts
 // src/services/PlaylistService.test.ts
@@ -716,13 +716,13 @@ describe('PlaylistService', () => {
 })
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```
 pnpm test src/services/PlaylistService.test.ts
 ```
 
-- [ ] **Implement PlaylistService**
+- [x] **Implement PlaylistService**
 
 ```ts
 // src/services/PlaylistService.ts
@@ -751,13 +751,13 @@ export class PlaylistService implements IPlaylistService {
 }
 ```
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```
 pnpm test src/services/PlaylistService.test.ts
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/services/PlaylistService.ts src/services/PlaylistService.test.ts
@@ -772,7 +772,7 @@ git commit -m "feat: add PlaylistService with ITransport"
 - Create: `src/services/ScrobbleService.ts`
 - Create: `src/services/ScrobbleService.test.ts`
 
-- [ ] **Write failing test**
+- [x] **Write failing test**
 
 ```ts
 // src/services/ScrobbleService.test.ts
@@ -837,13 +837,13 @@ describe('ScrobbleService', () => {
 })
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```
 pnpm test src/services/ScrobbleService.test.ts
 ```
 
-- [ ] **Implement ScrobbleService**
+- [x] **Implement ScrobbleService**
 
 ```ts
 // src/services/ScrobbleService.ts
@@ -879,13 +879,13 @@ export class ScrobbleService implements IScrobbleService {
 }
 ```
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```
 pnpm test src/services/ScrobbleService.test.ts
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/services/ScrobbleService.ts src/services/ScrobbleService.test.ts
@@ -900,7 +900,7 @@ git commit -m "feat: add ScrobbleService with ITransport — replaces scrobble-s
 - Create: `src/services/HistoryService.ts`
 - Create: `src/services/HistoryService.test.ts`
 
-- [ ] **Write failing test**
+- [x] **Write failing test**
 
 ```ts
 // src/services/HistoryService.test.ts
@@ -951,13 +951,13 @@ describe('HistoryService', () => {
 })
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```
 pnpm test src/services/HistoryService.test.ts
 ```
 
-- [ ] **Implement HistoryService**
+- [x] **Implement HistoryService**
 
 ```ts
 // src/services/HistoryService.ts
@@ -984,13 +984,13 @@ export class HistoryService implements IHistoryService {
 }
 ```
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```
 pnpm test src/services/HistoryService.test.ts
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/services/HistoryService.ts src/services/HistoryService.test.ts
@@ -1005,7 +1005,7 @@ git commit -m "feat: add HistoryService with ITransport"
 - Create: `src/services/RadioService.ts`
 - Create: `src/services/RadioService.test.ts`
 
-- [ ] **Write failing test**
+- [x] **Write failing test**
 
 ```ts
 // src/services/RadioService.test.ts
@@ -1059,13 +1059,13 @@ describe('RadioService', () => {
 })
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```
 pnpm test src/services/RadioService.test.ts
 ```
 
-- [ ] **Implement RadioService**
+- [x] **Implement RadioService**
 
 ```ts
 // src/services/RadioService.ts
@@ -1096,13 +1096,13 @@ export class RadioService implements IRadioService {
 }
 ```
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```
 pnpm test src/services/RadioService.test.ts
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/services/RadioService.ts src/services/RadioService.test.ts
@@ -1117,7 +1117,7 @@ git commit -m "feat: add RadioService with ITransport"
 - Create: `src/services/RecommendationService.ts`
 - Create: `src/services/RecommendationService.test.ts`
 
-- [ ] **Write failing test**
+- [x] **Write failing test**
 
 ```ts
 // src/services/RecommendationService.test.ts
@@ -1164,13 +1164,13 @@ describe('RecommendationService', () => {
 })
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```
 pnpm test src/services/RecommendationService.test.ts
 ```
 
-- [ ] **Implement RecommendationService**
+- [x] **Implement RecommendationService**
 
 ```ts
 // src/services/RecommendationService.ts
@@ -1199,13 +1199,13 @@ export class RecommendationService implements IRecommendationService {
 }
 ```
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```
 pnpm test src/services/RecommendationService.test.ts
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/services/RecommendationService.ts src/services/RecommendationService.test.ts
@@ -1220,7 +1220,7 @@ git commit -m "feat: add RecommendationService with ITransport"
 - Create: `src/services/SettingsService.ts`
 - Create: `src/services/SettingsService.test.ts`
 
-- [ ] **Write failing test**
+- [x] **Write failing test**
 
 ```ts
 // src/services/SettingsService.test.ts
@@ -1268,13 +1268,13 @@ describe('SettingsService', () => {
 })
 ```
 
-- [ ] **Run to confirm FAIL**
+- [x] **Run to confirm FAIL**
 
 ```
 pnpm test src/services/SettingsService.test.ts
 ```
 
-- [ ] **Implement SettingsService**
+- [x] **Implement SettingsService**
 
 ```ts
 // src/services/SettingsService.ts
@@ -1310,13 +1310,13 @@ export class SettingsService implements ISettingsService {
 }
 ```
 
-- [ ] **Run to confirm PASS**
+- [x] **Run to confirm PASS**
 
 ```
 pnpm test src/services/SettingsService.test.ts
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/services/SettingsService.ts src/services/SettingsService.test.ts
@@ -1332,7 +1332,7 @@ git commit -m "feat: add SettingsService with ITransport — replaces feature-fl
 
 No tests — pure wiring.
 
-- [ ] **Write services/index.ts**
+- [x] **Write services/index.ts**
 
 ```ts
 // src/services/index.ts
@@ -1354,7 +1354,7 @@ export const recommendations = new RecommendationService(transport)
 export const settings = new SettingsService(transport)
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/services/index.ts
@@ -1368,7 +1368,7 @@ git commit -m "feat: add service registry — single TauriTransport instance sha
 **Files:**
 - Create: `src/bootstrap/session.ts`
 
-- [ ] **Write session.ts** (extracted and cleaned from bridge.ts `setupSessionRestore` + `saveCurrentSession`)
+- [x] **Write session.ts** (extracted and cleaned from bridge.ts `setupSessionRestore` + `saveCurrentSession`)
 
 ```ts
 // src/bootstrap/session.ts
@@ -1432,7 +1432,7 @@ export async function restoreSession(
 }
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/bootstrap/session.ts
@@ -1446,7 +1446,7 @@ git commit -m "feat: extract session.ts from bridge.ts"
 **Files:**
 - Create: `src/bootstrap/keyboard.ts`
 
-- [ ] **Write keyboard.ts** (extracted from bridge.ts `setupKeyboard`)
+- [x] **Write keyboard.ts** (extracted from bridge.ts `setupKeyboard`)
 
 ```ts
 // src/bootstrap/keyboard.ts
@@ -1540,7 +1540,7 @@ export function setupKeyboard(store: PlayerStore, settings: ISettingsService, op
 }
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/bootstrap/keyboard.ts
@@ -1554,7 +1554,7 @@ git commit -m "feat: extract keyboard.ts from bridge.ts"
 **Files:**
 - Create: `src/bootstrap/AppBootstrap.ts`
 
-- [ ] **Write AppBootstrap.ts** (thin wiring that replaces bridge.ts)
+- [x] **Write AppBootstrap.ts** (thin wiring that replaces bridge.ts)
 
 ```ts
 // src/bootstrap/AppBootstrap.ts
@@ -1798,7 +1798,7 @@ export async function setupApp(webamp: Webamp): Promise<void> {
 }
 ```
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```bash
 git add src/bootstrap/AppBootstrap.ts src/bootstrap/session.ts src/bootstrap/keyboard.ts
@@ -1815,7 +1815,7 @@ git commit -m "feat: add AppBootstrap — replaces bridge.ts with service-layer 
 - Delete: `src/scrobble/scrobble-service.ts` (replaced by ScrobbleService)
 - Delete: `src/recommendations/recommendation-service.ts` (replaced by RecommendationService)
 
-- [ ] **Update panels to use new services**
+- [x] **Update panels to use new services**
 
 Any panel that imports directly from `src/scrobble/scrobble-service.ts` needs to import from `src/services/index.ts` instead. Search for these imports:
 
@@ -1846,7 +1846,7 @@ import { settings } from '../services/index'
 // Then use: settings.isEnabled(...), settings.refreshFlagCache()
 ```
 
-- [ ] **Update main.ts**
+- [x] **Update main.ts**
 
 ```ts
 // src/main.ts
@@ -1880,21 +1880,21 @@ webamp.renderWhenReady(container).then(() => {
 })
 ```
 
-- [ ] **Build to confirm no compile errors**
+- [x] **Build to confirm no compile errors**
 
 ```
 pnpm build
 ```
 Expected: build succeeds with no TypeScript errors.
 
-- [ ] **Run all tests**
+- [x] **Run all tests**
 
 ```
 pnpm test
 ```
 Expected: all tests pass.
 
-- [ ] **Delete old files**
+- [x] **Delete old files**
 
 ```bash
 git rm src/webamp/bridge.ts
@@ -1902,7 +1902,7 @@ git rm src/scrobble/scrobble-service.ts
 git rm src/recommendations/recommendation-service.ts
 ```
 
-- [ ] **Final commit**
+- [x] **Final commit**
 
 ```bash
 git add src/main.ts
