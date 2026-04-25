@@ -1,6 +1,6 @@
 # GOAMP Recommendation System — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build a local-first recommendation engine with P2P-augmented collaborative filtering, replacing Yandex Music dependency with GOAMP's own genre radio and personalized mood channels.
 
@@ -33,7 +33,7 @@
 **Files:**
 - Modify: `src-tauri/src/db/mod.rs:138-165` (add new migration block after radio tables)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // In src-tauri/src/db/mod.rs, add to #[cfg(test)] mod tests:
@@ -142,12 +142,12 @@ fn test_peer_track_weight() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test test_track_identity_table_exists test_listen_history_table_exists test_track_likes_table_exists test_track_identity_unique_source_pair test_peer_track_weight -- --nocapture 2>&1`
 Expected: FAIL — tables don't exist yet
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Add after the genre migration block in `src-tauri/src/db/mod.rs` (after line ~163):
 
@@ -219,12 +219,12 @@ Add after the genre migration block in `src-tauri/src/db/mod.rs` (after line ~16
     )?;
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test -- --nocapture 2>&1 | tail -20`
 Expected: All tests PASS including existing tests (migration is idempotent)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src-tauri/src/db/mod.rs
@@ -239,7 +239,7 @@ git commit -m "feat: add track identity, listen history, likes, and survey table
 - Create: `src-tauri/src/track_id.rs`
 - Modify: `src-tauri/src/lib.rs` (add `mod track_id;`)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // src-tauri/src/track_id.rs
@@ -316,12 +316,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test track_id -- --nocapture 2>&1`
 Expected: FAIL — module doesn't exist
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```rust
 // src-tauri/src/track_id.rs
@@ -524,22 +524,22 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Add `sha2` dependency**
+- [x] **Step 4: Add `sha2` dependency**
 
 ```bash
 cd /home/moffaty/projects/goamp/src-tauri && cargo add sha2
 ```
 
-- [ ] **Step 5: Register module in lib.rs**
+- [x] **Step 5: Register module in lib.rs**
 
 Add `mod track_id;` to `src-tauri/src/lib.rs` alongside other module declarations.
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test track_id -- --nocapture 2>&1`
 Expected: All 7 tests PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src-tauri/src/track_id.rs src-tauri/src/lib.rs src-tauri/Cargo.toml src-tauri/Cargo.lock
@@ -555,7 +555,7 @@ git commit -m "feat: track ID resolution with canonical hash, MusicBrainz, and p
 - Modify: `src-tauri/src/lib.rs` (register Tauri command)
 - Modify: `src/lib/tauri-ipc.ts` (add IPC declaration)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // Add to src-tauri/src/track_id.rs tests:
@@ -569,12 +569,12 @@ fn test_musicbrainz_query_url() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test test_musicbrainz_query_url -- --nocapture 2>&1`
 Expected: FAIL — function doesn't exist
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Add to `src-tauri/src/track_id.rs`:
 
@@ -680,11 +680,11 @@ pub async fn resolve_track_id(
 }
 ```
 
-- [ ] **Step 4: Register command in lib.rs**
+- [x] **Step 4: Register command in lib.rs**
 
 Add `track_id::resolve_track_id` to the `invoke_handler` macro in `src-tauri/src/lib.rs`.
 
-- [ ] **Step 5: Add IPC declaration**
+- [x] **Step 5: Add IPC declaration**
 
 Add to `src/lib/tauri-ipc.ts`:
 
@@ -701,12 +701,12 @@ export async function resolveTrackId(
 }
 ```
 
-- [ ] **Step 6: Run all tests**
+- [x] **Step 6: Run all tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test -- --nocapture 2>&1 | tail -20`
 Expected: All tests PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src-tauri/src/track_id.rs src-tauri/src/lib.rs src/lib/tauri-ipc.ts
@@ -722,7 +722,7 @@ git commit -m "feat: MusicBrainz lookup integration for track identification"
 - Modify: `src-tauri/src/lib.rs` (add `mod history;`, register commands)
 - Modify: `src/lib/tauri-ipc.ts` (add IPC declarations)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // src-tauri/src/history.rs
@@ -825,12 +825,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test history -- --nocapture 2>&1`
 Expected: FAIL — module doesn't exist
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```rust
 // src-tauri/src/history.rs
@@ -1090,7 +1090,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Register module and commands in lib.rs**
+- [x] **Step 4: Register module and commands in lib.rs**
 
 Add `mod history;` and register these commands in `invoke_handler`:
 - `history::record_track_listen`
@@ -1099,7 +1099,7 @@ Add `mod history;` and register these commands in `invoke_handler`:
 - `history::get_track_stats`
 - `history::get_liked_tracks`
 
-- [ ] **Step 5: Add IPC declarations to tauri-ipc.ts**
+- [x] **Step 5: Add IPC declarations to tauri-ipc.ts**
 
 ```typescript
 // Listen History
@@ -1141,12 +1141,12 @@ export async function getLikedTracks(): Promise<string[]> {
 }
 ```
 
-- [ ] **Step 6: Run all tests**
+- [x] **Step 6: Run all tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test -- --nocapture 2>&1 | tail -20`
 Expected: All tests PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src-tauri/src/history.rs src-tauri/src/lib.rs src/lib/tauri-ipc.ts
@@ -1161,7 +1161,7 @@ git commit -m "feat: listening history recording with likes, stats, and implicit
 - Create: `src/recommendations/history-service.ts`
 - Modify: `src/webamp/bridge.ts` (hook into track events)
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```typescript
 // src/recommendations/history-service.test.ts
@@ -1208,12 +1208,12 @@ describe('HistoryTracker', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /home/moffaty/projects/goamp && npx vitest run src/recommendations/history-service.test.ts 2>&1`
 Expected: FAIL — module doesn't exist
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```typescript
 // src/recommendations/history-service.ts
@@ -1277,12 +1277,12 @@ export class HistoryTracker {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd /home/moffaty/projects/goamp && npx vitest run src/recommendations/history-service.test.ts 2>&1`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/recommendations/history-service.ts src/recommendations/history-service.test.ts
@@ -1298,7 +1298,7 @@ git commit -m "feat: passive listening history tracker with implicit signal dete
 - Modify: `src-tauri/src/lib.rs`
 - Modify: `src/lib/tauri-ipc.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // src-tauri/src/survey.rs
@@ -1393,12 +1393,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test survey -- --nocapture 2>&1`
 Expected: FAIL
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```rust
 // src-tauri/src/survey.rs
@@ -1623,7 +1623,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Register module and commands, add IPC declarations**
+- [x] **Step 4: Register module and commands, add IPC declarations**
 
 In `src-tauri/src/lib.rs` add `mod survey;` and register:
 - `survey::survey_get_pending`
@@ -1659,12 +1659,12 @@ export async function surveyMarkShown(surveyId: number): Promise<void> {
 }
 ```
 
-- [ ] **Step 5: Run all tests**
+- [x] **Step 5: Run all tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test -- --nocapture 2>&1 | tail -20`
 Expected: All tests PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/survey.rs src-tauri/src/lib.rs src/lib/tauri-ipc.ts
@@ -1694,7 +1694,7 @@ git commit -m "feat: micro-survey system for similarity, genre, and mood data co
 - Create: `src-tauri/src/taste_profile.rs`
 - Modify: `src-tauri/src/lib.rs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // src-tauri/src/taste_profile.rs
@@ -1779,12 +1779,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test taste_profile -- --nocapture 2>&1`
 Expected: FAIL
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```rust
 // src-tauri/src/taste_profile.rs
@@ -1997,16 +1997,16 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Register module and command in lib.rs**
+- [x] **Step 4: Register module and command in lib.rs**
 
 Add `mod taste_profile;` and register `taste_profile::build_profile` in `invoke_handler`.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test taste_profile -- --nocapture 2>&1`
 Expected: All 4 tests PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/taste_profile.rs src-tauri/src/lib.rs
@@ -2021,7 +2021,7 @@ git commit -m "feat: anonymous taste profile generation from local listening dat
 - Create: `src-tauri/src/sybil.rs`
 - Modify: `src-tauri/src/lib.rs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // src-tauri/src/sybil.rs
@@ -2109,12 +2109,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test sybil -- --nocapture 2>&1`
 Expected: FAIL
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```rust
 // src-tauri/src/sybil.rs
@@ -2323,16 +2323,16 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Register module in lib.rs**
+- [x] **Step 4: Register module in lib.rs**
 
 Add `mod sybil;` to `src-tauri/src/lib.rs`.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test sybil -- --nocapture 2>&1`
 Expected: All 6 tests PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/sybil.rs src-tauri/src/lib.rs
@@ -2349,7 +2349,7 @@ git commit -m "feat: anti-Sybil proof-of-listening with timing and diversity val
 - Modify: `src-tauri/src/lib.rs`
 - Modify: `src/lib/tauri-ipc.ts`
 
-- [ ] **Step 1: Write the failing test for DB table**
+- [x] **Step 1: Write the failing test for DB table**
 
 ```rust
 // Add to src-tauri/src/db/mod.rs tests:
@@ -2390,12 +2390,12 @@ fn test_recommendation_cache_table_exists() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test peer_profiles_table recommendation_cache_table -- --nocapture 2>&1`
 Expected: FAIL
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
 Add to `src-tauri/src/db/mod.rs` after the survey tables migration:
 
@@ -2420,12 +2420,12 @@ Add to `src-tauri/src/db/mod.rs` after the survey tables migration:
     )?;
 ```
 
-- [ ] **Step 4: Run DB tests**
+- [x] **Step 4: Run DB tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test db::tests -- --nocapture 2>&1`
 Expected: All PASS
 
-- [ ] **Step 5: Write aggregator module tests**
+- [x] **Step 5: Write aggregator module tests**
 
 ```rust
 // src-tauri/src/aggregator.rs
@@ -2486,7 +2486,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 6: Write aggregator implementation**
+- [x] **Step 6: Write aggregator implementation**
 
 ```rust
 // src-tauri/src/aggregator.rs
@@ -2695,7 +2695,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 7: Register module, commands, add IPC**
+- [x] **Step 7: Register module, commands, add IPC**
 
 In `src-tauri/src/lib.rs` add `mod aggregator;` and register:
 - `aggregator::sync_profile`
@@ -2714,12 +2714,12 @@ export async function getRecommendations(limit?: number): Promise<[string, numbe
 }
 ```
 
-- [ ] **Step 8: Run all tests**
+- [x] **Step 8: Run all tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test -- --nocapture 2>&1 | tail -20`
 Expected: All tests PASS
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src-tauri/src/aggregator.rs src-tauri/src/db/mod.rs src-tauri/src/lib.rs src/lib/tauri-ipc.ts
@@ -2748,7 +2748,7 @@ git commit -m "feat: server aggregator client with profile sync and recommendati
 - Create: `src-tauri/src/recommend.rs`
 - Modify: `src-tauri/src/lib.rs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // src-tauri/src/recommend.rs
@@ -2847,12 +2847,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test recommend -- --nocapture 2>&1`
 Expected: FAIL
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```rust
 // src-tauri/src/recommend.rs
@@ -3084,16 +3084,16 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Register module and command**
+- [x] **Step 4: Register module and command**
 
 Add `mod recommend;` and register `recommend::get_hybrid_recommendations` in `invoke_handler`.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test recommend -- --nocapture 2>&1`
 Expected: All 3 tests PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/recommend.rs src-tauri/src/lib.rs
@@ -3107,7 +3107,7 @@ git commit -m "feat: hybrid recommendation engine with collaborative filtering a
 **Files:**
 - Modify: `src-tauri/src/recommend.rs` (add Last.fm getSimilar integration)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 // Add to src-tauri/src/recommend.rs tests:
@@ -3121,12 +3121,12 @@ fn test_lastfm_similar_url() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test lastfm_similar_url -- --nocapture 2>&1`
 Expected: FAIL
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Add to `src-tauri/src/recommend.rs`:
 
@@ -3200,11 +3200,11 @@ pub async fn get_coldstart_recommendations(
 }
 ```
 
-- [ ] **Step 4: Register command in lib.rs**
+- [x] **Step 4: Register command in lib.rs**
 
 Add `recommend::get_coldstart_recommendations` to `invoke_handler`.
 
-- [ ] **Step 5: Add IPC declaration**
+- [x] **Step 5: Add IPC declaration**
 
 Add to `src/lib/tauri-ipc.ts`:
 
@@ -3223,12 +3223,12 @@ export async function getColdstartRecommendations(
 }
 ```
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test recommend -- --nocapture 2>&1`
 Expected: All tests PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src-tauri/src/recommend.rs src-tauri/src/lib.rs src/lib/tauri-ipc.ts
@@ -3243,7 +3243,7 @@ git commit -m "feat: Last.fm getSimilar fallback for cold start recommendations"
 - Modify: `src-tauri/src/db/mod.rs` (mood_channels table)
 - Modify: `src-tauri/src/recommend.rs` (mood channel CRUD + track assignment)
 
-- [ ] **Step 1: Write the failing test for DB**
+- [x] **Step 1: Write the failing test for DB**
 
 ```rust
 // Add to db/mod.rs tests:
@@ -3267,12 +3267,12 @@ fn test_mood_channels_table_exists() {
 }
 ```
 
-- [ ] **Step 2: Run and verify failure**
+- [x] **Step 2: Run and verify failure**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test mood_channels_table -- --nocapture 2>&1`
 Expected: FAIL
 
-- [ ] **Step 3: Add migration and default channels**
+- [x] **Step 3: Add migration and default channels**
 
 Add to `src-tauri/src/db/mod.rs`:
 
@@ -3300,7 +3300,7 @@ Add to `src-tauri/src/db/mod.rs`:
     )?;
 ```
 
-- [ ] **Step 4: Write mood channel Tauri commands**
+- [x] **Step 4: Write mood channel Tauri commands**
 
 Add to `src-tauri/src/recommend.rs`:
 
@@ -3420,7 +3420,7 @@ pub fn delete_mood_channel(
 }
 ```
 
-- [ ] **Step 5: Register commands, add IPC**
+- [x] **Step 5: Register commands, add IPC**
 
 Register in `invoke_handler`:
 - `recommend::list_mood_channels`
@@ -3457,12 +3457,12 @@ export async function deleteMoodChannel(channelId: string): Promise<void> {
 }
 ```
 
-- [ ] **Step 6: Run all tests**
+- [x] **Step 6: Run all tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test -- --nocapture 2>&1 | tail -20`
 Expected: All PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src-tauri/src/recommend.rs src-tauri/src/db/mod.rs src-tauri/src/lib.rs src/lib/tauri-ipc.ts
@@ -3482,44 +3482,44 @@ git commit -m "feat: mood channels with seed tracks and default presets"
 - Modify: `src/youtube/SearchOverlay.ts` (remove Yandex tab)
 - Modify: `src-tauri/src/db/mod.rs` (remove `yandex_music` feature flag default)
 
-- [ ] **Step 1: Remove `yandex-music` from Cargo.toml**
+- [x] **Step 1: Remove `yandex-music` from Cargo.toml**
 
 ```bash
 cd /home/moffaty/projects/goamp/src-tauri && cargo remove yandex-music
 ```
 
-- [ ] **Step 2: Delete yandex.rs**
+- [x] **Step 2: Delete yandex.rs**
 
 ```bash
 rm /home/moffaty/projects/goamp/src-tauri/src/yandex.rs
 ```
 
-- [ ] **Step 3: Remove `mod yandex` and all yandex commands from lib.rs**
+- [x] **Step 3: Remove `mod yandex` and all yandex commands from lib.rs**
 
 Remove the `mod yandex;` declaration and all `yandex::*` commands from the `invoke_handler` macro in `src-tauri/src/lib.rs`.
 
-- [ ] **Step 4: Delete frontend Yandex directory**
+- [x] **Step 4: Delete frontend Yandex directory**
 
 ```bash
 rm -rf /home/moffaty/projects/goamp/src/yandex/
 ```
 
-- [ ] **Step 5: Remove Yandex panel from bridge.ts**
+- [x] **Step 5: Remove Yandex panel from bridge.ts**
 
 Remove the YandexPanel import and registration from `src/webamp/bridge.ts`.
 
-- [ ] **Step 6: Remove Yandex tab from SearchOverlay.ts**
+- [x] **Step 6: Remove Yandex tab from SearchOverlay.ts**
 
 Remove the Yandex search tab from `src/youtube/SearchOverlay.ts`.
 
-- [ ] **Step 7: Update feature flags default**
+- [x] **Step 7: Update feature flags default**
 
 In `src-tauri/src/db/mod.rs`, remove the line:
 ```sql
 ('yandex_music', 1, 'Yandex Music integration'),
 ```
 
-- [ ] **Step 8: Build and verify**
+- [x] **Step 8: Build and verify**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo build 2>&1 | tail -20`
 Expected: Builds successfully with no yandex references
@@ -3527,12 +3527,12 @@ Expected: Builds successfully with no yandex references
 Run: `cd /home/moffaty/projects/goamp && npx tsc --noEmit 2>&1`
 Expected: No TypeScript errors
 
-- [ ] **Step 9: Run all tests**
+- [x] **Step 9: Run all tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test -- --nocapture 2>&1 | tail -20`
 Expected: All tests PASS
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add -A
@@ -3550,7 +3550,7 @@ git commit -m "feat: remove Yandex Music integration, replaced by GOAMP recommen
 - Modify: `src/webamp/bridge.ts` (register new panel)
 - Modify: `src/webamp/goamp-menu.ts` (add menu entry)
 
-- [ ] **Step 1: Create recommendation service**
+- [x] **Step 1: Create recommendation service**
 
 ```typescript
 // src/recommendations/recommendation-service.ts
@@ -3603,7 +3603,7 @@ export async function dismissSurvey(surveyId: number): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: Create SurveyWidget**
+- [x] **Step 2: Create SurveyWidget**
 
 ```typescript
 // src/recommendations/SurveyWidget.ts
@@ -3691,7 +3691,7 @@ export function createSurveyWidget(container: HTMLElement): { check: () => void 
 }
 ```
 
-- [ ] **Step 3: Create RecommendationPanel**
+- [x] **Step 3: Create RecommendationPanel**
 
 ```typescript
 // src/recommendations/RecommendationPanel.ts
@@ -3796,20 +3796,20 @@ export function createRecommendationPanel(container: HTMLElement) {
 }
 ```
 
-- [ ] **Step 4: Register panel in bridge.ts**
+- [x] **Step 4: Register panel in bridge.ts**
 
 Add import and registration of RecommendationPanel in `src/webamp/bridge.ts`, following the same pattern as RadioPanel.
 
-- [ ] **Step 5: Add menu entry in goamp-menu.ts**
+- [x] **Step 5: Add menu entry in goamp-menu.ts**
 
 Add a "Recommendations" entry to the GOAMP menu in `src/webamp/goamp-menu.ts`.
 
-- [ ] **Step 6: Build and verify**
+- [x] **Step 6: Build and verify**
 
 Run: `cd /home/moffaty/projects/goamp && npx tsc --noEmit 2>&1`
 Expected: No TypeScript errors
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/recommendations/ src/webamp/bridge.ts src/webamp/goamp-menu.ts
@@ -3824,14 +3824,14 @@ git commit -m "feat: recommendation panel UI with mood channels, sync, and micro
 - Modify: `src-tauri/src/db/mod.rs` (add feature flag)
 - Modify: `src/webamp/bridge.ts` (wire history tracker to track events)
 
-- [ ] **Step 1: Add feature flag**
+- [x] **Step 1: Add feature flag**
 
 In `src-tauri/src/db/mod.rs`, add to feature flags INSERT:
 ```sql
 ('recommendations', 1, 'GOAMP recommendations and mood radio');
 ```
 
-- [ ] **Step 2: Wire HistoryTracker into bridge.ts**
+- [x] **Step 2: Wire HistoryTracker into bridge.ts**
 
 In `src/webamp/bridge.ts`, instantiate `HistoryTracker` and connect it to Webamp's track change events:
 
@@ -3851,19 +3851,19 @@ const historyTracker = new HistoryTracker(resolveTrackId, recordTrackListen);
 
 The exact event hooking depends on Webamp's API — read `bridge.ts` to find the right event listeners.
 
-- [ ] **Step 3: Run full build**
+- [x] **Step 3: Run full build**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo build 2>&1 | tail -10`
 Run: `cd /home/moffaty/projects/goamp && npx tsc --noEmit 2>&1`
 Expected: Both succeed
 
-- [ ] **Step 4: Run all tests**
+- [x] **Step 4: Run all tests**
 
 Run: `cd /home/moffaty/projects/goamp/src-tauri && cargo test -- --nocapture 2>&1 | tail -20`
 Run: `cd /home/moffaty/projects/goamp && npx vitest run 2>&1 | tail -10`
 Expected: All tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
