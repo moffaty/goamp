@@ -35,6 +35,18 @@ jobs:
       - name: Frontend tests
         run: pnpm test
 
+      - name: Frontend bundle (vite) — catches issues tsc misses
+        run: pnpm build
+
+      - name: Install Go (sidecar tests)
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Go tests (sidecar)
+        working-directory: goamp-node
+        run: go test ./... -timeout 120s
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -116,6 +128,21 @@ jobs:
             libjavascriptcoregtk-4.1-dev \
             libgtk-3-dev \
             librsvg2-dev
+
+      - name: Install Go (sidecar)
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Build Go sidecar (goamp-node)
+        shell: bash
+        working-directory: goamp-node
+        run: |
+          case "${{ matrix.target }}" in
+            x86_64-pc-windows-msvc)    GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o ../src-tauri/binaries/goamp-node-${{ matrix.target }}.exe ./cmd/goamp-node ;;
+            aarch64-apple-darwin)      GOOS=darwin  GOARCH=arm64                go build -o ../src-tauri/binaries/goamp-node-${{ matrix.target }}      ./cmd/goamp-node ;;
+            x86_64-unknown-linux-gnu)  GOOS=linux   GOARCH=amd64                go build -o ../src-tauri/binaries/goamp-node-${{ matrix.target }}      ./cmd/goamp-node ;;
+          esac
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0

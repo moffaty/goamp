@@ -8,9 +8,21 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let play_pause = MenuItem::with_id(app, "play_pause", "Play/Pause", true, None::<&str>)?;
     let next = MenuItem::with_id(app, "next", "Next", true, None::<&str>)?;
     let prev = MenuItem::with_id(app, "prev", "Previous", true, None::<&str>)?;
+    let toggle_aot = MenuItem::with_id(app, "toggle_aot", "On-Top", true, None::<&str>)?;
+    let toggle_bottom = MenuItem::with_id(app, "toggle_bottom", "To-Bottom", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-    let menu = Menu::with_items(app, &[&play_pause, &next, &prev, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &play_pause,
+            &next,
+            &prev,
+            &toggle_aot,
+            &toggle_bottom,
+            &quit,
+        ],
+    )?;
 
     TrayIconBuilder::new()
         .menu(&menu)
@@ -25,6 +37,12 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             }
             "prev" => {
                 emit_media_action(app, "prev");
+            }
+            "toggle_aot" => {
+                emit_media_action(app, "toggle_aot");
+            }
+            "toggle_bottom" => {
+                emit_media_action(app, "toggle_bottom");
             }
             "quit" => {
                 emit_media_action(app, "quit");

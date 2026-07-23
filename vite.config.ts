@@ -6,6 +6,12 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(async () => ({
 
+  build: {
+    // Tauri shells use Chromium 120+ — esnext is safe and allows top-level await.
+    // Keeping this explicit prevents esbuild from silently downgrading to es2020.
+    target: 'esnext',
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

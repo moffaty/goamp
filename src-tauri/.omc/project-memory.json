@@ -1,0 +1,152 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1776387558352,
+  "projectRoot": "/home/moffaty/projects/goamp/src-tauri",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Rust",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "Cargo.toml"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "cargo",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "cargo build",
+    "testCommand": "cargo test",
+    "lintCommand": "cargo clippy",
+    "devCommand": "cargo run",
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "src"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "binaries": {
+      "path": "binaries",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1776387558349,
+      "keyFiles": [
+        "goamp-node-x86_64-pc-windows-msvc.exe",
+        "goamp-node-x86_64-unknown-linux-gnu",
+        "yt-dlp-x86_64-pc-windows-msvc.exe",
+        "yt-dlp-x86_64-unknown-linux-gnu"
+      ]
+    },
+    "capabilities": {
+      "path": "capabilities",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1776387558349,
+      "keyFiles": [
+        "default.json",
+        "desktop.json"
+      ]
+    },
+    "gen": {
+      "path": "gen",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1776387558350,
+      "keyFiles": []
+    },
+    "icons": {
+      "path": "icons",
+      "purpose": null,
+      "fileCount": 16,
+      "lastAccessed": 1776387558350,
+      "keyFiles": [
+        "128x128.png",
+        "128x128@2x.png",
+        "32x32.png",
+        "Square107x107Logo.png",
+        "Square142x142Logo.png"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 20,
+      "lastAccessed": 1776387558350,
+      "keyFiles": [
+        "aggregator.rs",
+        "feature_flags.rs",
+        "history.rs",
+        "hook.rs",
+        "http.rs"
+      ]
+    },
+    "target": {
+      "path": "target",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1776387558351,
+      "keyFiles": [
+        "CACHEDIR.TAG"
+      ]
+    },
+    "gen/schemas": {
+      "path": "gen/schemas",
+      "purpose": "Schema definitions",
+      "fileCount": 5,
+      "lastAccessed": 1776387558351,
+      "keyFiles": [
+        "acl-manifests.json",
+        "capabilities.json",
+        "desktop-schema.json"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src/lib.rs",
+      "accessCount": 7,
+      "lastAccessed": 1776517325732,
+      "type": "file"
+    },
+    {
+      "path": "src/mood_engine.rs",
+      "accessCount": 4,
+      "lastAccessed": 1776387685385,
+      "type": "file"
+    },
+    {
+      "path": "src/commands/mood.rs",
+      "accessCount": 3,
+      "lastAccessed": 1776387759794,
+      "type": "file"
+    },
+    {
+      "path": "src/track_features.rs",
+      "accessCount": 1,
+      "lastAccessed": 1776387693845,
+      "type": "file"
+    },
+    {
+      "path": "src/node_client.rs",
+      "accessCount": 1,
+      "lastAccessed": 1776517302989,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

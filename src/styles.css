@@ -8,6 +8,11 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  /*
+   * Fully transparent so the window shows only Webamp's irregular skin shape
+   * (the window itself is transparent + borderless). A solid background here
+   * would draw an ugly opaque box around the player.
+   */
   background: transparent;
 }
 

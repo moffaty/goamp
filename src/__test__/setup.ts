@@ -9,7 +9,12 @@ vi.mock("@tauri-apps/api/core", () => ({
 // Mock Tauri window API
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: vi.fn(() => ({
-    setIgnoreCursorEvents: vi.fn(),
+    setAlwaysOnTop: vi.fn(() => Promise.resolve()),
+    setAlwaysOnBottom: vi.fn(() => Promise.resolve()),
+    setIgnoreCursorEvents: vi.fn(() => Promise.resolve()),
+    outerPosition: vi.fn(() => Promise.resolve({ x: 0, y: 0 })),
+    innerSize: vi.fn(() => Promise.resolve({ width: 275, height: 464 })),
+    listen: vi.fn(() => Promise.resolve(() => {})),
     destroy: vi.fn(),
   })),
 }));

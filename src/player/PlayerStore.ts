@@ -49,6 +49,11 @@ export class PlayerStore {
       .map((id: string) => ({ id, ...tracks[id] }))
   }
 
+  /** Id of the currently selected/playing track, or null. */
+  getCurrentTrackId(): string | null {
+    return this.state?.playlist?.currentTrack ?? null
+  }
+
   dispatch(action: PlayerAction): void {
     this.store?.dispatch(action)
   }
@@ -85,6 +90,14 @@ export class PlayerStore {
         lastOpen = open
         cb(open)
       }
+    }) ?? (() => {})
+  }
+
+  onStatusChange(cb: (status: PlayerStatus) => void): () => void {
+    let last = this.getStatus()
+    return this.store?.subscribe(() => {
+      const current = this.getStatus()
+      if (current !== last) { last = current; cb(current) }
     }) ?? (() => {})
   }
 
