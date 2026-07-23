@@ -6,6 +6,7 @@ export const EVENTS = {
   TRACK_END: 'track:end',
   TRACKS_LOAD: 'tracks:load',
   APP_CLOSE: 'app:close',
+  PEERS_UPDATED: 'peers:updated',
 } as const
 
 export type EventMap = {
@@ -14,4 +15,5 @@ export type EventMap = {
   [EVENTS.TRACK_END]: { track: Track; timeElapsed: number }
   [EVENTS.TRACKS_LOAD]: Track[]
   [EVENTS.APP_CLOSE]: undefined
+  [EVENTS.PEERS_UPDATED]: number
 }

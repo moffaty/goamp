@@ -95,4 +95,77 @@ describe('P2PFeature', () => {
   it('destroy does not throw when called without init', () => {
     expect(() => feature.destroy()).not.toThrow()
   })
+
+  it('updates peerCount when PEERS_UPDATED is emitted on ctx.events', async () => {
+    const ctx = makeCtx()
+    await feature.init(ctx)
+
+    ctx.events.emit<number>(EVENTS.PEERS_UPDATED, 5)
+
+    expect(feature.peers).toBe(5)
+  })
+
+  it('destroy stops reacting to PEERS_UPDATED', async () => {
+    const ctx = makeCtx()
+    await feature.init(ctx)
+    feature.destroy()
+
+    ctx.events.emit<number>(EVENTS.PEERS_UPDATED, 10)
+
+    expect(feature.peers).toBe(0)
+  })
+
+  describe('peer-list panel', () => {
+    it('init registers a panel with id "p2p-peers"', async () => {
+      const ctx = makeCtx()
+      await feature.init(ctx)
+      expect(ctx.ui.registerPanel).toHaveBeenCalledWith('p2p-peers', expect.any(Function))
+    })
+
+    it('init registers a menu item "Peers"', async () => {
+      const ctx = makeCtx()
+      await feature.init(ctx)
+      expect(ctx.ui.registerMenuItem).toHaveBeenCalledWith('Peers', expect.any(Function))
+    })
+
+    it('panel render shows the current peer count', async () => {
+      transport.setResponse('p2p_peers', [])
+      const ctx = makeCtx()
+      await feature.init(ctx)
+      ctx.events.emit<number>(EVENTS.PEERS_UPDATED, 3)
+
+      const render = (ctx.ui.registerPanel as ReturnType<typeof vi.fn>).mock.calls[0][1]
+      const el = render() as HTMLElement
+
+      expect(el.textContent).toContain('3')
+    })
+
+    it('panel render shows peer list rows', async () => {
+      transport.setResponse('p2p_peers', [
+        { id: 'peer-abcdefghij', addrs: ['/ip4/1.2.3.4/tcp/9000'] },
+        { id: 'peer-def', addrs: ['/ip4/5.6.7.8/tcp/9000'] },
+      ])
+      const ctx = makeCtx()
+      await feature.init(ctx)
+
+      const render = (ctx.ui.registerPanel as ReturnType<typeof vi.fn>).mock.calls[0][1]
+      const el = render() as HTMLElement
+      await new Promise((r) => setTimeout(r, 10))
+
+      expect(el.textContent).toContain('peer-abc')
+      expect(el.textContent).toContain('peer-def')
+    })
+
+    it('panel render shows "No peers" when list is empty', async () => {
+      transport.setResponse('p2p_peers', [])
+      const ctx = makeCtx()
+      await feature.init(ctx)
+
+      const render = (ctx.ui.registerPanel as ReturnType<typeof vi.fn>).mock.calls[0][1]
+      const el = render() as HTMLElement
+      await new Promise((r) => setTimeout(r, 10))
+
+      expect(el.textContent).toContain('No peers')
+    })
+  })
 })

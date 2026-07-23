@@ -27,14 +27,55 @@ export class P2PFeature implements IFeature {
       }),
     )
 
-    // Update peer count when the goamp-node emits a profile-synced event
-    // (fired via Tauri webview events from node_client.rs)
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent<number>).detail
-      if (typeof detail === 'number') this.peerCount = detail
-    }
-    window.addEventListener('goamp-node:profile-synced', handler)
-    this.cleanups.push(() => window.removeEventListener('goamp-node:profile-synced', handler))
+    // Peer count flows through the module bus. WebampUIFeature bridges the Tauri
+    // `goamp-node:profile-synced` event onto ctx.events, keeping this feature Tauri-free.
+    this.cleanups.push(
+      ctx.events.on<number>(EVENTS.PEERS_UPDATED, (count) => {
+        this.peerCount = count
+      }),
+    )
+
+    // Register the peer-list panel + a menu item to reach it.
+    ctx.ui.registerPanel('p2p-peers', () => this.renderPeerPanel())
+    ctx.ui.registerMenuItem('Peers', () => { /* toggle visibility — no-op until IUIRegistry is wired */ })
+  }
+
+  /** Renders the peer-list panel: count header + async-loaded peer rows. */
+  private renderPeerPanel(): HTMLElement {
+    const el = document.createElement('div')
+    el.className = 'goamp-p2p-panel'
+    el.style.cssText =
+      'background:#1e1e1e;color:#00ff00;font-family:monospace;font-size:11px;padding:8px;border:2px inset #444;'
+
+    const header = document.createElement('div')
+    header.className = 'goamp-p2p-header'
+    header.textContent = `Connected Peers: ${this.peerCount}`
+    header.style.cssText = 'font-weight:bold;margin-bottom:6px;'
+    el.appendChild(header)
+
+    const list = document.createElement('ul')
+    list.className = 'goamp-p2p-list'
+    list.style.cssText = 'list-style:none;margin:0;padding:0;'
+    list.textContent = 'Loading peers…'
+    el.appendChild(list)
+
+    this.svc.peers()
+      .then((peers) => {
+        list.textContent = ''
+        if (peers.length === 0) {
+          list.textContent = 'No peers connected'
+          return
+        }
+        for (const p of peers) {
+          const li = document.createElement('li')
+          const shortId = p.id.length > 16 ? `${p.id.slice(0, 8)}…${p.id.slice(-4)}` : p.id
+          li.textContent = `${shortId}  ${p.addrs[0] ?? ''}`.trim()
+          list.appendChild(li)
+        }
+      })
+      .catch(() => { list.textContent = 'Could not load peer list' })
+
+    return el
   }
 
   destroy(): void {

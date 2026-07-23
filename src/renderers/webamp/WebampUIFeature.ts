@@ -103,6 +103,8 @@ export class WebampUIFeature implements IFeature {
     webview.listen<number>('goamp-node:profile-synced', ({ payload: peerCount }) => {
       const text = `${peerCount} peer${peerCount !== 1 ? 's' : ''} · synced just now`
       invoke('update_tray_tooltip', { text }).catch(() => {})
+      // Relay onto the module bus so P2PFeature (single source of truth) picks it up.
+      ctx.events.emit(EVENTS.PEERS_UPDATED, peerCount)
     })
 
     setTimeout(() => checkForUpdates(), 5_000)
