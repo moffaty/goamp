@@ -6,6 +6,7 @@ import type { Track, PlaybackState } from './types'
 import type { ITransport } from '../services/transport'
 import { EventBus } from './EventBus'
 import { LocalKVStorage } from './KVStorage'
+import { UIRegistry } from './UIRegistry'
 import { EVENTS } from './events'
 
 export { EVENTS }
@@ -118,11 +119,7 @@ export class GoampCore {
   }
 
   private buildUI(): IUIRegistry {
-    return {
-      registerPanel: (_id, _render) => {},
-      registerShortcut: (_keys, _handler) => {},
-      registerMenuItem: (_label, _handler) => {},
-    }
+    return new UIRegistry()
   }
 
   private wireRenderer(ctx: ModuleContext): void {

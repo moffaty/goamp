@@ -30,8 +30,9 @@ vi.mock("./bridge", () => ({
   loadSkin: vi.fn(),
 }));
 
-import { initGoampMenu, buildSignalMenuItems } from "./goamp-menu";
+import { initGoampMenu, buildSignalMenuItems, buildDynamicMenuItems } from "./goamp-menu";
 import { toggleSearchOverlay } from "../youtube/SearchOverlay";
+import { UIRegistry } from "../core/UIRegistry";
 
 
 describe("initGoampMenu", () => {
@@ -132,5 +133,69 @@ describe("buildSignalMenuItems", () => {
     const labels = items.map((i) => i.label);
     expect(labels).toContain("↑ Recommend similar");
     expect(labels).toContain("✕ Don't recommend");
+  });
+});
+
+describe("buildDynamicMenuItems", () => {
+  it("returns [] for a null registry", () => {
+    expect(buildDynamicMenuItems(null)).toEqual([]);
+  });
+
+  it("returns [] when no items are registered", () => {
+    expect(buildDynamicMenuItems(new UIRegistry())).toEqual([]);
+  });
+
+  it("maps registered items to MenuItem objects with a leading separator", () => {
+    const r = new UIRegistry();
+    r.registerMenuItem("Peers", () => {});
+    r.registerMenuItem("Debug", () => {});
+
+    const items = buildDynamicMenuItems(r);
+
+    expect(items[0].separator).toBe(true);
+    expect(items.slice(1).map((i) => i.label)).toEqual(["Peers", "Debug"]);
+  });
+
+  it("the returned action invokes the original handler", () => {
+    const r = new UIRegistry();
+    const handler = vi.fn();
+    r.registerMenuItem("Peers", handler);
+
+    buildDynamicMenuItems(r)[1].action();
+
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("reads live — items registered after a first call appear on the next", () => {
+    const r = new UIRegistry();
+    r.registerMenuItem("A", () => {});
+    expect(buildDynamicMenuItems(r).slice(1)).toHaveLength(1);
+
+    r.registerMenuItem("B", () => {});
+    expect(buildDynamicMenuItems(r).slice(1)).toHaveLength(2);
+  });
+
+  it("a registered item shows up in the live context menu", () => {
+    const registry = new UIRegistry();
+    const handler = vi.fn();
+    registry.registerMenuItem("Peers", handler);
+
+    const webampEl = document.createElement("div");
+    webampEl.id = "webamp";
+    document.body.appendChild(webampEl);
+
+    initGoampMenu({} as any, registry);
+    webampEl.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, clientX: 50, clientY: 50 })
+    );
+
+    const menu = document.getElementById("goamp-context-menu")!;
+    const labels = Array.from(menu.querySelectorAll("div > span:first-child")).map(
+      (el) => el.textContent
+    );
+    expect(labels).toContain("Peers");
+
+    document.getElementById("goamp-context-menu")?.remove();
+    webampEl.remove();
   });
 });

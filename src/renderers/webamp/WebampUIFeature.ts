@@ -4,6 +4,8 @@ import type { IFeature } from '../../core/IFeature'
 import type { ModuleContext } from '../../core/ModuleContext'
 import type { Track } from '../../core/types'
 import { EVENTS } from '../../core/events'
+import type { UIRegistry } from '../../core/UIRegistry'
+import { PanelHost } from '../../webamp/PanelHost'
 import { track as analyticsTrack } from '../../lib/analytics'
 import { setupWindowDrag, setupClickThrough } from '../../webamp/window-drag'
 import { applyOnTop, isOnTop, setOnTop, sendToBack } from '../../webamp/window-layer'
@@ -35,6 +37,16 @@ export class WebampUIFeature implements IFeature {
   async init(ctx: ModuleContext): Promise<void> {
     const store = this.renderer.playerStore
 
+    // ctx.ui IS the UIRegistry instance GoampCore built (same ctx for every
+    // module), so this cast is safe. Wire the panel host + dynamic menu items —
+    // read live at right-click / panel-open time so module init order is irrelevant.
+    const registry = ctx.ui as UIRegistry
+    const panelHost = new PanelHost(registry)
+    registry.setPanelHost(panelHost)
+    this.cleanups.push(() => panelHost.destroy())
+    // TODO: bind a keydown listener over registry.shortcuts when a module first
+    // registers one (deferred — no module registers shortcuts yet, YAGNI).
+
     // Restore the persistent On-Top toggle.
     applyOnTop()
 
@@ -47,7 +59,7 @@ export class WebampUIFeature implements IFeature {
     initGenrePanel(this.webamp)
     initRadioPanel(this.webamp)
     initRecommendationPanel(this.webamp)
-    initGoampMenu(this.webamp)
+    initGoampMenu(this.webamp, registry)
     initMilkdropController(store)
     renderMoodTabs().catch(() => {})
     restoreAudioDevice()

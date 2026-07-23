@@ -16,7 +16,7 @@ function makeCtx(): ModuleContext {
       getState: vi.fn(() => ({ status: 'STOPPED' as const, track: null, timeElapsed: 0, duration: 0 })),
     },
     events: new EventBus(),
-    ui: { registerPanel: vi.fn(), registerShortcut: vi.fn(), registerMenuItem: vi.fn() },
+    ui: { registerPanel: vi.fn(), registerShortcut: vi.fn(), registerMenuItem: vi.fn(), togglePanel: vi.fn() },
     storage: new LocalKVStorage('test-p2p'),
     transport: new MockTransport(),
   }
@@ -126,6 +126,14 @@ describe('P2PFeature', () => {
       const ctx = makeCtx()
       await feature.init(ctx)
       expect(ctx.ui.registerMenuItem).toHaveBeenCalledWith('Peers', expect.any(Function))
+    })
+
+    it('the "Peers" menu item toggles the p2p-peers panel', async () => {
+      const ctx = makeCtx()
+      await feature.init(ctx)
+      const handler = (ctx.ui.registerMenuItem as ReturnType<typeof vi.fn>).mock.calls[0][1]
+      handler()
+      expect(ctx.ui.togglePanel).toHaveBeenCalledWith('p2p-peers')
     })
 
     it('panel render shows the current peer count', async () => {

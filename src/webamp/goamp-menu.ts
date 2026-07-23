@@ -14,19 +14,35 @@ import { isAutoplayEnabled, toggleAutoplay } from "../features/autoplay/Autoplay
 import { openFolder, openFiles, loadSkin } from "./file-actions";
 import { moodService } from "../recommendations/mood-service";
 import type Webamp from "webamp";
+import type { UIRegistry } from "../core/UIRegistry";
 let menu: HTMLDivElement | null = null;
 let webampRef: Webamp | null = null;
+let registryRef: UIRegistry | null = null;
 
 interface SubMenuItem {
   label: string;
   action: () => void;
 }
 
-interface MenuItem {
+export interface MenuItem {
   label: string;
   shortcut?: string;
   action: () => void;
   separator?: boolean;
+}
+
+/**
+ * Maps registry-registered menu items into the context menu's MenuItem shape.
+ * Pure + Tauri-free so it can be unit-tested. Reads `registry.menuItems` live —
+ * items registered after the last render still show on the next right-click.
+ * Prefixes a separator so dynamic items are visually grouped below the built-ins.
+ */
+export function buildDynamicMenuItems(registry: UIRegistry | null): MenuItem[] {
+  if (!registry || registry.menuItems.length === 0) return [];
+  return [
+    { label: "", action: () => {}, separator: true },
+    ...registry.menuItems.map((i) => ({ label: i.label, action: i.handler })),
+  ];
 }
 
 export function buildSignalMenuItems(
@@ -113,8 +129,9 @@ function showScopeSubmenu(items: SubMenuItem[]): void {
   }, 0);
 }
 
-export function initGoampMenu(webamp: Webamp) {
+export function initGoampMenu(webamp: Webamp, registry?: UIRegistry) {
   webampRef = webamp;
+  registryRef = registry ?? null;
 
   // Use capture phase to intercept before Webamp's own context menu
   document.addEventListener("contextmenu", (e) => {
@@ -212,6 +229,9 @@ function showGoampMenu(x: number, y: number) {
     items.push({ label: "", action: () => {}, separator: true });
     items.push(...buildSignalMenuItems(canonicalId, currentTrack.artist ?? "", currentTrack.defaultName ?? ""));
   }
+
+  // Dynamic items registered by feature modules via ctx.ui.registerMenuItem.
+  items.push(...buildDynamicMenuItems(registryRef));
 
   menu = document.createElement("div");
   menu.id = "goamp-context-menu";

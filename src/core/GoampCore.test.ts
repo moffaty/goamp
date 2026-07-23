@@ -216,6 +216,34 @@ describe('GoampCore', () => {
     expect(cb).toHaveBeenCalled()
   })
 
+  it('ctx.ui collects panel/menu registrations from features', async () => {
+    let captured: ModuleContext | null = null
+    const f: IFeature = {
+      id: 'reg',
+      init: vi.fn(async (ctx) => {
+        captured = ctx
+        ctx.ui.registerPanel('x', () => document.createElement('div'))
+        ctx.ui.registerMenuItem('X', () => {})
+      }),
+      destroy: vi.fn(),
+    }
+
+    await new GoampCore().renderer(renderer).transport(transport).feature(f).start(container)
+
+    const ui = captured!.ui as any
+    expect(ui.panels.get('x')).toBeTypeOf('function')
+    expect(ui.menuItems.map((m: any) => m.label)).toContain('X')
+  })
+
+  it('togglePanel on ctx.ui does not throw when no panel host is wired', async () => {
+    let captured: ModuleContext | null = null
+    const f: IFeature = {
+      id: 'reg', init: vi.fn(async (ctx) => { captured = ctx }), destroy: vi.fn(),
+    }
+    await new GoampCore().renderer(renderer).transport(transport).feature(f).start(container)
+    expect(() => captured!.ui.togglePanel('anything')).not.toThrow()
+  })
+
   it('each module gets isolated storage namespace', async () => {
     let ctxA: ModuleContext | null = null
     const fA: IFeature = { id: 'fa', init: vi.fn(async (ctx) => { ctxA = ctx }), destroy: vi.fn() }

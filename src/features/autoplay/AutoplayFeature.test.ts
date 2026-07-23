@@ -25,7 +25,7 @@ function makeCtx(storageNs = 'test-autoplay'): ModuleContext {
       getState: vi.fn(() => ({ status: 'STOPPED' as const, track: null, timeElapsed: 0, duration: 0 })),
     },
     events: new EventBus(),
-    ui: { registerPanel: vi.fn(), registerShortcut: vi.fn(), registerMenuItem: vi.fn() },
+    ui: { registerPanel: vi.fn(), registerShortcut: vi.fn(), registerMenuItem: vi.fn(), togglePanel: vi.fn() },
     storage: new LocalKVStorage(storageNs),
     transport: new MockTransport(),
   }
