@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd goamp-node && go test ./... 2>&1 | tail -15\",\"description\":\"Full Go test suite\"}",
+  "error": "Exit code 1\n(eval):cd:1: not a directory: goamp-node",
+  "timestamp": "2026-04-21T10:08:23.225Z",
+  "retry_count": 1
+}

@@ -2,12 +2,11 @@ use tauri::{Listener, Manager};
 
 pub mod account;
 mod aggregator;
+mod audio_protocol;
 mod commands;
 mod db;
 mod feature_flags;
 mod history;
-#[cfg(not(target_os = "android"))]
-mod hook;
 mod http;
 mod md5;
 #[cfg(not(target_os = "android"))]
@@ -45,6 +44,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Streaming audio for the autoplay queue — see audio_protocol.rs.
+        .register_asynchronous_uri_scheme_protocol("goampaudio", audio_protocol::handle)
         .manage(radio::RadioStreamState::new())
         .manage(node::NodeProcess::new());
 
@@ -70,6 +71,7 @@ pub fn run() {
             commands::youtube::search_youtube,
             commands::youtube::extract_audio,
             commands::youtube::extract_audio_url,
+            commands::youtube::extract_audio_stream_url,
             commands::playlists::create_playlist,
             commands::playlists::list_playlists,
             commands::playlists::get_playlist_tracks,
@@ -151,6 +153,12 @@ pub fn run() {
             commands::mood::get_tag_weight,
             mood_engine::generate_mood_queue,
             mood_engine::update_mood_centroid,
+            commands::window::window_send_to_back,
+            commands::window::cursor_position,
+            commands::p2p::p2p_health,
+            commands::p2p::p2p_peers,
+            commands::p2p::p2p_catalog_search,
+            commands::p2p::p2p_catalog_announce,
         ])
         .setup(|app| {
             db::init(app).expect("failed to initialize database");
@@ -188,9 +196,6 @@ pub fn run() {
                 });
 
                 let _ = window.maximize();
-
-                #[cfg(not(target_os = "android"))]
-                hook::start_global_mouse_stream(window);
             }
 
             Ok(())

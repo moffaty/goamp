@@ -536,7 +536,7 @@ async function downloadAndAddToPlaylist(item: YoutubeResult, playlistId: string)
   }
 }
 
-/** Extract audio file path / URL — uses video_id for YouTube, webpage_url for SoundCloud */
+/** Download audio to a local cache file — uses video_id for YouTube, webpage_url for SoundCloud. */
 async function extractForItem(item: YoutubeResult): Promise<string> {
   if (item.source === "youtube" || !item.webpage_url) {
     return extractAudio(item.id);

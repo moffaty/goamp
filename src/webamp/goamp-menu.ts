@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { isOnTop, setOnTop, sendToBack } from "./window-layer";
 import { toggleSearchOverlay } from "../youtube/SearchOverlay";
 import { togglePlaylistPanel } from "../playlists/PlaylistPanel";
 import { toggleAudioDevicePanel } from "../settings/AudioDevicePanel";
@@ -9,6 +10,7 @@ import { toggleMilkdrop } from "./milkdrop-controller";
 import { toggleGenrePanel, toggleYouTubeSettings } from "../settings/GenrePanel";
 import { toggleRadioPanel } from "../radio/RadioPanel";
 import { toggleRecommendationPanel } from "../recommendations/RecommendationPanel";
+import { isAutoplayEnabled, toggleAutoplay } from "../features/autoplay/AutoplayFeature";
 import { openFolder, openFiles, loadSkin } from "./file-actions";
 import { moodService } from "../recommendations/mood-service";
 import type Webamp from "webamp";
@@ -145,8 +147,26 @@ export function initGoampMenu(webamp: Webamp) {
 function showGoampMenu(x: number, y: number) {
   closeGoampMenu();
 
+  const onTop = isOnTop();
+  const autoplayEnabled = isAutoplayEnabled();
+
   const items: MenuItem[] = [
-    { label: "Search", shortcut: "Ctrl+Y", action: () => toggleSearchOverlay() },
+    // ── Window z-order ───────────────────────────────────────────────
+    {
+      // Persistent toggle — pins the window above all others.
+      label: `${onTop ? "✓ " : "  "}On-Top`,
+      action: () => setOnTop(!onTop),
+    },
+    {
+      // One-shot action (no checkmark) — drops the window to the back once.
+      label: "To-Bottom",
+      action: () => { void sendToBack(); },
+    },
+    {
+      label: `${autoplayEnabled ? "✓ " : "  "}Autoplay (Infinite Playlist)`,
+      action: () => toggleAutoplay(),
+    },
+    { label: "Search", shortcut: "Ctrl+Y", action: () => toggleSearchOverlay(), separator: true },
     { label: "Genres", shortcut: "Ctrl+G", action: () => toggleGenrePanel() },
     { label: "Internet Radio", shortcut: "Ctrl+R", action: () => toggleRadioPanel() },
     { label: "Recommendations", shortcut: "Ctrl+Shift+R", action: () => toggleRecommendationPanel() },

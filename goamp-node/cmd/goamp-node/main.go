@@ -29,14 +29,14 @@ func main() {
 		mode       = flag.String("mode", "", "node mode: client|full|server (overrides config)")
 		apiPort    = flag.Int("api-port", 0, "HTTP API port (overrides config)")
 		configPath = flag.String("config", "", "path to node.toml (default: ~/.goamp/node.toml)")
+		dataDir    = flag.String("data-dir", "", "data directory (overrides config; host passes the OS app-data folder)")
 	)
 	flag.Parse()
 
-	// 1. Load config
+	// 1. Load config — default location follows OS conventions (see config.DefaultDataDir).
 	cfgPath := *configPath
 	if cfgPath == "" {
-		home, _ := os.UserHomeDir()
-		cfgPath = filepath.Join(home, ".goamp", "node.toml")
+		cfgPath = filepath.Join(config.DefaultDataDir(), "node.toml")
 	}
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
@@ -47,6 +47,11 @@ func main() {
 	}
 	if *apiPort != 0 {
 		cfg.Node.APIPort = *apiPort
+	}
+	// --data-dir unifies node storage with the Tauri app's app-data folder.
+	// Applied last so it wins over both the config file and defaults.
+	if *dataDir != "" {
+		config.ApplyDataDir(cfg, *dataDir)
 	}
 
 	// 2. Ensure data directory exists

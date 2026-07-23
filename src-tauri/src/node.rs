@@ -31,11 +31,23 @@ impl NodeProcess {
 /// Reads stdout until it sees `ready:PORT`, then returns.
 /// Call this from the Tauri setup hook.
 pub fn start_node(app: &AppHandle) -> Result<(), String> {
+    // Unify storage: the node keeps its SQLite store, identity key, plugins and
+    // archive under <app_data_dir>/node — the same app-data folder that holds
+    // goamp.db. Without this the node would default to ~/.goamp, leaving the two
+    // binaries' state disconnected.
+    let node_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("app_data_dir: {e}"))?
+        .join("node");
+    std::fs::create_dir_all(&node_dir).map_err(|e| format!("create node data dir: {e}"))?;
+    let data_dir_arg = format!("--data-dir={}", node_dir.display());
+
     let sidecar = app
         .shell()
         .sidecar("goamp-node")
         .map_err(|e| format!("sidecar not found: {e}"))?
-        .args(["--mode=client", "--api-port=7472"]);
+        .args(["--mode=client", "--api-port=7472", &data_dir_arg]);
 
     let (mut rx, child) = sidecar
         .spawn()

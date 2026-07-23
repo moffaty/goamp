@@ -32,3 +32,7 @@ export async function extractAudio(videoId: string): Promise<string> {
 export async function extractAudioUrl(url: string): Promise<string> {
   return invoke("extract_audio_url", { url });
 }
+
+// Note: `extract_audio_stream_url` (Rust) is still registered — it is called
+// internally by the `goampaudio://` protocol handler. No frontend wrapper is
+// needed: the webview's <audio> element loads the protocol URL directly.

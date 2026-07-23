@@ -12,7 +12,7 @@ WIN_OUT        := /mnt/c/Users/Moffaty/Desktop/goamp-dev
 
 # ─── Development ──────────────────────────────────────────────
 
-node-sidecar: ## Build goamp-node sidecar binary for current platform
+node-sidecar: ## Build goamp-node sidecar bigfgkljhfsklhfs'klj; nary for current platform
 	cd goamp-node && go build -o ../$(NODE_BIN) ./cmd/goamp-node
 	@echo "Built sidecar: $(NODE_BIN)"
 
@@ -61,16 +61,27 @@ dev-android: ## Run on connected Android device (hot-reload)
 build: ## Build for Linux (deb + AppImage)
 	pnpm tauri build
 
-build-win: node-sidecar-win ## Cross-compile for Windows via cargo-xwin (builds Go sidecar first)
+build-win: node-sidecar-win ## Cross-compile for Windows + copy all binaries to $(WIN_OUT)
 	pnpm build:win
+	@mkdir -p $(WIN_OUT)
+	@echo "Stopping any running GOAMP processes (Windows locks running .exe files)..."
+	-@taskkill.exe /F /IM goamp.exe >/dev/null 2>&1
+	-@taskkill.exe /F /IM goamp-node.exe >/dev/null 2>&1
+	-@taskkill.exe /F /IM yt-dlp.exe >/dev/null 2>&1
+	cp src-tauri/target/$(WIN_TARGET)/release/goamp.exe $(WIN_OUT)/goamp.exe
+	cp src-tauri/binaries/goamp-node-$(WIN_TARGET).exe $(WIN_OUT)/goamp-node.exe
+	cp src-tauri/binaries/yt-dlp-$(WIN_TARGET).exe $(WIN_OUT)/yt-dlp.exe
+	@echo ""
+	@echo "✓ Deployed to $(WIN_OUT)/:"
+	@ls -lh $(WIN_OUT)/*.exe | awk '{printf "    %-25s %s\n", $$9, $$5}'
+	@echo ""
+	@echo "Note: sidecars renamed (triple suffix stripped) so Tauri finds them at runtime."
 
 build-android: ## Build APK for Android
 	pnpm tauri android build --apk
 
-deploy-win: build-win ## Build for Windows and copy exe to desktop
-	@mkdir -p $(WIN_OUT)
-	cp src-tauri/target/$(WIN_TARGET)/release/goamp.exe $(WIN_OUT)/
-	@echo "Deployed to $(WIN_OUT)/goamp.exe"
+deploy-win: build-win ## Alias for build-win (kept for backwards compat)
+	@echo "deploy-win is now an alias for build-win (which already copies everything)"
 
 # ─── Quality ──────────────────────────────────────────────────
 
@@ -81,7 +92,10 @@ lint-rust: ## Rust clippy + fmt check
 	cargo fmt --manifest-path $(TAURI_MANIFEST) --check
 	cargo clippy --manifest-path $(TAURI_MANIFEST) -- -D warnings
 
-check: lint lint-rust test test-rust ## Run all checks (lint + test)
+build-check: ## Verify the frontend bundles (catches issues tsc misses, e.g. top-level await on old targets)
+	pnpm build
+
+check: lint lint-rust test test-rust build-check ## Run all checks (lint + tests + frontend bundle)
 
 fmt: ## Format all code
 	cargo fmt --manifest-path $(TAURI_MANIFEST)

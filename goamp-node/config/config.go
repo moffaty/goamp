@@ -4,6 +4,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/BurntSushi/toml"
 )
@@ -44,12 +45,40 @@ type PluginsConfig struct {
 	Enabled bool   `toml:"enabled"`
 }
 
-// Default returns a Config with all fields set to sensible values.
-// TODO(you): fill in the default values matching the spec's node.toml section.
-// Expand "~" using os.UserHomeDir() for any path field that starts with "~".
-func Default() *Config {
+// DefaultDataDir returns the OS-conventional per-user data directory for GOAMP.
+// Used as the default when neither --data-dir nor a config file specifies one
+// (i.e. standalone runs — when spawned by Tauri, --data-dir always wins).
+//
+//	Windows: %AppData%\goamp                      (…\AppData\Roaming\goamp)
+//	macOS:   ~/Library/Application Support/goamp
+//	Linux:   $XDG_DATA_HOME/goamp  or  ~/.local/share/goamp
+//
+// Falls back to ~/.goamp only if the OS directory cannot be resolved.
+func DefaultDataDir() string {
+	switch runtime.GOOS {
+	case "linux":
+		// os.UserConfigDir() returns ~/.config on Linux, but application *data*
+		// belongs in XDG_DATA_HOME (~/.local/share) — matches the Tauri host.
+		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+			return filepath.Join(xdg, "goamp")
+		}
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, ".local", "share", "goamp")
+		}
+	default:
+		// Windows → %AppData% (Roaming); macOS → ~/Library/Application Support.
+		if dir, err := os.UserConfigDir(); err == nil {
+			return filepath.Join(dir, "goamp")
+		}
+	}
+	// Last resort — works everywhere, just not idiomatic.
 	home, _ := os.UserHomeDir()
-	goampDir := filepath.Join(home, ".goamp")
+	return filepath.Join(home, ".goamp")
+}
+
+// Default returns a Config with all fields set to sensible, OS-appropriate values.
+func Default() *Config {
+	goampDir := DefaultDataDir()
 	return &Config{
 		Node: NodeConfig{
 			Mode:    "client",
@@ -75,6 +104,18 @@ func Default() *Config {
 			Enabled: true,
 		},
 	}
+}
+
+// ApplyDataDir points DataDir and every path derived from it at dir.
+// The host application (Tauri) calls this — via the --data-dir flag — so the
+// node stores its SQLite store, identity key, plugins and archive inside the
+// OS app-data folder alongside goamp.db, instead of the default ~/.goamp.
+// This keeps both binaries' state in one place.
+func ApplyDataDir(cfg *Config, dir string) {
+	cfg.Node.DataDir = dir
+	cfg.Identity.KeyPath = filepath.Join(dir, "identity.key")
+	cfg.Plugins.Dir = filepath.Join(dir, "plugins")
+	cfg.Archive.StoragePath = filepath.Join(dir, "archive")
 }
 
 // Load reads the TOML file at path (if it exists) over the defaults.

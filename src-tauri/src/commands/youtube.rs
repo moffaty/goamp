@@ -351,6 +351,19 @@ fn find_cached_file(base: &std::path::Path) -> Option<String> {
     None
 }
 
+/// Return the path of an already-downloaded audio file for `video_id`, if any.
+/// Used by the goamp-audio:// streaming protocol for its instant-cache path.
+pub fn cached_audio_path(app: &tauri::AppHandle, video_id: &str) -> Option<String> {
+    let cache = cache_dir(app);
+    for ext in &["opus", "m4a", "webm", "ogg", "mp3", "wav"] {
+        let p = cache.join(format!("{}.{}", video_id, ext));
+        if p.exists() {
+            return Some(p.to_string_lossy().to_string());
+        }
+    }
+    None
+}
+
 #[tauri::command]
 pub async fn extract_audio(app: tauri::AppHandle, video_id: String) -> Result<String, String> {
     let cache = cache_dir(&app);
@@ -448,6 +461,52 @@ pub async fn extract_audio(app: tauri::AppHandle, video_id: String) -> Result<St
     }
 
     Err("Audio file not found after extraction".into())
+}
+
+/// Extract a directly streamable audio URL WITHOUT downloading the file.
+/// `yt-dlp -g` returns the direct CDN URL (n-parameter already deciphered, so
+/// the browser gets full-speed playback). The webview's <audio> element then
+/// streams it progressively — playback starts in ~1-2s instead of waiting for
+/// a full download.
+///
+/// `input` may be a bare YouTube video id or any yt-dlp-supported page URL.
+/// The returned URL is time-limited (~6h) — fine for immediate playback and
+/// for the autoplay queue, not for persistent saved playlists.
+#[tauri::command]
+pub async fn extract_audio_stream_url(
+    app: tauri::AppHandle,
+    input: String,
+) -> Result<String, String> {
+    let url = if input.contains("://") {
+        input
+    } else {
+        format!("https://www.youtube.com/watch?v={}", input)
+    };
+
+    let mut args: Vec<String> = cookies_args(&app);
+    args.extend([
+        url,
+        "-g".to_string(),
+        "-f".to_string(),
+        "bestaudio".to_string(),
+        "--no-playlist".to_string(),
+        "--no-warnings".to_string(),
+    ]);
+    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let output = run_ytdlp(&app, &arg_refs).await?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("yt-dlp -g error: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    stdout
+        .lines()
+        .map(|l| l.trim())
+        .find(|l| l.starts_with("http"))
+        .map(|l| l.to_string())
+        .ok_or_else(|| "no stream URL returned by yt-dlp".to_string())
 }
 
 // --- YouTube cookies/auth ---

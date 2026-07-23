@@ -1,35 +1,54 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { isAppContent } from "./window-drag";
 
-// We test the isAppContent logic indirectly via the module's behavior
-// Since isAppContent is private, we test the core logic pattern
-describe("click-through logic", () => {
-  it("body element should be considered non-content (click-through)", () => {
-    const el = document.body;
-    // The logic: if el === body or documentElement => not content
-    const isContent = el !== document.body && el !== document.documentElement;
-    expect(isContent).toBe(false);
+afterEach(() => {
+  document.body.innerHTML = "";
+});
+
+describe("isAppContent — click-through classification", () => {
+  it("null → not content (cursor over nothing)", () => {
+    expect(isAppContent(null)).toBe(false);
   });
 
-  it("html element should be considered non-content", () => {
-    const el = document.documentElement;
-    const isContent = el !== document.body && el !== document.documentElement;
-    expect(isContent).toBe(false);
+  it("body → not content (transparent → click-through)", () => {
+    expect(isAppContent(document.body)).toBe(false);
   });
 
-  it("any other element should be considered content (captures clicks)", () => {
-    const div = document.createElement("div");
-    document.body.appendChild(div);
-    const isContent = div !== document.body && div !== document.documentElement;
-    expect(isContent).toBe(true);
-    div.remove();
+  it("documentElement → not content (transparent → click-through)", () => {
+    expect(isAppContent(document.documentElement)).toBe(false);
   });
 
-  it("overlay element should capture clicks", () => {
+  it("#app container → not content (fills window, transparent gap)", () => {
+    const app = document.createElement("div");
+    app.id = "app";
+    document.body.appendChild(app);
+    expect(isAppContent(app)).toBe(false);
+  });
+
+  it("#webamp positioning root → not content (transparent gap)", () => {
+    const webamp = document.createElement("div");
+    webamp.id = "webamp";
+    document.body.appendChild(webamp);
+    expect(isAppContent(webamp)).toBe(false);
+  });
+
+  it("a real Webamp window → content (captures clicks)", () => {
+    const mainWindow = document.createElement("div");
+    mainWindow.id = "main-window";
+    document.body.appendChild(mainWindow);
+    expect(isAppContent(mainWindow)).toBe(true);
+  });
+
+  it("an overlay element → content (captures clicks)", () => {
     const overlay = document.createElement("div");
     overlay.id = "yt-search-overlay";
     document.body.appendChild(overlay);
-    const isContent = overlay !== document.body && overlay !== document.documentElement;
-    expect(isContent).toBe(true);
-    overlay.remove();
+    expect(isAppContent(overlay)).toBe(true);
+  });
+
+  it("a generic child element → content (captures clicks)", () => {
+    const div = document.createElement("div");
+    document.body.appendChild(div);
+    expect(isAppContent(div)).toBe(true);
   });
 });

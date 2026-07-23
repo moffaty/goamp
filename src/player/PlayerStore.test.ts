@@ -58,6 +58,18 @@ describe('PlayerStore', () => {
     expect(tracks[1].id).toBe('a')
   })
 
+  it('getCurrentTrackId returns null when no state', () => {
+    const w = makeWebamp({})
+    const s = new PlayerStore(w)
+    expect(s.getCurrentTrackId()).toBeNull()
+  })
+
+  it('getCurrentTrackId returns playlist.currentTrack', () => {
+    const w = makeWebamp({ playlist: { currentTrack: 'track-7' } })
+    const s = new PlayerStore(w)
+    expect(s.getCurrentTrackId()).toBe('track-7')
+  })
+
   it('isMilkdropOpen returns true when milkdrop is open', () => {
     const w = makeWebamp({ windows: { genWindows: { milkdrop: { open: true } } } })
     const s = new PlayerStore(w)
