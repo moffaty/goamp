@@ -3,6 +3,7 @@ use tauri::{Listener, Manager};
 pub mod account;
 mod aggregator;
 mod audio_protocol;
+mod charts;
 mod commands;
 mod db;
 mod feature_flags;
@@ -132,6 +133,7 @@ pub fn run() {
             history::remove_track_like,
             history::get_track_stats,
             history::get_liked_tracks,
+            charts::get_top_tracks_cmd,
             survey::survey_get_pending,
             survey::survey_respond,
             survey::survey_skip,
