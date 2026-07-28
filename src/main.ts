@@ -13,6 +13,7 @@ import { ScrobbleFeature } from './features/scrobble/ScrobbleFeature'
 import { RadioFeature } from './features/radio/RadioFeature'
 import { RecommendationsFeature } from './features/recommendations/RecommendationsFeature'
 import { P2PFeature } from './features/p2p/P2PFeature'
+import { ChartsFeature } from './features/charts/ChartsFeature'
 import { AutoplayFeature } from './features/autoplay/AutoplayFeature'
 import { showErrorOverlay, installGlobalErrorHandlers } from './lib/error-overlay'
 
@@ -53,6 +54,7 @@ try {
     .feature(new RadioFeature(transport))
     .feature(new RecommendationsFeature(transport))
     .feature(new P2PFeature(transport))
+    .feature(new ChartsFeature(transport))
     .feature(new AutoplayFeature(webamp, transport))
     .start(document.getElementById('app')!)
 

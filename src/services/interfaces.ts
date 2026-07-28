@@ -158,6 +158,19 @@ export interface IHistoryService {
   surveyMarkShown(id: number): Promise<void>
 }
 
+export type ChartPeriod = 'week' | 'month' | 'all'
+
+export interface ChartEntry {
+  canonical_id: string
+  artist: string
+  title: string
+  play_count: number
+}
+
+export interface IChartsService {
+  getTopTracks(period: ChartPeriod, limit?: number): Promise<ChartEntry[]>
+}
+
 export interface IRadioService {
   search(query: string, tag?: string, country?: string, limit?: number): Promise<RadioStation[]>
   topStations(limit?: number): Promise<RadioStation[]>
