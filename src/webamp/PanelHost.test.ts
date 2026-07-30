@@ -63,6 +63,32 @@ describe('PanelHost', () => {
     expect(b.style.display).toBe('')
   })
 
+  it('wraps the panel in retro chrome with a prettified titlebar', () => {
+    const registry = new UIRegistry()
+    registry.registerPanel('p2p-peers', () => {
+      const el = document.createElement('div')
+      el.textContent = 'body'
+      return el
+    })
+    const host = new PanelHost(registry)
+    host.toggle('p2p-peers')
+
+    const title = document.querySelector('.goamp-retro-title') as HTMLElement
+    expect(title.textContent).toBe('P2P Peers')
+    expect(document.querySelector('[data-panel-id="p2p-peers"]')?.textContent).toContain('body')
+  })
+
+  it('the retro close button hides the panel', () => {
+    const registry = new UIRegistry()
+    registry.registerPanel('p1', () => document.createElement('div'))
+    const host = new PanelHost(registry)
+    host.toggle('p1')
+
+    const container = document.querySelector('[data-panel-id="p1"]') as HTMLElement
+    ;(container.querySelector('.goamp-retro-close') as HTMLButtonElement).click()
+    expect(container.style.display).toBe('none')
+  })
+
   it('destroy removes all mounted panels', () => {
     const registry = new UIRegistry()
     registry.registerPanel('a', () => document.createElement('div'))
