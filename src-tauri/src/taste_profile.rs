@@ -10,6 +10,10 @@ pub struct TasteProfile {
     pub genre_weights: std::collections::HashMap<String, f64>,
     pub total_listens: u32,
     pub generated_at: i64,
+    /// Top played tracks with metadata, for network-aggregated community charts.
+    /// `serde(default)` keeps older profiles (without this field) parseable.
+    #[serde(default)]
+    pub top_tracks: Vec<crate::charts::ChartEntry>,
 }
 
 pub fn build_taste_profile(conn: &Connection, max_items: usize) -> TasteProfile {
@@ -20,6 +24,7 @@ pub fn build_taste_profile(conn: &Connection, max_items: usize) -> TasteProfile 
         genre_weights: get_genre_weights(conn),
         total_listens: get_total_completed(conn),
         generated_at: chrono::Utc::now().timestamp(),
+        top_tracks: crate::charts::get_top_tracks(conn, "all", max_items as i32),
     }
 }
 

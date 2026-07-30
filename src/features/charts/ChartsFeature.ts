@@ -1,13 +1,23 @@
 import type { IFeature } from '../../core/IFeature'
 import type { ModuleContext } from '../../core/ModuleContext'
 import type { ITransport } from '../../services/transport'
-import type { ChartPeriod } from '../../services/interfaces'
+import type { ChartEntry, ChartPeriod } from '../../services/interfaces'
 import { ChartsService } from '../../services/ChartsService'
 
-const PERIODS: Array<{ id: ChartPeriod; label: string }> = [
-  { id: 'week', label: 'Week' },
-  { id: 'month', label: 'Month' },
-  { id: 'all', label: 'All' },
+// A tab is just a label + a loader. Personal periods hit get_top_tracks;
+// Community aggregates peer profiles via get_community_charts.
+type Tab = { label: string; load: (svc: ChartsService) => Promise<ChartEntry[]> }
+
+const personalTab = (period: ChartPeriod, label: string): Tab => ({
+  label,
+  load: (svc) => svc.getTopTracks(period),
+})
+
+const TABS: Tab[] = [
+  personalTab('week', 'Week'),
+  personalTab('month', 'Month'),
+  personalTab('all', 'All'),
+  { label: 'Community', load: (svc) => svc.getCommunityCharts() },
 ]
 
 export class ChartsFeature implements IFeature {
@@ -40,9 +50,9 @@ export class ChartsFeature implements IFeature {
     list.className = 'goamp-charts-list'
     list.style.cssText = 'margin:0;padding-left:20px;'
 
-    const load = (period: ChartPeriod) => {
+    const load = (tab: Tab) => {
       list.textContent = 'Loading…'
-      this.svc.getTopTracks(period)
+      tab.load(this.svc)
         .then((tracks) => {
           list.textContent = ''
           if (tracks.length === 0) {
@@ -60,17 +70,17 @@ export class ChartsFeature implements IFeature {
 
     const toggle = document.createElement('div')
     toggle.style.cssText = 'margin-bottom:6px;'
-    for (const p of PERIODS) {
+    for (const tab of TABS) {
       const btn = document.createElement('button')
-      btn.textContent = p.label
+      btn.textContent = tab.label
       btn.style.cssText = 'margin-right:4px;font-family:monospace;'
-      btn.addEventListener('click', () => load(p.id))
+      btn.addEventListener('click', () => load(tab))
       toggle.appendChild(btn)
     }
     el.appendChild(toggle)
     el.appendChild(list)
 
-    load('week')
+    load(TABS[0])
     return el
   }
 

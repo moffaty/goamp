@@ -7,4 +7,8 @@ export class ChartsService implements IChartsService {
   getTopTracks(period: ChartPeriod, limit = 50) {
     return this.t.call<ChartEntry[]>('get_top_tracks_cmd', { period, limit })
   }
+
+  getCommunityCharts(limit = 50) {
+    return this.t.call<ChartEntry[]>('get_community_charts_cmd', { limit })
+  }
 }

@@ -169,6 +169,7 @@ export interface ChartEntry {
 
 export interface IChartsService {
   getTopTracks(period: ChartPeriod, limit?: number): Promise<ChartEntry[]>
+  getCommunityCharts(limit?: number): Promise<ChartEntry[]>
 }
 
 export interface IRadioService {

@@ -134,6 +134,7 @@ pub fn run() {
             history::get_track_stats,
             history::get_liked_tracks,
             charts::get_top_tracks_cmd,
+            charts::get_community_charts_cmd,
             survey::survey_get_pending,
             survey::survey_respond,
             survey::survey_skip,
