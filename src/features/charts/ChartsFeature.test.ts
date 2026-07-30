@@ -107,6 +107,25 @@ describe('ChartsFeature', () => {
     expect(transport.lastCall?.args).toEqual({ period: 'month', limit: 50 })
   })
 
+  it('clicking Community loads network-aggregated charts', async () => {
+    transport.setResponse('get_community_charts_cmd', [
+      { canonical_id: 'c', artist: 'PeerArtist', title: 'PeerSong', play_count: 42 },
+    ])
+    const ctx = makeCtx(transport)
+    await feature.init(ctx)
+    const render = (ctx.ui.registerPanel as ReturnType<typeof vi.fn>).mock.calls[0][1]
+    const el = render() as HTMLElement
+    await flush()
+
+    const communityBtn = [...el.querySelectorAll('button')].find((b) => b.textContent === 'Community')!
+    communityBtn.click()
+    await flush()
+
+    expect(transport.lastCall?.command).toBe('get_community_charts_cmd')
+    expect(el.textContent).toContain('PeerSong')
+    expect(el.textContent).toContain('42')
+  })
+
   it('panel shows error state when the query fails', async () => {
     transport.setResponse('get_top_tracks_cmd', new Error('boom'))
     const ctx = makeCtx(transport)

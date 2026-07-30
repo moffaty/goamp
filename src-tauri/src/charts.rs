@@ -1,9 +1,10 @@
 use chrono::Utc;
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tauri::Manager;
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ChartEntry {
     pub canonical_id: String,
     pub artist: String,
@@ -60,7 +61,72 @@ pub fn get_top_tracks(conn: &Connection, period: &str, limit: i32) -> Vec<ChartE
     }
 }
 
-// ─── Tauri command ───
+/// Network-aggregated charts: local completed plays + peers' gossiped `top_tracks`,
+/// summed by canonical_id. Peer data comes from the already-synced `peer_profiles`
+/// table (JSON blobs), so this is a pure local read — no network call here.
+///
+/// No period filter: gossiped profiles are snapshots without per-play timestamps,
+/// so community charts are all-time only.
+// ponytail: reads whole peer_profiles table each call; add a materialized cache if
+// profile counts ever get large enough to matter.
+pub fn get_community_charts(conn: &Connection, limit: i32) -> Vec<ChartEntry> {
+    // canonical_id -> (artist, title, summed play_count)
+    let mut agg: HashMap<String, (String, String, i32)> = HashMap::new();
+
+    let merge = |agg: &mut HashMap<String, (String, String, i32)>, e: ChartEntry| {
+        let slot = agg
+            .entry(e.canonical_id)
+            .or_insert_with(|| (String::new(), String::new(), 0));
+        slot.2 += e.play_count;
+        if slot.0.is_empty() && !e.artist.is_empty() {
+            slot.0 = e.artist;
+        }
+        if slot.1.is_empty() && !e.title.is_empty() {
+            slot.1 = e.title;
+        }
+    };
+
+    // Local contribution (all-time).
+    for e in get_top_tracks(conn, "all", limit.max(0)) {
+        merge(&mut agg, e);
+    }
+
+    // Peer contributions from stored profiles.
+    if let Ok(mut stmt) = conn.prepare("SELECT profile_data FROM peer_profiles") {
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0));
+        if let Ok(rows) = rows {
+            for data in rows.filter_map(|r| r.ok()) {
+                let profile: crate::taste_profile::TasteProfile = match serde_json::from_str(&data)
+                {
+                    Ok(p) => p,
+                    Err(_) => continue, // skip malformed / old profiles without top_tracks
+                };
+                for e in profile.top_tracks {
+                    merge(&mut agg, e);
+                }
+            }
+        }
+    }
+
+    let mut entries: Vec<ChartEntry> = agg
+        .into_iter()
+        .map(|(canonical_id, (artist, title, play_count))| ChartEntry {
+            canonical_id,
+            artist,
+            title,
+            play_count,
+        })
+        .collect();
+    entries.sort_by(|a, b| {
+        b.play_count
+            .cmp(&a.play_count)
+            .then_with(|| a.canonical_id.cmp(&b.canonical_id))
+    });
+    entries.truncate(limit.max(0) as usize);
+    entries
+}
+
+// ─── Tauri commands ───
 
 #[tauri::command]
 pub fn get_top_tracks_cmd(
@@ -71,6 +137,16 @@ pub fn get_top_tracks_cmd(
     let db = app.state::<crate::db::Db>();
     let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     Ok(get_top_tracks(&conn, &period, limit))
+}
+
+#[tauri::command]
+pub fn get_community_charts_cmd(
+    app: tauri::AppHandle,
+    limit: i32,
+) -> Result<Vec<ChartEntry>, String> {
+    let db = app.state::<crate::db::Db>();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
+    Ok(get_community_charts(&conn, limit))
 }
 
 #[cfg(test)]
@@ -213,5 +289,110 @@ mod tests {
             top[0].play_count, 4,
             "play_count must not be inflated by the join"
         );
+    }
+
+    // Insert a peer profile JSON carrying the given top_tracks.
+    fn seed_peer(conn: &Connection, hash: &str, top: &[(&str, &str, &str, i32)]) {
+        let top_tracks: Vec<ChartEntry> = top
+            .iter()
+            .map(|(id, artist, title, n)| ChartEntry {
+                canonical_id: id.to_string(),
+                artist: artist.to_string(),
+                title: title.to_string(),
+                play_count: *n,
+            })
+            .collect();
+        let data = serde_json::json!({
+            "version": 1,
+            "liked_hashes": [],
+            "listen_pairs": [],
+            "genre_weights": {},
+            "total_listens": 0,
+            "generated_at": 0,
+            "top_tracks": top_tracks,
+        })
+        .to_string();
+        crate::aggregator::store_peer_profile(conn, hash, &data);
+    }
+
+    #[test]
+    fn test_community_merges_local_and_peers() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        let now = Utc::now().timestamp();
+
+        // Local: track "x" played twice.
+        seed_identity(&conn, "x", "ArtX", "SongX");
+        for _ in 0..2 {
+            record_listen(&conn, "x", "youtube", now - 3600, 200, 200, true, false);
+        }
+
+        // Peer 1: "x" +3, "y" +5. Peer 2: "x" +1.
+        seed_peer(
+            &conn,
+            "p1",
+            &[("x", "ArtX", "SongX", 3), ("y", "ArtY", "SongY", 5)],
+        );
+        seed_peer(&conn, "p2", &[("x", "ArtX", "SongX", 1)]);
+
+        let top = get_community_charts(&conn, 10);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].canonical_id, "x", "x = 2+3+1 = 6 > y = 5");
+        assert_eq!(top[0].play_count, 6);
+        assert_eq!(top[1].canonical_id, "y");
+        assert_eq!(top[1].play_count, 5);
+    }
+
+    #[test]
+    fn test_community_uses_peer_metadata_for_unknown_track() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        // Track never heard locally — metadata must come from the peer profile.
+        seed_peer(&conn, "p1", &[("z", "ArtZ", "SongZ", 4)]);
+        let top = get_community_charts(&conn, 10);
+        assert_eq!(top.len(), 1);
+        assert_eq!(top[0].canonical_id, "z");
+        assert_eq!(top[0].artist, "ArtZ");
+        assert_eq!(top[0].title, "SongZ");
+        assert_eq!(top[0].play_count, 4);
+    }
+
+    #[test]
+    fn test_community_skips_malformed_peer_profiles() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        let now = Utc::now().timestamp();
+        seed_identity(&conn, "x", "ArtX", "SongX");
+        record_listen(&conn, "x", "youtube", now - 3600, 200, 200, true, false);
+
+        crate::aggregator::store_peer_profile(&conn, "bad", "not json at all");
+        // Old-format profile without top_tracks parses (serde default) and contributes nothing.
+        crate::aggregator::store_peer_profile(&conn, "old", r#"{"liked_hashes":["x"]}"#);
+
+        let top = get_community_charts(&conn, 10);
+        assert_eq!(top.len(), 1);
+        assert_eq!(top[0].play_count, 1, "only the local play counts");
+    }
+
+    #[test]
+    fn test_community_respects_limit() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        seed_peer(
+            &conn,
+            "p1",
+            &[("a", "A", "a", 5), ("b", "A", "b", 4), ("c", "A", "c", 3)],
+        );
+        let top = get_community_charts(&conn, 2);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].canonical_id, "a");
+        assert_eq!(top[1].canonical_id, "b");
+    }
+
+    #[test]
+    fn test_community_empty() {
+        let db = test_db();
+        let conn = db.0.lock().unwrap();
+        assert!(get_community_charts(&conn, 10).is_empty());
     }
 }

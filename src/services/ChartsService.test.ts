@@ -29,4 +29,11 @@ describe('ChartsService', () => {
     transport.setResponse('get_top_tracks_cmd', rows)
     expect(await svc.getTopTracks('all')).toEqual(rows)
   })
+
+  it('getCommunityCharts calls the community command with a default limit of 50', async () => {
+    transport.setResponse('get_community_charts_cmd', [])
+    await svc.getCommunityCharts()
+    expect(transport.lastCall?.command).toBe('get_community_charts_cmd')
+    expect(transport.lastCall?.args).toEqual({ limit: 50 })
+  })
 })
