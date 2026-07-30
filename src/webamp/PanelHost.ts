@@ -1,4 +1,5 @@
 import type { UIRegistry } from '../core/UIRegistry'
+import { retroWindow, prettifyPanelId } from './retro'
 
 /**
  * Generic host for panels registered via `ctx.ui.registerPanel(id, render)`.
@@ -25,7 +26,12 @@ export class PanelHost {
     container.className = 'goamp-dynamic-panel'
     container.dataset.panelId = id
     container.style.cssText = 'position:fixed;top:120px;left:120px;z-index:19000;'
-    container.appendChild(render())
+    // Wrap the panel body in retro Winamp chrome (draggable titlebar + close).
+    const frame = retroWindow(
+      { title: prettifyPanelId(id), onClose: () => this.toggle(id), dragTarget: container },
+      render(),
+    )
+    container.appendChild(frame)
     document.body.appendChild(container)
     this.mounted.set(id, container)
   }
