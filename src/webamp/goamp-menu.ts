@@ -198,11 +198,13 @@ function showGoampMenu(x: number, y: number) {
       shortcut: "Ctrl+O",
       action: () => { if (webampRef) openFolder(webampRef); },
       separator: true,
+      icon: "folder",
     },
     {
       label: "Open Files",
       shortcut: "Ctrl+Shift+O",
       action: () => { if (webampRef) openFiles(webampRef); },
+      icon: "folder",
     },
     {
       label: "Load Skin",

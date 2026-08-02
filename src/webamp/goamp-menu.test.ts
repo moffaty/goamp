@@ -101,6 +101,18 @@ describe("initGoampMenu", () => {
     expect(toggleSearchOverlay).toHaveBeenCalled();
   });
 
+  it("renders a folder glyph on the Open Folder built-in", () => {
+    initGoampMenu({} as any);
+    webampEl.querySelector(".webamp-inner")!.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, clientX: 100, clientY: 100 })
+    );
+    const menu = document.getElementById("goamp-context-menu")!;
+    const row = Array.from(menu.querySelectorAll("div[style*='cursor: pointer']")).find(
+      (r) => r.querySelector("span")?.textContent === "Open Folder"
+    )!;
+    expect(row.querySelector("svg")).not.toBeNull();
+  });
+
   it("closes menu on Escape key", () => {
     initGoampMenu({} as any);
 
