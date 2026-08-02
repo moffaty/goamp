@@ -120,8 +120,6 @@ func ApplyDataDir(cfg *Config, dir string) {
 
 // Load reads the TOML file at path (if it exists) over the defaults.
 // If path is empty or the file does not exist, returns defaults unchanged.
-// TODO(you): implement TOML decoding using github.com/BurntSushi/toml.
-// Hint: toml.DecodeFile(path, cfg) merges only the keys present in the file.
 func Load(path string) (*Config, error) {
 	cfg := Default()
 	if path == "" {
@@ -133,6 +131,5 @@ func Load(path string) (*Config, error) {
 	if _, err := toml.DecodeFile(path, cfg); err != nil {
 		return nil, err
 	}
-	// TODO(you): expand "~" in all path fields after decoding.
 	return cfg, nil
 }
