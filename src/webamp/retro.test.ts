@@ -18,6 +18,11 @@ describe('retroIcon', () => {
   it('returns empty string for unknown icon', () => {
     expect(retroIcon('nope')).toBe('')
   })
+  it('has glyphs for the menu-wired names', () => {
+    for (const name of ['charts', 'peers', 'folder', 'note']) {
+      expect(retroIcon(name)).toContain('<svg')
+    }
+  })
 })
 
 describe('retroWindow', () => {

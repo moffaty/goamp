@@ -17,7 +17,7 @@ export interface IPlayer {
 export interface IUIRegistry {
   registerPanel(id: string, render: () => HTMLElement): void
   registerShortcut(keys: string, handler: () => void): void
-  registerMenuItem(label: string, handler: () => void): void
+  registerMenuItem(label: string, handler: () => void, icon?: string): void
   /** Open/close a previously registered panel by id. No-ops if no host is wired. */
   togglePanel(id: string): void
 }

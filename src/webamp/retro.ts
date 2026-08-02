@@ -8,15 +8,39 @@
 
 // ── Pixel icon pack (inline SVG, no assets) ──────────────────────────────────
 // 8×8 crisp-edges glyphs. Grows as consumers appear — only what's used ships.
+const SVG = '<svg viewBox="0 0 8 8" width="8" height="8" shape-rendering="crispEdges" fill="#c8c8ff">'
 const ICONS: Record<string, string> = {
   // classic Winamp titlebar close: an X in the corner.
   close:
-    '<svg viewBox="0 0 8 8" width="8" height="8" shape-rendering="crispEdges" fill="#c8c8ff">' +
+    SVG +
     '<rect x="1" y="1" width="1" height="1"/><rect x="6" y="1" width="1" height="1"/>' +
     '<rect x="2" y="2" width="1" height="1"/><rect x="5" y="2" width="1" height="1"/>' +
     '<rect x="3" y="3" width="2" height="2"/>' +
     '<rect x="2" y="5" width="1" height="1"/><rect x="5" y="5" width="1" height="1"/>' +
     '<rect x="1" y="6" width="1" height="1"/><rect x="6" y="6" width="1" height="1"/></svg>',
+  // ascending bar-chart columns.
+  charts:
+    SVG +
+    '<rect x="1" y="5" width="1" height="2"/>' +
+    '<rect x="3" y="3" width="1" height="4"/>' +
+    '<rect x="5" y="1" width="1" height="6"/></svg>',
+  // two peers linked by a bar.
+  peers:
+    SVG +
+    '<rect x="1" y="2" width="2" height="2"/><rect x="5" y="2" width="2" height="2"/>' +
+    '<rect x="3" y="2" width="2" height="1"/>' +
+    '<rect x="1" y="5" width="2" height="1"/><rect x="5" y="5" width="2" height="1"/></svg>',
+  // classic folder with a tab.
+  folder:
+    SVG +
+    '<rect x="1" y="2" width="3" height="1"/>' +
+    '<rect x="0" y="3" width="8" height="4"/></svg>',
+  // eighth note.
+  note:
+    SVG +
+    '<rect x="5" y="1" width="1" height="5"/>' +
+    '<rect x="6" y="1" width="1" height="2"/>' +
+    '<rect x="2" y="5" width="3" height="2"/></svg>',
 }
 
 /** Returns the inline SVG markup for a pixel icon, or '' if unknown. */

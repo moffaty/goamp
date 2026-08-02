@@ -45,7 +45,7 @@ describe('ChartsFeature', () => {
   it('init registers a menu item "Charts"', async () => {
     const ctx = makeCtx(transport)
     await feature.init(ctx)
-    expect(ctx.ui.registerMenuItem).toHaveBeenCalledWith('Charts', expect.any(Function))
+    expect(ctx.ui.registerMenuItem).toHaveBeenCalledWith('Charts', expect.any(Function), 'charts')
   })
 
   it('the "Charts" menu item toggles the charts panel', async () => {

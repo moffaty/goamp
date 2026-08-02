@@ -29,3 +29,9 @@ src-tauri/binaries/
 *.sln
 *.sw?
 goamp-node/goamp-node
+
+# Tool runtime state (not source)
+.omc/
+.superpowers/
+**/__pycache__/
+docs/superpowers/plans/.omc/

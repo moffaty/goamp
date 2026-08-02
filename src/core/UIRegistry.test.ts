@@ -32,6 +32,14 @@ describe('UIRegistry', () => {
     expect(r.menuItems.map((m) => m.label)).toEqual(['A', 'B'])
   })
 
+  it('registerMenuItem stores an optional icon (and leaves it undefined without one)', () => {
+    const r = new UIRegistry()
+    r.registerMenuItem('Charts', () => {}, 'charts')
+    r.registerMenuItem('Plain', () => {})
+    expect(r.menuItems[0].icon).toBe('charts')
+    expect(r.menuItems[1].icon).toBeUndefined()
+  })
+
   it('registerShortcut appends', () => {
     const r = new UIRegistry()
     r.registerShortcut('Ctrl+P', () => {})

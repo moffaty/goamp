@@ -15,6 +15,7 @@ import { openFolder, openFiles, loadSkin } from "./file-actions";
 import { moodService } from "../recommendations/mood-service";
 import type Webamp from "webamp";
 import type { UIRegistry } from "../core/UIRegistry";
+import { retroIcon } from "./retro";
 let menu: HTMLDivElement | null = null;
 let webampRef: Webamp | null = null;
 let registryRef: UIRegistry | null = null;
@@ -29,6 +30,8 @@ export interface MenuItem {
   shortcut?: string;
   action: () => void;
   separator?: boolean;
+  /** Optional retro glyph name (see retroIcon); rendered before the label. */
+  icon?: string;
 }
 
 /**
@@ -41,7 +44,7 @@ export function buildDynamicMenuItems(registry: UIRegistry | null): MenuItem[] {
   if (!registry || registry.menuItems.length === 0) return [];
   return [
     { label: "", action: () => {}, separator: true },
-    ...registry.menuItems.map((i) => ({ label: i.label, action: i.handler })),
+    ...registry.menuItems.map((i) => ({ label: i.label, action: i.handler, icon: i.icon })),
   ];
 }
 
@@ -267,7 +270,17 @@ function showGoampMenu(x: number, y: number) {
     });
 
     const label = document.createElement("span");
-    label.textContent = item.label;
+    // Optional retro glyph before the label; empty markup ⇒ no span, no gap.
+    const iconMarkup = item.icon ? retroIcon(item.icon) : "";
+    if (iconMarkup) {
+      const iconSpan = document.createElement("span");
+      iconSpan.className = "goamp-menu-icon";
+      iconSpan.innerHTML = iconMarkup;
+      iconSpan.style.cssText = "display:inline-flex;align-items:center;margin-right:6px;";
+      label.style.cssText = "display:inline-flex;align-items:center;";
+      label.prepend(iconSpan);
+    }
+    label.append(item.label);
 
     const shortcut = document.createElement("span");
     shortcut.textContent = item.shortcut || "";
