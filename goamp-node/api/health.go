@@ -9,7 +9,6 @@ import (
 var startTime = time.Now()
 
 // handleHealth responds with node status, uptime, and peer count.
-// TODO(you): fill in peer_count from s.node.Peers(), mode from config.
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	peerCount := 0
 	if s.node != nil {
@@ -25,7 +24,6 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // handlePeers returns the list of connected peers.
-// TODO(you): return peers from s.node.Peers() as JSON.
 func (s *Server) handlePeers(w http.ResponseWriter, r *http.Request) {
 	var peers []map[string]any
 	if s.node != nil {

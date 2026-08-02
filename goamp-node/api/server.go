@@ -28,13 +28,11 @@ func New(node sdk.Node, cat sdk.Catalog, prof sdk.ProfileAggregator, loader *plu
 		hub:      newWSHub(),
 	}
 	// Wire node events to WebSocket hub so Tauri receives them in real time.
-	// TODO(you): in node.go, call s.hub.Broadcast when Emit is called.
 	return s
 }
 
 // Start registers all routes and calls http.ListenAndServe.
 // It blocks until the server stops.
-// TODO(you): register all routes (see plan), call http.ListenAndServe(addr, mux).
 func (s *Server) Start(addr string) error {
 	mux := http.NewServeMux()
 

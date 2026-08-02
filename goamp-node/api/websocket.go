@@ -43,7 +43,6 @@ func (h *WSHub) Broadcast(event sdk.Event) {
 
 // ServeWS upgrades an HTTP connection to WebSocket and keeps it open.
 // The client receives JSON events pushed via Broadcast.
-// TODO(you): this is complete; no changes needed.
 func (h *WSHub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

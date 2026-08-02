@@ -11,7 +11,6 @@ import (
 )
 
 // handleProfileSync handles POST /profiles/sync body: TasteProfile JSON
-// TODO(you): decode body as proto.TasteProfile, call s.profiles.Submit, return 204.
 func (s *Server) handleProfileSync(w http.ResponseWriter, r *http.Request) {
 	var profile proto.TasteProfile
 	if err := json.NewDecoder(r.Body).Decode(&profile); err != nil {
@@ -71,7 +70,6 @@ func (s *Server) handleGetPeerProfiles(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleRecommendations handles GET /recommendations
-// TODO(you): call s.profiles.GetRecommendations, return JSON.
 func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
 	recs, err := s.profiles.GetRecommendations(r.Context(), nil)
 	if err != nil {

@@ -11,7 +11,6 @@ import (
 )
 
 // handleCatalogSearch handles GET /catalog/search?q=&genre=&limit=
-// TODO(you): parse query params, call s.catalog.Search, return JSON.
 func (s *Server) handleCatalogSearch(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	genreParam := r.URL.Query().Get("genre")
@@ -39,7 +38,6 @@ func (s *Server) handleCatalogSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleCatalogAnnounce handles POST /catalog/announce body: {"track_id":"..."}
-// TODO(you): decode body, call s.catalog.Announce, return 204.
 func (s *Server) handleCatalogAnnounce(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		TrackID string `json:"track_id"`

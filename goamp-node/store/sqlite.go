@@ -21,7 +21,6 @@ type SQLiteStore struct {
 // Open opens (or creates) the SQLite database at dataDir/node.db and runs
 // the schema migrations.
 // For tests, pass ":memory:" as dataDir to use an in-memory database.
-// TODO(you): implement the CRUD methods below.
 func Open(dataDir string) (*SQLiteStore, error) {
 	var dsn string
 	if dataDir == ":memory:" {
@@ -44,7 +43,6 @@ func (s *SQLiteStore) Close() error {
 }
 
 // IndexTrack upserts a track into the local catalog.
-// TODO(you): INSERT OR REPLACE INTO tracks(...) VALUES(...)
 func (s *SQLiteStore) IndexTrack(ctx context.Context, t *proto.Track) error {
 	_, err := s.db.ExecContext(ctx, `
 		INSERT OR REPLACE INTO tracks
@@ -58,7 +56,6 @@ func (s *SQLiteStore) IndexTrack(ctx context.Context, t *proto.Track) error {
 
 // SearchTracks returns tracks matching q (case-insensitive substring on artist or title)
 // and optionally filtered by genres.
-// TODO(you): build the SQL dynamically based on genres slice.
 func (s *SQLiteStore) SearchTracks(ctx context.Context, q string, genres []string, limit int) ([]*proto.Track, error) {
 	if limit <= 0 {
 		limit = 20
@@ -100,7 +97,6 @@ func (s *SQLiteStore) SearchTracks(ctx context.Context, q string, genres []strin
 }
 
 // AnnounceProvider records that peerID has the given trackID available.
-// TODO(you): INSERT OR REPLACE INTO providers(track_id, peer_id, announced_at) VALUES(?,?,unixepoch())
 func (s *SQLiteStore) AnnounceProvider(ctx context.Context, trackID, peerID string) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT OR REPLACE INTO providers (track_id, peer_id, announced_at) VALUES (?, ?, unixepoch())`,
@@ -129,7 +125,6 @@ func (s *SQLiteStore) FindProviders(ctx context.Context, trackID string) ([]stri
 
 // UpsertPeer stores or updates a peer in the peer book.
 // Addrs and Protocols are serialised as JSON arrays.
-// TODO(you): marshal slices to JSON, then INSERT OR REPLACE INTO peers(...)
 func (s *SQLiteStore) UpsertPeer(ctx context.Context, p Peer) error {
 	addrs, _ := json.Marshal(p.Addrs)
 	protocols, _ := json.Marshal(p.Protocols)

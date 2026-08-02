@@ -2,7 +2,6 @@ package store
 
 // schema is the SQLite DDL executed on every Open() call.
 // All statements use IF NOT EXISTS so they are idempotent.
-// TODO(you): verify column types match the proto.Track fields you use.
 const schema = `
 CREATE TABLE IF NOT EXISTS tracks (
     id             TEXT PRIMARY KEY,
