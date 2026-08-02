@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {"type": "command", "command": "if echo \"$CLAUDE_FILE_PATHS\" | grep -q '\\.rs$'; then PATH=\"$HOME/.cargo/bin:$PATH\" cargo fmt --manifest-path src-tauri/Cargo.toml --quiet 2>/dev/null; fi"}
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {"type": "command", "command": "if echo \"$CLAUDE_FILE_PATHS\" | grep -q -E 'Cargo\\.lock|pnpm-lock'; then echo 'BLOCK: lock files should not be edited directly' >&2; exit 2; fi"}
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {"type": "command", "command": "python3 /home/moffaty/projects/goamp/.claude/hooks/destructive-command-guard.py"},
+          {"type": "command", "command": "python3 /home/moffaty/projects/goamp/.claude/hooks/git-destructive-guard.py"}
+        ]
+      },
+      {
+        "matcher": "Bash|Read|Edit|Write",
+        "hooks": [
+          {"type": "command", "command": "python3 /home/moffaty/projects/goamp/.claude/hooks/secret-leak-guard.py"}
+        ]
+      },
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {"type": "command", "command": "python3 /home/moffaty/projects/goamp/.claude/hooks/self-harm-guard.py"}
+        ]
+      }
+    ]
+  }
+}

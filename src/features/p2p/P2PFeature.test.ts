@@ -125,7 +125,7 @@ describe('P2PFeature', () => {
     it('init registers a menu item "Peers"', async () => {
       const ctx = makeCtx()
       await feature.init(ctx)
-      expect(ctx.ui.registerMenuItem).toHaveBeenCalledWith('Peers', expect.any(Function))
+      expect(ctx.ui.registerMenuItem).toHaveBeenCalledWith('Peers', expect.any(Function), 'peers')
     })
 
     it('the "Peers" menu item toggles the p2p-peers panel', async () => {

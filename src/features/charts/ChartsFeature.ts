@@ -31,7 +31,7 @@ export class ChartsFeature implements IFeature {
 
   async init(ctx: ModuleContext): Promise<void> {
     ctx.ui.registerPanel('charts', () => this.renderChartsPanel())
-    ctx.ui.registerMenuItem('Charts', () => ctx.ui.togglePanel('charts'))
+    ctx.ui.registerMenuItem('Charts', () => ctx.ui.togglePanel('charts'), 'charts')
   }
 
   /** "Your Top Tracks" panel with a Week/Month/All period toggle. */

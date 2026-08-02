@@ -1,0 +1,44 @@
+schema: spec-driven
+
+context: |
+  GOAMP — Winamp-inspired music player. Tauri (Rust backend) + TypeScript/vitest
+  frontend + Go sidecar (goamp-node) for P2P (libp2p, GossipSub, DHT).
+  Modular "framework not app" architecture: GoampCore fluent builder
+  (.renderer().transport().source().feature().start()); modules implement
+  IRenderer/ISource/IFeature and receive ModuleContext (ctx.player, ctx.events,
+  ctx.ui, ctx.storage, ctx.transport). Frontend routes through a typed service
+  layer — never direct invoke(). Testing: frontend Tauri-free via MockTransport;
+  Rust via in-memory SQLite (crate::db::test_db()). Conventions: master branch,
+  feature branches only, no Co-Authored-By trailer, commit after approval.
+  Ponytail mode: laziest solution that works, stdlib-first, fewest files.
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

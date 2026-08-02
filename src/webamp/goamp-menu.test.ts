@@ -156,6 +156,38 @@ describe("buildDynamicMenuItems", () => {
     expect(items.slice(1).map((i) => i.label)).toEqual(["Peers", "Debug"]);
   });
 
+  it("carries the registered icon name through to the MenuItem", () => {
+    const r = new UIRegistry();
+    r.registerMenuItem("Charts", () => {}, "charts");
+    expect(buildDynamicMenuItems(r)[1].icon).toBe("charts");
+  });
+
+  it("renders an svg glyph for an icon-bearing item, none for a plain one", () => {
+    const registry = new UIRegistry();
+    registry.registerMenuItem("Charts", () => {}, "charts");
+    registry.registerMenuItem("Plain", () => {});
+
+    const webampEl = document.createElement("div");
+    webampEl.id = "webamp";
+    document.body.appendChild(webampEl);
+
+    initGoampMenu({} as any, registry);
+    webampEl.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, clientX: 50, clientY: 50 })
+    );
+
+    const menu = document.getElementById("goamp-context-menu")!;
+    const rowFor = (label: string) =>
+      Array.from(menu.querySelectorAll("div[style*='cursor: pointer']")).find(
+        (row) => row.querySelector("span")?.textContent === label
+      )!;
+    expect(rowFor("Charts").querySelector("svg")).not.toBeNull();
+    expect(rowFor("Plain").querySelector("svg")).toBeNull();
+
+    document.getElementById("goamp-context-menu")?.remove();
+    webampEl.remove();
+  });
+
   it("the returned action invokes the original handler", () => {
     const r = new UIRegistry();
     const handler = vi.fn();

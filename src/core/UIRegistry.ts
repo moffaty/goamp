@@ -3,6 +3,8 @@ import type { IUIRegistry } from './ModuleContext'
 export interface MenuItemEntry {
   label: string
   handler: () => void
+  /** Optional retro glyph name (see retroIcon); rendered before the label. */
+  icon?: string
 }
 
 export interface ShortcutEntry {
@@ -31,8 +33,8 @@ export class UIRegistry implements IUIRegistry {
     this._panels.set(id, render)
   }
 
-  registerMenuItem(label: string, handler: () => void): void {
-    this._menuItems.push({ label, handler })
+  registerMenuItem(label: string, handler: () => void, icon?: string): void {
+    this._menuItems.push({ label, handler, icon })
   }
 
   registerShortcut(keys: string, handler: () => void): void {

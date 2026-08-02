@@ -37,7 +37,7 @@ export class P2PFeature implements IFeature {
 
     // Register the peer-list panel + a menu item to reach it.
     ctx.ui.registerPanel('p2p-peers', () => this.renderPeerPanel())
-    ctx.ui.registerMenuItem('Peers', () => ctx.ui.togglePanel('p2p-peers'))
+    ctx.ui.registerMenuItem('Peers', () => ctx.ui.togglePanel('p2p-peers'), 'peers')
   }
 
   /** Renders the peer-list panel: count header + async-loaded peer rows. */
