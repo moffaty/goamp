@@ -25,6 +25,18 @@ export async function searchYoutube(
   });
 }
 
+/** Import a whole album/set/playlist by URL (SoundCloud set, YouTube playlist, …). */
+export async function importPlaylist(url: string): Promise<YoutubeResult[]> {
+  return invoke("import_playlist", { url });
+}
+
+/** True if the string looks like a playlist/album/set URL we can import. */
+export function isPlaylistUrl(s: string): boolean {
+  const t = s.trim();
+  if (!/^https?:\/\//i.test(t)) return false;
+  return /\/sets\//i.test(t) || /[?&]list=/i.test(t) || /\/playlist/i.test(t);
+}
+
 export async function extractAudio(videoId: string): Promise<string> {
   return invoke("extract_audio", { videoId });
 }

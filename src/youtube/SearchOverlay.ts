@@ -3,6 +3,8 @@ import {
   searchYoutube,
   extractAudio,
   extractAudioUrl,
+  importPlaylist,
+  isPlaylistUrl,
   type YoutubeResult,
   type SearchSource,
 } from "./youtube-service";
@@ -60,7 +62,7 @@ function openOverlay() {
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
         </div>
-        <input type="text" id="yt-search-input" placeholder="Search ${currentSource === "soundcloud" ? "SoundCloud" : "YouTube"}..." autocomplete="off"
+        <input type="text" id="yt-search-input" placeholder="Search ${currentSource === "soundcloud" ? "SoundCloud" : "YouTube"} or paste an album URL..." autocomplete="off"
                style="background:${c.textBg};color:${c.text};border-color:${c.fg}" />
         <button id="yt-search-close" style="color:${c.text}">\u00d7</button>
       </div>
@@ -90,7 +92,7 @@ function openOverlay() {
       });
       // Update placeholder
       const inp = document.getElementById("yt-search-input") as HTMLInputElement;
-      if (inp) inp.placeholder = `Search ${src === "soundcloud" ? "SoundCloud" : "YouTube"}...`;
+      if (inp) inp.placeholder = `Search ${src === "soundcloud" ? "SoundCloud" : "YouTube"} or paste an album URL...`;
       // Clear results on source switch
       allResults = [];
       const results = document.getElementById("yt-search-results");
@@ -161,6 +163,13 @@ function hideSuggestions() {
   document.getElementById("yt-suggestions")?.remove();
 }
 
+/** hh:mm-ish total for an album/set, e.g. "3h 28m" or "14m". */
+function formatTotal(secs: number): string {
+  const h = Math.floor(secs / 3600);
+  const m = Math.round((secs % 3600) / 60);
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
 async function doSearch(query: string) {
   if (!query.trim()) return;
   currentQuery = query.trim();
@@ -169,6 +178,11 @@ async function doSearch(query: string) {
   const status = document.getElementById("yt-search-status");
   const results = document.getElementById("yt-search-results");
   if (!status || !results) return;
+
+  // Pasting an album/set/playlist URL imports the whole tracklist.
+  if (isPlaylistUrl(currentQuery)) {
+    return doImport(currentQuery, status, results);
+  }
 
   status.innerHTML = `<span class="yt-loading">Searching</span>`;
   results.innerHTML = "";
@@ -188,6 +202,64 @@ async function doSearch(query: string) {
     status.textContent = `Error: ${e}`;
     trackError(e, { action: "youtube_search" });
   }
+}
+
+async function doImport(url: string, status: HTMLElement, results: HTMLElement) {
+  status.innerHTML = `<span class="yt-loading">Importing album</span>`;
+  results.innerHTML = "";
+  allResults = [];
+
+  try {
+    const items = await importPlaylist(url);
+    allResults = items;
+    localStorage.setItem("goamp_yt_last_results", JSON.stringify(items));
+    track("playlist_import", { source: items[0]?.source ?? "unknown", tracks: items.length });
+    showPage(results, 0, "none");
+    renderImportSummary(items, status);
+  } catch (e) {
+    status.textContent = `Error: ${e}`;
+    trackError(e, { action: "import_playlist" });
+  }
+}
+
+/** Status line with track count + total duration, plus a "Queue all" action. */
+function renderImportSummary(items: YoutubeResult[], status: HTMLElement) {
+  const total = items.reduce((s, i) => s + (i.duration || 0), 0);
+  status.textContent = `${items.length} tracks • ${formatTotal(total)} • `;
+
+  const queueAllBtn = document.createElement("span");
+  queueAllBtn.textContent = "➕ Queue all";
+  queueAllBtn.style.cssText = "cursor:pointer;text-decoration:underline;";
+  queueAllBtn.addEventListener("click", () => queueAll(items, status));
+  status.appendChild(queueAllBtn);
+}
+
+/**
+ * Append every imported track to the Webamp queue. YouTube uses the lazy
+ * goampaudio:// scheme (instant, streams on play); SoundCloud eager-extracts
+ * each track (same path as a single-track add today).
+ * ponytail: SC is sequential eager download — a lazy source-aware goampaudio
+ * scheme would make SC albums instant too; follow-up.
+ */
+async function queueAll(items: YoutubeResult[], status: HTMLElement) {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    status.textContent = `Queuing ${i + 1}/${items.length}…`;
+    try {
+      let url: string;
+      if (item.source === "youtube") {
+        url = convertFileSrc(item.id, "goampaudio"); // lazy — no download now
+      } else {
+        url = convertFileSrc(await extractForItem(item)); // eager cache file
+      }
+      webampRef?.appendTracks([
+        { metaData: { artist: item.channel, title: item.title }, url, duration: item.duration },
+      ]);
+    } catch (e) {
+      trackError(e, { action: "queue_all", video_id: item.id });
+    }
+  }
+  status.textContent = `Queued ${items.length} tracks`;
 }
 
 async function ensureResultsForPage(page: number): Promise<boolean> {

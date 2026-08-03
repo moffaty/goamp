@@ -1,7 +1,7 @@
 {
-  "tool_name": "Glob",
-  "tool_input_preview": "{\"pattern\":\".claude/hooks/*.py\"}",
-  "error": "Ripgrep search timed out after 60 seconds. The search may have matched files but did not complete in time. Try searching a more specific path or pattern.",
-  "timestamp": "2026-04-21T08:49:32.118Z",
-  "retry_count": 2
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /home/moffaty/projects/goamp && git checkout -q -b feature/community-charts && git add src-tauri/src/charts.rs src-tauri/src/taste_profile.rs src-tauri/src/lib.rs src/services/interface...",
+  "error": "Exit code 1\n╭──────────────────────────────────────╮\n│ 🥊 lefthook v2.1.4  hook: pre-commit │\n╰──────────────────────────────────────╯\n┃  rust-fmt ❯ \n\nDiff in /home/moffaty/projects/goamp/src-tauri/src/charts.rs:96:\r\n         let rows = stmt.query_map([], |row| row.get::<_, String>(0));\r\n         if let Ok(rows) = rows {\r\n             for data in rows.filter_map(|r| r.ok()) {\r\n\u001b[31m-                let profile: crate::taste_profile::TasteProfile =\r\n\u001b(B\u001b[m\u001b[31m-                    match serde_jso...",
+  "timestamp": "2026-07-30T14:42:57.346Z",
+  "retry_count": 1
 }

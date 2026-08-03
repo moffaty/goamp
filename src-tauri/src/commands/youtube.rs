@@ -222,55 +222,103 @@ pub async fn search_youtube(
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let results: Vec<YoutubeResult> = stdout
+    Ok(parse_entries(&stdout, src))
+}
+
+/// Infer the logical source from a page/playlist URL host.
+fn infer_source(url: &str) -> &'static str {
+    if url.contains("soundcloud.com") {
+        "soundcloud"
+    } else {
+        "youtube"
+    }
+}
+
+/// Parse one yt-dlp `--dump-json` line into a YoutubeResult, or None if unusable
+/// (missing id, or a SoundCloud ≤31s preview). Pure — unit-testable without yt-dlp.
+fn parse_entry(line: &str, src: &str) -> Option<YoutubeResult> {
+    let entry: YtDlpEntry = serde_json::from_str(line).ok()?;
+    let id = entry.id?;
+    let title = entry.title.unwrap_or_else(|| "Unknown".into());
+    let channel = entry
+        .channel
+        .or(entry.uploader)
+        .unwrap_or_else(|| "Unknown".into());
+    let duration = entry.duration.unwrap_or(0.0);
+
+    // Filter out SoundCloud 30-second previews (unauthenticated).
+    if src == "soundcloud" && duration <= 31.0 {
+        return None;
+    }
+
+    let thumbnail = entry
+        .thumbnail
+        .or_else(|| {
+            entry
+                .thumbnails
+                .and_then(|t| t.into_iter().last())
+                .and_then(|t| t.url)
+        })
+        .unwrap_or_default();
+
+    let webpage_url = entry.webpage_url.unwrap_or_default();
+
+    // Genre: prefer explicit genre field (SoundCloud), fall back to first category (YouTube).
+    let genre = entry
+        .genre
+        .or_else(|| entry.categories.and_then(|c| c.into_iter().next()))
+        .unwrap_or_default();
+
+    Some(YoutubeResult {
+        id,
+        title,
+        channel,
+        duration,
+        thumbnail,
+        source: src.to_string(),
+        webpage_url,
+        genre,
+    })
+}
+
+/// Parse a full yt-dlp `--dump-json` stdout (one JSON object per line).
+fn parse_entries(stdout: &str, src: &str) -> Vec<YoutubeResult> {
+    stdout
         .lines()
         .filter(|line| !line.trim().is_empty())
-        .filter_map(|line| {
-            let entry: YtDlpEntry = serde_json::from_str(line).ok()?;
-            let id = entry.id?;
-            let title = entry.title.unwrap_or_else(|| "Unknown".into());
-            let channel = entry
-                .channel
-                .or(entry.uploader)
-                .unwrap_or_else(|| "Unknown".into());
-            let duration = entry.duration.unwrap_or(0.0);
+        .filter_map(|line| parse_entry(line, src))
+        .collect()
+}
 
-            // Filter out SoundCloud 30-second previews
-            if src == "soundcloud" && duration <= 31.0 {
-                return None;
-            }
+/// Import a whole playlist/album/set by URL (SoundCloud set, YouTube playlist, …).
+/// Uses a full (non-flat) `--dump-json` so each track carries title + duration —
+/// SoundCloud sets return nothing useful under `--flat-playlist`. Source is inferred
+/// from the URL host, so cross-profile re-uploads import the same way.
+#[tauri::command]
+pub async fn import_playlist(
+    app: tauri::AppHandle,
+    url: String,
+) -> Result<Vec<YoutubeResult>, String> {
+    let src = infer_source(&url);
+    let mut args: Vec<String> = cookies_args(&app);
+    args.extend([
+        url,
+        "--dump-json".to_string(),
+        "--no-warnings".to_string(),
+        // Keep emitting good tracks even if one entry in the set fails to resolve.
+        "--ignore-errors".to_string(),
+    ]);
+    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let output = run_ytdlp(&app, &arg_refs).await?;
 
-            let thumbnail = entry
-                .thumbnail
-                .or_else(|| {
-                    entry
-                        .thumbnails
-                        .and_then(|t| t.into_iter().last())
-                        .and_then(|t| t.url)
-                })
-                .unwrap_or_default();
-
-            let webpage_url = entry.webpage_url.unwrap_or_default();
-
-            // Genre: prefer explicit genre field (SoundCloud), fall back to first category (YouTube)
-            let genre = entry
-                .genre
-                .or_else(|| entry.categories.and_then(|c| c.into_iter().next()))
-                .unwrap_or_default();
-
-            Some(YoutubeResult {
-                id,
-                title,
-                channel,
-                duration,
-                thumbnail,
-                source: src.to_string(),
-                webpage_url,
-                genre,
-            })
-        })
-        .collect();
-
+    // yt-dlp may exit non-zero on a partial failure while still printing usable
+    // tracks, so parse stdout regardless and only error when nothing came back.
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let results = parse_entries(&stdout, src);
+    if results.is_empty() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("no tracks found for playlist: {}", stderr));
+    }
     Ok(results)
 }
 
@@ -612,4 +660,61 @@ pub async fn youtube_get_playlist(
         .collect();
 
     Ok(results)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn infers_source_from_url_host() {
+        assert_eq!(
+            infer_source(
+                "https://soundcloud.com/sofiya-chernyak-646218391/sets/koroli-abstrakta-vi"
+            ),
+            "soundcloud"
+        );
+        assert_eq!(
+            infer_source("https://www.youtube.com/playlist?list=PLabc"),
+            "youtube"
+        );
+    }
+
+    #[test]
+    fn parses_a_track_line_with_metadata() {
+        let line = r#"{"id":"t1","title":"Некропатруль","uploader":"ежемесячные","duration":260.0,"webpage_url":"https://soundcloud.com/x/y","genre":"rap"}"#;
+        let r = parse_entry(line, "soundcloud").expect("should parse");
+        assert_eq!(r.id, "t1");
+        assert_eq!(r.title, "Некропатруль");
+        assert_eq!(r.channel, "ежемесячные");
+        assert_eq!(r.duration, 260.0);
+        assert_eq!(r.source, "soundcloud");
+        assert_eq!(r.genre, "rap");
+    }
+
+    #[test]
+    fn drops_soundcloud_preview_but_keeps_full_track() {
+        let preview = r#"{"id":"p","title":"Preview","duration":30.0}"#;
+        let full = r#"{"id":"f","title":"Full","duration":200.0}"#;
+        assert!(parse_entry(preview, "soundcloud").is_none());
+        assert!(parse_entry(full, "soundcloud").is_some());
+        // Same 30s clip on YouTube is not a preview — kept.
+        assert!(parse_entry(preview, "youtube").is_some());
+    }
+
+    #[test]
+    fn parse_entries_sums_a_set() {
+        let stdout = concat!(
+            r#"{"id":"a","title":"A","duration":100.0}"#,
+            "\n",
+            r#"{"id":"b","title":"B","duration":150.0}"#,
+            "\n",
+            "\n", // blank line ignored
+            r#"not-json"#,
+        );
+        let rows = parse_entries(stdout, "soundcloud");
+        assert_eq!(rows.len(), 2);
+        let total: f64 = rows.iter().map(|r| r.duration).sum();
+        assert_eq!(total, 250.0);
+    }
 }

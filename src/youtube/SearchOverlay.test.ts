@@ -12,6 +12,8 @@ vi.mock("./youtube-service", () => ({
   searchYoutube: vi.fn().mockResolvedValue([]),
   extractAudio: vi.fn(),
   extractAudioUrl: vi.fn(),
+  importPlaylist: vi.fn().mockResolvedValue([]),
+  isPlaylistUrl: vi.fn((s: string) => /\/sets\//.test(s) || /[?&]list=/.test(s)),
 }));
 vi.mock("../lib/tauri-ipc", () => ({
   listPlaylists: vi.fn().mockResolvedValue([]),
@@ -139,6 +141,37 @@ describe("SearchOverlay", () => {
     const scTab = document.querySelector('.yt-source-tab[data-source="soundcloud"]') as HTMLElement;
     scTab.click();
     expect(localStorage.getItem("goamp_search_source")).toBe("soundcloud");
+  });
+
+  it("pasting a set URL imports the album and shows total duration + Queue all", async () => {
+    const mod = await freshModule();
+    const { importPlaylist, searchYoutube } = await import("./youtube-service");
+    vi.mocked(searchYoutube).mockClear();
+    vi.mocked(importPlaylist).mockResolvedValue([
+      { id: "a", title: "T1", channel: "Ежемесячные", duration: 470, thumbnail: "", source: "soundcloud", webpage_url: "https://soundcloud.com/x/a", genre: "" },
+      { id: "b", title: "T2", channel: "Ежемесячные", duration: 469, thumbnail: "", source: "soundcloud", webpage_url: "https://soundcloud.com/x/b", genre: "" },
+    ]);
+
+    mod.initSearchOverlay({} as any);
+    mod.toggleSearchOverlay();
+
+    const input = document.getElementById("yt-search-input") as HTMLInputElement;
+    input.value = "https://soundcloud.com/sofiya-chernyak-646218391/sets/koroli-abstrakta-vi";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(importPlaylist).toHaveBeenCalledWith(input.value);
+    });
+    // Imports, not searches.
+    expect(searchYoutube).not.toHaveBeenCalled();
+
+    await vi.waitFor(() => {
+      expect(document.querySelectorAll(".yt-result-row").length).toBe(2);
+    });
+    const status = document.getElementById("yt-search-status")!;
+    expect(status.textContent).toContain("2 tracks");
+    expect(status.textContent).toContain("16m"); // 939s → round(15.65m) = 16m
+    expect(status.textContent).toContain("Queue all");
   });
 
   it("status shows initial hint", async () => {
