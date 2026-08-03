@@ -41,7 +41,7 @@ export class WebampUIFeature implements IFeature {
     // module), so this cast is safe. Wire the panel host + dynamic menu items —
     // read live at right-click / panel-open time so module init order is irrelevant.
     const registry = ctx.ui as UIRegistry
-    const panelHost = new PanelHost(registry)
+    const panelHost = new PanelHost(registry, ctx.storage)
     registry.setPanelHost(panelHost)
     this.cleanups.push(() => panelHost.destroy())
     // TODO: bind a keydown listener over registry.shortcuts when a module first
