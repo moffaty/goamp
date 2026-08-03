@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1776387558352,
+  "lastScanned": 1785648535862,
   "projectRoot": "/home/moffaty/projects/goamp/src-tauri",
   "techStack": {
     "languages": [
@@ -44,7 +44,7 @@
       "path": "binaries",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1776387558349,
+      "lastAccessed": 1785648535837,
       "keyFiles": [
         "goamp-node-x86_64-pc-windows-msvc.exe",
         "goamp-node-x86_64-unknown-linux-gnu",
@@ -56,7 +56,7 @@
       "path": "capabilities",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1776387558349,
+      "lastAccessed": 1785648535837,
       "keyFiles": [
         "default.json",
         "desktop.json"
@@ -66,14 +66,14 @@
       "path": "gen",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776387558350,
+      "lastAccessed": 1785648535837,
       "keyFiles": []
     },
     "icons": {
       "path": "icons",
       "purpose": null,
       "fileCount": 16,
-      "lastAccessed": 1776387558350,
+      "lastAccessed": 1785648535837,
       "keyFiles": [
         "128x128.png",
         "128x128@2x.png",
@@ -85,21 +85,21 @@
     "src": {
       "path": "src",
       "purpose": "Source code",
-      "fileCount": 20,
-      "lastAccessed": 1776387558350,
+      "fileCount": 23,
+      "lastAccessed": 1785648535837,
       "keyFiles": [
+        "account.rs",
         "aggregator.rs",
-        "feature_flags.rs",
-        "history.rs",
-        "hook.rs",
-        "http.rs"
+        "audio_protocol.rs",
+        "charts.rs",
+        "feature_flags.rs"
       ]
     },
     "target": {
       "path": "target",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1776387558351,
+      "lastAccessed": 1785648535849,
       "keyFiles": [
         "CACHEDIR.TAG"
       ]
@@ -108,7 +108,7 @@
       "path": "gen/schemas",
       "purpose": "Schema definitions",
       "fileCount": 5,
-      "lastAccessed": 1776387558351,
+      "lastAccessed": 1785648535862,
       "keyFiles": [
         "acl-manifests.json",
         "capabilities.json",

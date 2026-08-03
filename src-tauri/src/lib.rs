@@ -70,6 +70,7 @@ pub fn run() {
             commands::files::scan_directory,
             commands::files::read_metadata,
             commands::youtube::search_youtube,
+            commands::youtube::import_playlist,
             commands::youtube::extract_audio,
             commands::youtube::extract_audio_url,
             commands::youtube::extract_audio_stream_url,

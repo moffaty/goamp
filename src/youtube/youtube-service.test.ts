@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { searchYoutube, extractAudio, extractAudioUrl } from "./youtube-service";
+import { searchYoutube, extractAudio, extractAudioUrl, importPlaylist, isPlaylistUrl } from "./youtube-service";
 
 const mockInvoke = vi.mocked(invoke);
 
@@ -37,6 +37,29 @@ describe("searchYoutube", () => {
     const res = await searchYoutube("song");
     expect(res).toHaveLength(1);
     expect(res[0].id).toBe("abc");
+  });
+});
+
+describe("importPlaylist", () => {
+  it("calls invoke with the url", async () => {
+    mockInvoke.mockResolvedValue([]);
+    await importPlaylist("https://soundcloud.com/x/sets/album");
+    expect(mockInvoke).toHaveBeenCalledWith("import_playlist", {
+      url: "https://soundcloud.com/x/sets/album",
+    });
+  });
+});
+
+describe("isPlaylistUrl", () => {
+  it("detects SoundCloud sets and YouTube playlists", () => {
+    expect(isPlaylistUrl("https://soundcloud.com/sofiya-chernyak-646218391/sets/koroli-abstrakta-vi")).toBe(true);
+    expect(isPlaylistUrl("https://www.youtube.com/playlist?list=PLabc")).toBe(true);
+    expect(isPlaylistUrl("https://youtube.com/watch?v=x&list=PLabc")).toBe(true);
+  });
+  it("rejects plain queries and single tracks", () => {
+    expect(isPlaylistUrl("короли абстракта")).toBe(false);
+    expect(isPlaylistUrl("https://soundcloud.com/artist/single-track")).toBe(false);
+    expect(isPlaylistUrl("")).toBe(false);
   });
 });
 
