@@ -64,7 +64,13 @@ export function prettifyPanelId(id: string): string {
  * frame itself if the frame is positioned).
  */
 export function retroWindow(
-  opts: { title: string; onClose: () => void; dragTarget?: HTMLElement },
+  opts: {
+    title: string
+    onClose: () => void
+    dragTarget?: HTMLElement
+    /** Called when a drag ends, with the target's final left/top in px. */
+    onDragEnd?: (left: number, top: number) => void
+  },
   body: HTMLElement,
 ): HTMLElement {
   const win = document.createElement('div')
@@ -115,6 +121,7 @@ export function retroWindow(
     const up = () => {
       window.removeEventListener('mousemove', move)
       window.removeEventListener('mouseup', up)
+      opts.onDragEnd?.(parseFloat(target.style.left) || 0, parseFloat(target.style.top) || 0)
     }
     window.addEventListener('mousemove', move)
     window.addEventListener('mouseup', up)
