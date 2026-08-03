@@ -107,6 +107,11 @@ export function retroWindow(
   win.appendChild(bar)
   win.appendChild(body)
 
+  // Windowshade: double-click the titlebar collapses to titlebar-only, again restores.
+  bar.addEventListener('dblclick', () => {
+    body.style.display = body.style.display === 'none' ? '' : 'none'
+  })
+
   // Drag the whole window by its title bar.
   const target = opts.dragTarget ?? win
   bar.addEventListener('mousedown', (e) => {

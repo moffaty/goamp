@@ -42,6 +42,27 @@ describe('retroWindow', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('double-clicking the titlebar collapses and restores the body', () => {
+    const body = document.createElement('div')
+    body.textContent = 'BODY'
+    const win = retroWindow({ title: 'X', onClose: () => {} }, body)
+    const bar = win.querySelector('.goamp-retro-titlebar') as HTMLElement
+
+    bar.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    expect(body.style.display).toBe('none')
+    bar.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    expect(body.style.display).toBe('')
+  })
+
+  it('close still fires onClose after a collapse', () => {
+    const onClose = vi.fn()
+    const win = retroWindow({ title: 'X', onClose }, document.createElement('div'))
+    const bar = win.querySelector('.goamp-retro-titlebar') as HTMLElement
+    bar.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    ;(win.querySelector('.goamp-retro-close') as HTMLButtonElement).click()
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
   it('a drag reports the final position via onDragEnd', () => {
     const onDragEnd = vi.fn()
     const target = document.createElement('div')
