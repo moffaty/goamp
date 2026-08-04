@@ -363,14 +363,69 @@ fn sanitize_filename(artist: &str, title: &str) -> String {
     }
 }
 
+// --- P2P content seeding wiring (talks to the local goamp-node) ---
+
+const NODE_BASE: &str = "http://localhost:7472";
+
+/// Stable, cross-peer content id. Both the seeder (on download) and the fetcher
+/// (on play) compute the same string for the same track:
+/// `youtube:<videoId>` / `soundcloud:<webpageUrl>`.
+fn content_id(source: &str, native: &str) -> String {
+    format!("{}:{}", source, native)
+}
+
+/// Best-effort: ask the local node to seed `path` under `track_id` (store in the
+/// archive + announce to the DHT). Failures are ignored — seeding is optional.
+async fn node_provide(track_id: String, path: String) {
+    let body = serde_json::json!({ "track_id": track_id, "path": path });
+    let _ = crate::http::CLIENT
+        .post(format!("{NODE_BASE}/content/provide"))
+        .json(&body)
+        .send()
+        .await;
+}
+
+/// Fire-and-forget seed so the download command returns immediately.
+fn spawn_provide(track_id: String, path: String) {
+    if track_id.is_empty() {
+        return;
+    }
+    tauri::async_runtime::spawn(node_provide(track_id, path));
+}
+
+/// Best-effort peer fetch: if a peer serves `cid`, write the bytes to
+/// `dest_base.opus` and return that path; else None. A short timeout keeps
+/// playback from ever stalling on the node.
+async fn node_fetch(cid: &str, dest_base: &std::path::Path) -> Option<String> {
+    let resp = crate::http::CLIENT
+        .get(format!("{NODE_BASE}/content"))
+        .query(&[("id", cid)])
+        .timeout(std::time::Duration::from_secs(4))
+        .send()
+        .await
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let bytes = resp.bytes().await.ok()?;
+    if bytes.is_empty() {
+        return None;
+    }
+    let dest = dest_base.with_extension("opus");
+    fs::write(&dest, &bytes).ok()?;
+    Some(dest.to_string_lossy().to_string())
+}
+
 /// Download a track's audio to the OS Downloads folder as `Artist - Title.ext`.
-/// `url` is any yt-dlp page URL, or a bare YouTube video id. Returns the saved path.
+/// `url` is any yt-dlp page URL, or a bare YouTube video id. `track_id` is the
+/// P2P content id to seed under (empty = don't seed). Returns the saved path.
 #[tauri::command]
 pub async fn download_track(
     app: tauri::AppHandle,
     url: String,
     title: String,
     artist: String,
+    track_id: Option<String>,
 ) -> Result<String, String> {
     let page_url = if url.contains("://") {
         url
@@ -412,6 +467,7 @@ pub async fn download_track(
     // instead of downloading a second time. Only fall back when nothing landed.
     if let Some(path) = find_cached_file(&base) {
         sweep_sidecar_images(&base);
+        spawn_provide(track_id.clone().unwrap_or_default(), path.clone());
         return Ok(path);
     }
 
@@ -435,7 +491,10 @@ pub async fn download_track(
     }
 
     sweep_sidecar_images(&base);
-    find_cached_file(&base).ok_or_else(|| "file not found after download".into())
+    let path =
+        find_cached_file(&base).ok_or_else(|| "file not found after download".to_string())?;
+    spawn_provide(track_id.unwrap_or_default(), path.clone());
+    Ok(path)
 }
 
 /// Remove sidecar thumbnail images (`--embed-thumbnail` leaves these when ffmpeg
@@ -460,6 +519,11 @@ pub async fn extract_audio_url(app: tauri::AppHandle, url: String) -> Result<Str
         if path.exists() {
             return Ok(path.to_string_lossy().to_string());
         }
+    }
+
+    // Resolve-on-play: try a peer before yt-dlp; fall through on any miss.
+    if let Some(p) = node_fetch(&content_id("soundcloud", &url), &out_template).await {
+        return Ok(p);
     }
 
     // Try with -x first
@@ -552,6 +616,11 @@ pub async fn extract_audio(app: tauri::AppHandle, video_id: String) -> Result<St
             eprintln!("[GOAMP] cache hit: {}", p.display());
             return Ok(p.to_string_lossy().to_string());
         }
+    }
+
+    // Resolve-on-play: try a peer before yt-dlp; fall through on any miss.
+    if let Some(p) = node_fetch(&content_id("youtube", &video_id), &cache.join(&video_id)).await {
+        return Ok(p);
     }
 
     let out_template = cache.join(format!("{}.%(ext)s", video_id));
@@ -843,6 +912,15 @@ mod tests {
         assert_eq!(sanitize_filename("", ""), "track");
         // Only-illegal input collapses to the fallback, never empty.
         assert_eq!(sanitize_filename("///", "***"), "track");
+    }
+
+    #[test]
+    fn content_id_is_stable_per_source() {
+        assert_eq!(content_id("youtube", "abc123"), "youtube:abc123");
+        assert_eq!(
+            content_id("soundcloud", "https://soundcloud.com/x/y"),
+            "soundcloud:https://soundcloud.com/x/y"
+        );
     }
 
     #[test]

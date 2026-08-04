@@ -146,6 +146,12 @@
       "accessCount": 1,
       "lastAccessed": 1776517302989,
       "type": "file"
+    },
+    {
+      "path": "src/commands/youtube.rs",
+      "accessCount": 1,
+      "lastAccessed": 1785801562230,
+      "type": "file"
     }
   ],
   "userDirectives": []

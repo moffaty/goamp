@@ -49,6 +49,10 @@ func (s *Server) Start(addr string) error {
 	mux.HandleFunc("GET /profiles/peers", s.handleGetPeerProfiles)
 	mux.HandleFunc("GET /recommendations", s.handleRecommendations)
 
+	// Content (P2P seeding)
+	mux.HandleFunc("POST /content/provide", s.handleContentProvide)
+	mux.HandleFunc("GET /content", s.handleContentGet)
+
 	// WebSocket events
 	mux.HandleFunc("GET /events", s.hub.ServeWS)
 
@@ -88,6 +92,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mux.HandleFunc("POST /profiles/sync", s.handleProfileSync)
 	mux.HandleFunc("GET /profiles/peers", s.handleGetPeerProfiles)
 	mux.HandleFunc("GET /recommendations", s.handleRecommendations)
+	mux.HandleFunc("POST /content/provide", s.handleContentProvide)
+	mux.HandleFunc("GET /content", s.handleContentGet)
 	mux.HandleFunc("GET /events", s.hub.ServeWS)
 	mux.HandleFunc("GET /plugins", s.handlePluginList)
 	mux.HandleFunc("/plugins/", s.handlePluginProxy)

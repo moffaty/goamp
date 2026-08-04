@@ -28,6 +28,12 @@ type Node interface {
 	// PublishProfile broadcasts a taste profile to all peers via GossipSub.
 	// Returns nil on the LocalNode stub (no-op).
 	PublishProfile(ctx context.Context, profile *proto.TasteProfile) error
+	// ProvideContent stores a track's audio locally and announces it to the DHT.
+	// No-op on the LocalNode stub.
+	ProvideContent(ctx context.Context, trackID string, data []byte) error
+	// GetContent returns a track's bytes from the local archive or a peer.
+	// Returns an error on the LocalNode stub (no content layer).
+	GetContent(ctx context.Context, trackID string) ([]byte, error)
 }
 
 // Protocol is a libp2p stream handler with an ID.

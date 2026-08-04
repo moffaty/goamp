@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { searchYoutube, extractAudio, extractAudioUrl, importPlaylist, isPlaylistUrl, downloadTrack } from "./youtube-service";
+import { searchYoutube, extractAudio, extractAudioUrl, importPlaylist, isPlaylistUrl, downloadTrack, contentId } from "./youtube-service";
 import type { YoutubeResult } from "./youtube-service";
 
 const mockInvoke = vi.mocked(invoke);
@@ -70,20 +70,31 @@ describe("downloadTrack", () => {
     thumbnail: "", source: "youtube", webpage_url: "https://sc/x", genre: "",
   };
 
-  it("uses the video id for YouTube", async () => {
+  it("uses the video id for YouTube and seeds under a youtube content id", async () => {
     mockInvoke.mockResolvedValue("/dl/Artist - Title.mp3");
     await downloadTrack(base);
     expect(mockInvoke).toHaveBeenCalledWith("download_track", {
-      url: "vid1", title: "Title", artist: "Artist",
+      url: "vid1", title: "Title", artist: "Artist", trackId: "youtube:vid1",
     });
   });
 
-  it("uses the webpage_url for SoundCloud", async () => {
+  it("uses the webpage_url for SoundCloud and seeds under a soundcloud content id", async () => {
     mockInvoke.mockResolvedValue("/dl/x.opus");
     await downloadTrack({ ...base, source: "soundcloud" });
     expect(mockInvoke).toHaveBeenCalledWith("download_track", {
-      url: "https://sc/x", title: "Title", artist: "Artist",
+      url: "https://sc/x", title: "Title", artist: "Artist", trackId: "soundcloud:https://sc/x",
     });
+  });
+});
+
+describe("contentId", () => {
+  const base: YoutubeResult = {
+    id: "vid1", title: "T", channel: "A", duration: 1,
+    thumbnail: "", source: "youtube", webpage_url: "https://sc/x", genre: "",
+  };
+  it("prefixes youtube ids and soundcloud urls", () => {
+    expect(contentId(base)).toBe("youtube:vid1");
+    expect(contentId({ ...base, source: "soundcloud" })).toBe("soundcloud:https://sc/x");
   });
 });
 
