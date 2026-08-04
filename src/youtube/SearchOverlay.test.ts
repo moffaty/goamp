@@ -14,6 +14,7 @@ vi.mock("./youtube-service", () => ({
   extractAudioUrl: vi.fn(),
   importPlaylist: vi.fn().mockResolvedValue([]),
   isPlaylistUrl: vi.fn((s: string) => /\/sets\//.test(s) || /[?&]list=/.test(s)),
+  downloadTrack: vi.fn().mockResolvedValue("/dl/track.mp3"),
 }));
 vi.mock("../lib/tauri-ipc", () => ({
   listPlaylists: vi.fn().mockResolvedValue([]),

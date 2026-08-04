@@ -30,6 +30,12 @@ export async function importPlaylist(url: string): Promise<YoutubeResult[]> {
   return invoke("import_playlist", { url });
 }
 
+/** Download a track to the OS Downloads folder as `Artist - Title.ext`; returns the path. */
+export async function downloadTrack(item: YoutubeResult): Promise<string> {
+  const url = item.source === "youtube" ? item.id : item.webpage_url || item.id;
+  return invoke("download_track", { url, title: item.title, artist: item.channel });
+}
+
 /** True if the string looks like a playlist/album/set URL we can import. */
 export function isPlaylistUrl(s: string): boolean {
   const t = s.trim();

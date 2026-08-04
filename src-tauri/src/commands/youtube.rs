@@ -322,6 +322,130 @@ pub async fn import_playlist(
     Ok(results)
 }
 
+/// Build a filesystem-safe `Artist - Title` stem. Pure — unit-testable.
+fn sanitize_filename(artist: &str, title: &str) -> String {
+    let a = artist.trim();
+    let t = title.trim();
+    let stem = match (a.is_empty(), t.is_empty()) {
+        (false, false) => format!("{a} - {t}"),
+        (true, false) => t.to_string(),
+        (false, true) => a.to_string(),
+        (true, true) => String::new(),
+    };
+
+    // Drop chars illegal on Windows/macOS/Linux + control chars; collapse whitespace.
+    let mut out = String::with_capacity(stem.len());
+    let mut prev_space = false;
+    for c in stem.chars() {
+        let bad =
+            matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control();
+        let ch = if bad || c.is_whitespace() { ' ' } else { c };
+        if ch == ' ' {
+            if prev_space {
+                continue;
+            }
+            prev_space = true;
+        } else {
+            prev_space = false;
+        }
+        out.push(ch);
+    }
+    let out = out.trim().to_string();
+
+    // Cap length (char-safe), then fall back if nothing usable remains.
+    let capped: String = out.chars().take(120).collect();
+    let capped = capped.trim().to_string();
+    // Fall back when nothing meaningful survived (empty, or only separators like "-").
+    if capped.chars().any(|c| c.is_alphanumeric()) {
+        capped
+    } else {
+        "track".to_string()
+    }
+}
+
+/// Download a track's audio to the OS Downloads folder as `Artist - Title.ext`.
+/// `url` is any yt-dlp page URL, or a bare YouTube video id. Returns the saved path.
+#[tauri::command]
+pub async fn download_track(
+    app: tauri::AppHandle,
+    url: String,
+    title: String,
+    artist: String,
+) -> Result<String, String> {
+    let page_url = if url.contains("://") {
+        url
+    } else {
+        format!("https://www.youtube.com/watch?v={}", url)
+    };
+
+    let dir = app
+        .path()
+        .download_dir()
+        .unwrap_or_else(|_| std::env::temp_dir().join("goamp"));
+    let _ = fs::create_dir_all(&dir);
+
+    let stem = sanitize_filename(&artist, &title);
+    let base = dir.join(&stem);
+    let out_arg = format!("{}.%(ext)s", base.display());
+
+    // Primary: tagged mp3 (needs ffmpeg). Fallback: raw bestaudio.
+    let mut args: Vec<String> = cookies_args(&app);
+    args.extend([
+        page_url.clone(),
+        "-x".to_string(),
+        "--audio-format".to_string(),
+        "mp3".to_string(),
+        "--audio-quality".to_string(),
+        "5".to_string(),
+        "--embed-metadata".to_string(),
+        "--embed-thumbnail".to_string(),
+        "--no-playlist".to_string(),
+        "--no-warnings".to_string(),
+        "-o".to_string(),
+        out_arg.clone(),
+    ]);
+    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let _ = run_ytdlp(&app, &arg_refs).await?;
+
+    // The primary pass may exit non-zero when ffmpeg is missing (postprocessing
+    // fails) yet still leave the fully-downloaded audio on disk — accept that file
+    // instead of downloading a second time. Only fall back when nothing landed.
+    if let Some(path) = find_cached_file(&base) {
+        sweep_sidecar_images(&base);
+        return Ok(path);
+    }
+
+    // Fallback: raw bestaudio, no post-processing (no ffmpeg needed).
+    let mut args2: Vec<String> = cookies_args(&app);
+    args2.extend([
+        page_url,
+        "-f".to_string(),
+        "bestaudio".to_string(),
+        "--no-playlist".to_string(),
+        "--no-warnings".to_string(),
+        "-o".to_string(),
+        out_arg,
+    ]);
+    let arg_refs2: Vec<&str> = args2.iter().map(|s| s.as_str()).collect();
+    let output2 = run_ytdlp(&app, &arg_refs2).await?;
+
+    if !output2.status.success() {
+        let stderr = String::from_utf8_lossy(&output2.stderr);
+        return Err(format!("download failed: {}", stderr));
+    }
+
+    sweep_sidecar_images(&base);
+    find_cached_file(&base).ok_or_else(|| "file not found after download".into())
+}
+
+/// Remove sidecar thumbnail images (`--embed-thumbnail` leaves these when ffmpeg
+/// can't embed them) so the Downloads folder gets only the audio file.
+fn sweep_sidecar_images(base: &std::path::Path) {
+    for ext in &["jpg", "jpeg", "png", "webp"] {
+        let _ = fs::remove_file(base.with_extension(ext));
+    }
+}
+
 /// Extract audio from any yt-dlp supported URL (YouTube, SoundCloud, etc)
 #[tauri::command]
 pub async fn extract_audio_url(app: tauri::AppHandle, url: String) -> Result<String, String> {
@@ -700,6 +824,33 @@ mod tests {
         assert!(parse_entry(full, "soundcloud").is_some());
         // Same 30s clip on YouTube is not a preview — kept.
         assert!(parse_entry(preview, "youtube").is_some());
+    }
+
+    #[test]
+    fn sanitize_strips_illegal_chars_and_collapses_space() {
+        let n = sanitize_filename("AC/DC", "Back:In*Black?");
+        assert!(!n.contains('/'));
+        assert!(!n.contains(':'));
+        assert!(!n.contains('*'));
+        assert!(!n.contains('?'));
+        assert_eq!(n, "AC DC - Back In Black");
+    }
+
+    #[test]
+    fn sanitize_handles_one_sided_and_empty_metadata() {
+        assert_eq!(sanitize_filename("", "Just Title"), "Just Title");
+        assert_eq!(sanitize_filename("Just Artist", ""), "Just Artist");
+        assert_eq!(sanitize_filename("", ""), "track");
+        // Only-illegal input collapses to the fallback, never empty.
+        assert_eq!(sanitize_filename("///", "***"), "track");
+    }
+
+    #[test]
+    fn sanitize_caps_length() {
+        let long = "x".repeat(500);
+        let n = sanitize_filename(&long, &long);
+        assert!(n.chars().count() <= 120);
+        assert!(!n.is_empty());
     }
 
     #[test]

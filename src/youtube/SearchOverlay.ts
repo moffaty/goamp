@@ -5,6 +5,7 @@ import {
   extractAudioUrl,
   importPlaylist,
   isPlaylistUrl,
+  downloadTrack,
   type YoutubeResult,
   type SearchSource,
 } from "./youtube-service";
@@ -444,6 +445,13 @@ function showContextMenu(
   });
   menu.appendChild(addCurrentRow);
 
+  // Download to the OS Downloads folder as a named audio file
+  const downloadRow = createMenuItem("\u2b07 Download", c, () => {
+    closeCtxMenu();
+    void saveToDisk(item);
+  });
+  menu.appendChild(downloadRow);
+
   // Add to playlist → submenu with delayed close
   let submenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -619,6 +627,20 @@ async function extractForItem(item: YoutubeResult): Promise<string> {
 function playNow(item: YoutubeResult) {
   const row = document.querySelector(".yt-result-row") ?? document.createElement("div");
   playYoutubeTrack(item, row as HTMLElement);
+}
+
+async function saveToDisk(item: YoutubeResult) {
+  const status = document.getElementById("yt-search-status");
+  if (status) status.innerHTML = `<span class="yt-loading">Downloading</span> ${escapeHtml(item.title)}`;
+  try {
+    const path = await downloadTrack(item);
+    const name = path.split(/[\\/]/).pop() ?? path;
+    if (status) status.textContent = `Saved: ${name}`;
+    track("track_download", { source: item.source, video_id: item.id });
+  } catch (e) {
+    if (status) status.textContent = `Error: ${e}`;
+    trackError(e, { action: "download_track", video_id: item.id });
+  }
 }
 
 async function addToWebampQueue(item: YoutubeResult) {
