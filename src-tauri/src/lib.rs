@@ -72,6 +72,8 @@ pub fn run() {
             commands::youtube::search_youtube,
             commands::youtube::import_playlist,
             commands::youtube::download_track,
+            commands::youtube::set_seed_enabled,
+            commands::youtube::get_seed_enabled,
             commands::youtube::extract_audio,
             commands::youtube::extract_audio_url,
             commands::youtube::extract_audio_stream_url,
