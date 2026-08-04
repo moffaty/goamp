@@ -22,6 +22,9 @@ type Config struct {
 	// Catalog is used by the catalog stream protocol handler (optional).
 	Catalog sdk.Catalog
 
+	// Archive is used by the content stream protocol to serve track audio (optional).
+	Archive sdk.Archive
+
 	// Profiles receives incoming taste profiles published via GossipSub (optional).
 	Profiles sdk.ProfileAggregator
 
