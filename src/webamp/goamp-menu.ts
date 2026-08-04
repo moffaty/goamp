@@ -196,6 +196,14 @@ function showGoampMenu(x: number, y: number) {
       // Opt-in P2P seeding of downloaded tracks (default off).
       label: `${seedEnabled ? "✓ " : "  "}Seed downloads (P2P)`,
       action: () => {
+        if (!seedEnabled) {
+          // Informed consent before sharing any downloaded audio with peers.
+          const ok = confirm(
+            "Seeding shares your downloaded tracks with other GOAMP users over P2P. " +
+              "You are responsible for the content you share. Enable seeding?"
+          );
+          if (!ok) return;
+        }
         seedEnabled = !seedEnabled;
         setSeedEnabled(seedEnabled).catch(() => {});
       },

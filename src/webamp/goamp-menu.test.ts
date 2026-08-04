@@ -113,21 +113,38 @@ describe("initGoampMenu", () => {
     expect(row.querySelector("svg")).not.toBeNull();
   });
 
-  it("has a P2P seeding toggle that persists via set_seed_enabled", async () => {
-    const { invoke } = await import("@tauri-apps/api/core");
-    vi.mocked(invoke).mockClear();
+  const openSeedRow = () => {
     initGoampMenu({} as any);
-
-    const inner = webampEl.querySelector(".webamp-inner")!;
-    inner.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 100, clientY: 100 }));
-
+    webampEl.querySelector(".webamp-inner")!.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, clientX: 100, clientY: 100 })
+    );
     const menu = document.getElementById("goamp-context-menu")!;
-    const row = Array.from(menu.querySelectorAll("div[style*='cursor: pointer']")).find(
+    return Array.from(menu.querySelectorAll("div[style*='cursor: pointer']")).find(
       (r) => r.querySelector("span")?.textContent?.includes("Seed downloads (P2P)")
     );
+  };
+
+  it("enabling seeding persists only after consent is accepted", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockClear();
+    vi.stubGlobal("confirm", vi.fn(() => true));
+
+    const row = openSeedRow();
     expect(row).toBeTruthy();
     row!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(invoke).toHaveBeenCalledWith("set_seed_enabled", { enabled: true });
+    vi.unstubAllGlobals();
+  });
+
+  it("declining consent leaves seeding off (no persist)", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockClear();
+    vi.stubGlobal("confirm", vi.fn(() => false));
+
+    const row = openSeedRow();
+    row!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(invoke).not.toHaveBeenCalledWith("set_seed_enabled", expect.anything());
+    vi.unstubAllGlobals();
   });
 
   it("closes menu on Escape key", () => {
