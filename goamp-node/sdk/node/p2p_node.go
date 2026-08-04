@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	"github.com/goamp/sdk/sdk"
+	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -70,6 +70,11 @@ func (n *P2PNode) Start(ctx context.Context) error {
 	// Catalog stream protocol (only if a catalog is provided).
 	if n.cfg.Catalog != nil {
 		n.registerCatalogProtocol()
+	}
+
+	// Content stream protocol (only if an archive is provided).
+	if n.cfg.Archive != nil {
+		n.registerContentProtocol()
 	}
 
 	// Emit peer lifecycle events.

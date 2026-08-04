@@ -17,6 +17,7 @@ import (
 	"github.com/goamp/sdk/config"
 	"github.com/goamp/sdk/identity"
 	goampsdk "github.com/goamp/sdk/sdk"
+	"github.com/goamp/sdk/sdk/archive"
 	"github.com/goamp/sdk/sdk/catalog"
 	"github.com/goamp/sdk/sdk/node"
 	"github.com/goamp/sdk/sdk/plugin"
@@ -74,6 +75,7 @@ func main() {
 
 	// 5. Build catalog + profiles
 	cat := catalog.New(db, "local")
+	arch := archive.New(cfg.Archive.StoragePath, cfg.Archive.QuotaGB)
 	prof := profiles.New(db)
 
 	// 6. Load plugins
@@ -92,6 +94,7 @@ func main() {
 		PrivKey:    privKey,
 		ListenAddr: "/ip4/0.0.0.0/tcp/0",
 		Catalog:    cat,
+		Archive:    arch,
 		Profiles:   prof,
 		EmitFn: func(e goampsdk.Event) {
 			if srv != nil {
