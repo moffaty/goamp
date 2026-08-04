@@ -11,6 +11,7 @@ import { toggleGenrePanel, toggleYouTubeSettings } from "../settings/GenrePanel"
 import { toggleRadioPanel } from "../radio/RadioPanel";
 import { toggleRecommendationPanel } from "../recommendations/RecommendationPanel";
 import { isAutoplayEnabled, toggleAutoplay } from "../features/autoplay/AutoplayFeature";
+import { getSeedEnabled, setSeedEnabled } from "../youtube/seeding-service";
 import { openFolder, openFiles, loadSkin } from "./file-actions";
 import { moodService } from "../recommendations/mood-service";
 import type Webamp from "webamp";
@@ -19,6 +20,8 @@ import { retroIcon } from "./retro";
 let menu: HTMLDivElement | null = null;
 let webampRef: Webamp | null = null;
 let registryRef: UIRegistry | null = null;
+// Cached P2P-seeding preference, refreshed on menu init; toggled via the menu item.
+let seedEnabled = false;
 
 interface SubMenuItem {
   label: string;
@@ -136,6 +139,9 @@ export function initGoampMenu(webamp: Webamp, registry?: UIRegistry) {
   webampRef = webamp;
   registryRef = registry ?? null;
 
+  // Load the persisted seeding preference so the menu checkbox reflects it.
+  getSeedEnabled().then((v) => { seedEnabled = v; }).catch(() => {});
+
   // Use capture phase to intercept before Webamp's own context menu
   document.addEventListener("contextmenu", (e) => {
     const target = e.target as HTMLElement;
@@ -185,6 +191,14 @@ function showGoampMenu(x: number, y: number) {
     {
       label: `${autoplayEnabled ? "✓ " : "  "}Autoplay (Infinite Playlist)`,
       action: () => toggleAutoplay(),
+    },
+    {
+      // Opt-in P2P seeding of downloaded tracks (default off).
+      label: `${seedEnabled ? "✓ " : "  "}Seed downloads (P2P)`,
+      action: () => {
+        seedEnabled = !seedEnabled;
+        setSeedEnabled(seedEnabled).catch(() => {});
+      },
     },
     { label: "Search", shortcut: "Ctrl+Y", action: () => toggleSearchOverlay(), separator: true },
     { label: "Genres", shortcut: "Ctrl+G", action: () => toggleGenrePanel() },

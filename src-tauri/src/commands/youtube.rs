@@ -385,12 +385,40 @@ async fn node_provide(track_id: String, path: String) {
         .await;
 }
 
-/// Fire-and-forget seed so the download command returns immediately.
-fn spawn_provide(track_id: String, path: String) {
-    if track_id.is_empty() {
+/// Setting that gates P2P seeding of downloaded tracks. OFF unless "1".
+const SEED_ENABLED_SETTING: &str = "p2p_seed_enabled";
+
+/// Default OFF: only an explicit "1" enables seeding.
+fn parse_seed_enabled(v: Option<String>) -> bool {
+    matches!(v.as_deref(), Some("1"))
+}
+
+fn seed_enabled(app: &tauri::AppHandle) -> bool {
+    let db = app.state::<Db>();
+    parse_seed_enabled(db.get_setting(SEED_ENABLED_SETTING))
+}
+
+/// Fire-and-forget seed so the download command returns immediately. No-op when
+/// the user hasn't opted into seeding (default) or when there's no content id.
+fn spawn_provide(app: &tauri::AppHandle, track_id: String, path: String) {
+    if track_id.is_empty() || !seed_enabled(app) {
         return;
     }
     tauri::async_runtime::spawn(node_provide(track_id, path));
+}
+
+/// Enable/disable P2P seeding of downloaded tracks (persisted).
+#[tauri::command]
+pub fn set_seed_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    app.state::<Db>()
+        .set_setting(SEED_ENABLED_SETTING, if enabled { "1" } else { "0" });
+    Ok(())
+}
+
+/// Whether P2P seeding of downloaded tracks is currently enabled.
+#[tauri::command]
+pub fn get_seed_enabled(app: tauri::AppHandle) -> Result<bool, String> {
+    Ok(seed_enabled(&app))
 }
 
 /// Best-effort peer fetch: if a peer serves `cid`, write the bytes to
@@ -467,7 +495,7 @@ pub async fn download_track(
     // instead of downloading a second time. Only fall back when nothing landed.
     if let Some(path) = find_cached_file(&base) {
         sweep_sidecar_images(&base);
-        spawn_provide(track_id.clone().unwrap_or_default(), path.clone());
+        spawn_provide(&app, track_id.clone().unwrap_or_default(), path.clone());
         return Ok(path);
     }
 
@@ -493,7 +521,7 @@ pub async fn download_track(
     sweep_sidecar_images(&base);
     let path =
         find_cached_file(&base).ok_or_else(|| "file not found after download".to_string())?;
-    spawn_provide(track_id.unwrap_or_default(), path.clone());
+    spawn_provide(&app, track_id.unwrap_or_default(), path.clone());
     Ok(path)
 }
 
@@ -912,6 +940,15 @@ mod tests {
         assert_eq!(sanitize_filename("", ""), "track");
         // Only-illegal input collapses to the fallback, never empty.
         assert_eq!(sanitize_filename("///", "***"), "track");
+    }
+
+    #[test]
+    fn seed_enabled_defaults_off() {
+        assert!(!parse_seed_enabled(None));
+        assert!(!parse_seed_enabled(Some("0".into())));
+        assert!(!parse_seed_enabled(Some("".into())));
+        assert!(!parse_seed_enabled(Some("true".into())));
+        assert!(parse_seed_enabled(Some("1".into())));
     }
 
     #[test]
