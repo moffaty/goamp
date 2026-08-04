@@ -30,10 +30,22 @@ export async function importPlaylist(url: string): Promise<YoutubeResult[]> {
   return invoke("import_playlist", { url });
 }
 
-/** Download a track to the OS Downloads folder as `Artist - Title.ext`; returns the path. */
+/** Stable cross-peer P2P content id: `youtube:<id>` / `soundcloud:<webpageUrl>`. */
+export function contentId(item: YoutubeResult): string {
+  const native = item.source === "youtube" ? item.id : item.webpage_url || item.id;
+  return `${item.source}:${native}`;
+}
+
+/** Download a track to the OS Downloads folder as `Artist - Title.ext`; returns the path.
+ *  Also seeds it to the P2P network under its content id. */
 export async function downloadTrack(item: YoutubeResult): Promise<string> {
   const url = item.source === "youtube" ? item.id : item.webpage_url || item.id;
-  return invoke("download_track", { url, title: item.title, artist: item.channel });
+  return invoke("download_track", {
+    url,
+    title: item.title,
+    artist: item.channel,
+    trackId: contentId(item),
+  });
 }
 
 /** True if the string looks like a playlist/album/set URL we can import. */

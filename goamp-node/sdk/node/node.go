@@ -5,6 +5,7 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/goamp/sdk/proto"
@@ -53,4 +54,14 @@ func (n *LocalNode) Emit(event sdk.Event) {
 // PublishProfile is a no-op on the stub — used in tests only.
 func (n *LocalNode) PublishProfile(_ context.Context, _ *proto.TasteProfile) error {
 	return nil
+}
+
+// ProvideContent is a no-op on the stub (no content layer without libp2p).
+func (n *LocalNode) ProvideContent(_ context.Context, _ string, _ []byte) error {
+	return nil
+}
+
+// GetContent always misses on the stub.
+func (n *LocalNode) GetContent(_ context.Context, _ string) ([]byte, error) {
+	return nil, fmt.Errorf("no content layer on stub node")
 }
