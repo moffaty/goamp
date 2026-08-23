@@ -26,8 +26,26 @@ const WRITE_COMMANDS = new Set([
   'track_page_view',
 ])
 
+// Fixture track for the local-playback scenario (Task 8). The dialog shim's
+// `open` resolves to this directory, and these two commands are what
+// LocalSource.scanDirectory/readMetadata call against it.
+const FIXTURE_TRACK = {
+  path: '/fixtures/sample.wav',
+  artist: 'Fixture',
+  title: 'Sample Tone',
+  album: 'E2E',
+  duration: 3,
+  genre: '',
+}
+
+const local: Record<string, unknown> = {
+  scan_directory: [FIXTURE_TRACK],
+  read_metadata: FIXTURE_TRACK,
+}
+
 export async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   calls.push({ command, args })
+  if (command in local) return local[command] as T
   if (command in responses) return responses[command] as T
   if (command === 'resolve_track_id') return 'e2e-canonical-id' as T
   if (WRITE_COMMANDS.has(command) || command.startsWith('track_')) return null as T
