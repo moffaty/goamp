@@ -110,11 +110,12 @@ failed check rather than a silent update.
 
 #### What this gate does not cover
 
-- **96 of the app's 106 Tauri commands** rest only on the static registration
+- **94 of the app's 106 Tauri commands** rest only on the static registration
   guard (`verify::registration`): it proves every `#[tauri::command]` fn is
   actually wired into `lib.rs`'s handler, not that the command *works*. Radio,
-  YouTube, moods, playlists (beyond `list_playlists`/`load_session`), settings,
-  surveys, downloads, and P2P are not invoked by anything in this gate.
+  moods, playlists (beyond `list_playlists`/`load_session`), YouTube (beyond
+  `get_seed_enabled`), settings, surveys, downloads, and P2P are not invoked by
+  anything in this gate.
 - **The dev server, not the production bundle.** `playwright.config.ts` points
   at `vite --config vite.e2e.config.ts`, not a `vite build` artifact. No
   tree-shaking, minification, or production `import.meta.env` branches run
