@@ -35,3 +35,5 @@ goamp-node/goamp-node
 .superpowers/
 **/__pycache__/
 docs/superpowers/plans/.omc/
+
+e2e/artifacts/
