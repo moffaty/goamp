@@ -1,0 +1,47 @@
+[
+  {
+    "description": "Auto-scrobble after 50% or 4 min",
+    "enabled": true,
+    "key": "auto_scrobble"
+  },
+  {
+    "description": "Last.fm scrobbling",
+    "enabled": true,
+    "key": "lastfm_scrobble"
+  },
+  {
+    "description": "ListenBrainz scrobbling",
+    "enabled": true,
+    "key": "listenbrainz_scrobble"
+  },
+  {
+    "description": "System media keys / MPRIS",
+    "enabled": true,
+    "key": "media_keys"
+  },
+  {
+    "description": "GOAMP recommendations and mood radio",
+    "enabled": true,
+    "key": "recommendations"
+  },
+  {
+    "description": "SoundCloud search",
+    "enabled": true,
+    "key": "soundcloud_search"
+  },
+  {
+    "description": "System tray icon",
+    "enabled": true,
+    "key": "system_tray"
+  },
+  {
+    "description": "Butterchurn visualizer",
+    "enabled": true,
+    "key": "visualizer"
+  },
+  {
+    "description": "YouTube search and playback",
+    "enabled": true,
+    "key": "youtube_search"
+  }
+]
