@@ -2,3 +2,4 @@
 //! on Tauri's MockRuntime. See
 //! docs/superpowers/specs/2026-08-23-verification-harness-design.md
 pub mod harness;
+pub mod registration;
