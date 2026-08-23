@@ -38,7 +38,8 @@ Three layers. The first two form the gate and run offline; the third is manual.
 ### L1 — IPC contract (Rust)
 
 Unit tests inside the crate, using `tauri::test::mock_builder` with the real
-`invoke_handler` and a real SQLite database in a temp file. Commands are invoked
+`invoke_handler` and a real SQLite database built by the production migrations
+(`db::test_db()`, in-memory — same schema, no temp files to clean up). Commands are invoked
 through the actual IPC path via `get_ipc_response`, not called as plain functions,
 so registration and argument/return shapes are exercised for real.
 
@@ -157,10 +158,16 @@ dump, and a Playwright trace on failure. CI uploads them via `upload-artifact`.
 
 ## Changes to production code
 
-One: `src-tauri/src/lib.rs` extracts its `invoke_handler` and state registration
-into `build_app<R: Runtime>(Builder<R>) -> Builder<R>`, which `run()` then uses.
-Plugins stay in `run()` — the mock runtime should not have to initialise the
-updater, dialog, fs and shell plugins.
+One: `src-tauri/src/lib.rs` extracts its `invoke_handler` call into
+`register_commands<R: Runtime>(Builder<R>) -> Builder<R>`, which `run()` then
+uses. Plugins and managed state stay in `run()` — the mock runtime should not
+have to initialise the updater, dialog, fs and shell plugins, and tests manage
+only the database.
+
+One more may be needed, decided at implementation time: if the host mounts
+panels without a stable selector, `WebampUIFeature.ts` gains a `data-panel`
+attribute carrying the panel id. That is a test-visibility affordance, not a
+behaviour change.
 
 L2 requires no production change at all; the vite alias intercepts the Tauri API
 below `TauriTransport`, and analytics is neutralised the same way.
