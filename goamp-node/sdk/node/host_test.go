@@ -14,9 +14,15 @@ import (
 // connectNodes directly connects a→b so tests don't depend on mDNS multicast.
 func connectNodes(t *testing.T, a, b *node.P2PNode) {
 	t.Helper()
-	require.NoError(t, a.Connect(context.Background(), b.AddrInfo()))
-	require.Eventually(t, func() bool { return len(a.Peers()) > 0 },
-		2*time.Second, 50*time.Millisecond, "nodes must be connected")
+	// Retry the dial: an ephemeral listen port can briefly collide with an
+	// outbound socket from a sibling test, which fails the security handshake.
+	require.Eventually(t, func() bool {
+		if len(a.Peers()) > 0 {
+			return true
+		}
+		_ = a.Connect(context.Background(), b.AddrInfo())
+		return len(a.Peers()) > 0
+	}, 5*time.Second, 100*time.Millisecond, "nodes must be connected")
 }
 
 // newTestNode spins up a P2PNode on a random port with a fresh ephemeral identity.

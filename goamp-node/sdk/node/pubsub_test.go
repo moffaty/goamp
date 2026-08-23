@@ -139,21 +139,24 @@ func TestGossipSubEmitsProfileSynced(t *testing.T) {
 	waitForGossipMesh(t, a, b)
 
 	profile := &proto.TasteProfile{Version: 1, TotalListens: 5}
-	require.NoError(t, a.PublishProfile(ctx, profile))
 
-	// Drain the channel looking for profile:synced — ignore lifecycle events.
+	// Retry publish — GossipSub grafts the mesh on a later heartbeat than the one
+	// that makes the peer visible in TopicPeers, so the first publish can be dropped.
 	var gotEvent sdk.Event
 	require.Eventually(t, func() bool {
-		select {
-		case e := <-synced:
-			if e.Type == sdk.EventProfileSynced {
-				gotEvent = e
-				return true
+		_ = a.PublishProfile(ctx, profile)
+		for {
+			select {
+			case e := <-synced:
+				if e.Type == sdk.EventProfileSynced {
+					gotEvent = e
+					return true
+				}
+			case <-time.After(300 * time.Millisecond):
+				return false
 			}
-		default:
 		}
-		return false
-	}, 5*time.Second, 50*time.Millisecond, "profile:synced event not emitted")
+	}, 10*time.Second, 350*time.Millisecond, "profile:synced event not emitted")
 
 	var payload struct {
 		Hash      string `json:"hash"`

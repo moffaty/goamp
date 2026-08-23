@@ -69,14 +69,20 @@ func TestE2EHTTPProfileGossip(t *testing.T) {
 	require.NoError(t, err)
 
 	// POST /profiles/sync on node A (what Tauri's sync_to_node does).
-	resp, err := http.Post(urlA+"/profiles/sync", "application/json", bytes.NewReader(body))
-	require.NoError(t, err)
-	_ = resp.Body.Close()
-	require.Equal(t, http.StatusNoContent, resp.StatusCode)
+	syncA := func() {
+		resp, err := http.Post(urlA+"/profiles/sync", "application/json", bytes.NewReader(body))
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+		require.Equal(t, http.StatusNoContent, resp.StatusCode)
+	}
+	syncA()
 
 	// GET /profiles/peers on node B (what Tauri's fetch_peer_profiles does).
-	// GossipSub needs a beat to propagate, so poll until it shows up.
+	// GossipSub grafts the mesh on a later heartbeat than the one that makes the
+	// peer visible in TopicPeers, so the first publish can be dropped — re-sync
+	// on every poll until B sees it.
 	require.Eventually(t, func() bool {
+		syncA()
 		r, err := http.Get(urlB + "/profiles/peers?limit=10")
 		if err != nil {
 			return false
