@@ -17,8 +17,15 @@ files, learns your taste, and pretends it's 1999.
 - **Per-track feedback** — `L` like, `D` dislike, `N` normal. Backed by
   `track_signals` so the mood engine learns
 - **Local files** — scans folders, reads tags
+- **Album import** — paste an album/set/playlist URL, get a playable tracklist
+- **Charts** — "Your Top Tracks" over week / month / all time, plus a Community
+  tab that sums in the taste profiles gossiped from peers
+- **Download to disk** — save a track as a real, human-named file in Downloads
+  instead of leaving it in the opaque cache
 - **Internet radio**, **playlists**, **scrobbling** (Last.fm / ListenBrainz)
-- **P2P node** — Go-based libp2p sidecar for peer-based recommendations
+- **P2P node** — Go-based libp2p sidecar for peer-based recommendations, taste
+  gossip, and peer-to-peer transfer of downloaded track audio. Seeding is
+  **off by default** and takes explicit consent; the archive stays within quota
 - **Modular architecture** — sources, renderers, features all plug in via
   `IFeature` / `ISource` / `IRenderer` interfaces
 
@@ -48,7 +55,9 @@ Grab a build for your OS from
 | `V` | Visualizer presets |
 
 Right-click anywhere on Webamp for the full menu (Pin on Top, To-Bottom,
-Autoplay, settings, etc.).
+Autoplay, Charts, Peers, settings, etc.). Panels opened from that menu behave
+like retro windows — draggable, remembered between runs, and collapsible to
+their titlebar.
 
 ## Development
 
@@ -56,7 +65,7 @@ Autoplay, settings, etc.).
 
 - Node 23 + pnpm 10
 - Rust stable
-- Go 1.21
+- Go 1.25 (see `goamp-node/go.mod`)
 - On Linux: `libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libgtk-3-dev librsvg2-dev`
 
 ### Setup
