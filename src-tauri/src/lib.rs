@@ -27,6 +27,8 @@ mod track_features;
 mod track_id;
 #[cfg(desktop)]
 mod tray;
+#[cfg(test)]
+mod verify;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

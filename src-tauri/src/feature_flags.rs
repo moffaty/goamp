@@ -11,7 +11,9 @@ pub struct FeatureFlag {
 }
 
 #[tauri::command]
-pub fn feature_flags_list(app: tauri::AppHandle) -> Result<Vec<FeatureFlag>, String> {
+pub fn feature_flags_list<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<Vec<FeatureFlag>, String> {
     let db = app.state::<Db>();
     let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     let mut stmt = conn

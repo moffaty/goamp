@@ -129,8 +129,8 @@ pub fn get_community_charts(conn: &Connection, limit: i32) -> Vec<ChartEntry> {
 // ─── Tauri commands ───
 
 #[tauri::command]
-pub fn get_top_tracks_cmd(
-    app: tauri::AppHandle,
+pub fn get_top_tracks_cmd<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     period: String,
     limit: i32,
 ) -> Result<Vec<ChartEntry>, String> {
@@ -140,8 +140,8 @@ pub fn get_top_tracks_cmd(
 }
 
 #[tauri::command]
-pub fn get_community_charts_cmd(
-    app: tauri::AppHandle,
+pub fn get_community_charts_cmd<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     limit: i32,
 ) -> Result<Vec<ChartEntry>, String> {
     let db = app.state::<crate::db::Db>();

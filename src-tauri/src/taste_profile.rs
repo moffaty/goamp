@@ -119,7 +119,7 @@ fn get_total_completed(conn: &Connection) -> u32 {
 // ─── Tauri commands ───
 
 #[tauri::command]
-pub fn build_profile(app: tauri::AppHandle) -> Result<TasteProfile, String> {
+pub fn build_profile<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<TasteProfile, String> {
     let db = app.state::<crate::db::Db>();
     let conn =
         db.0.lock()

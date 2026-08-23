@@ -167,8 +167,8 @@ pub async fn lastfm_get_similar(
 // ─── Tauri commands ───
 
 #[tauri::command]
-pub fn get_hybrid_recommendations(
-    app: tauri::AppHandle,
+pub fn get_hybrid_recommendations<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     limit: Option<u32>,
 ) -> Result<Vec<RecEntry>, String> {
     let db = app.state::<crate::db::Db>();

@@ -112,8 +112,8 @@ pub struct ListenStats {
 
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-pub fn record_track_listen(
-    app: tauri::AppHandle,
+pub fn record_track_listen<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     canonical_id: String,
     source: String,
     started_at: i64,
@@ -170,7 +170,9 @@ pub fn get_track_stats(app: tauri::AppHandle, canonical_id: String) -> Result<Li
 }
 
 #[tauri::command]
-pub fn get_liked_tracks(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+pub fn get_liked_tracks<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<Vec<String>, String> {
     let db = app.state::<crate::db::Db>();
     let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     Ok(get_liked_canonical_ids(&conn))
