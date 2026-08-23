@@ -4,3 +4,4 @@
 pub mod golden;
 pub mod harness;
 pub mod registration;
+pub mod scenarios;
