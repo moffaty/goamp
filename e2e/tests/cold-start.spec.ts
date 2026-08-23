@@ -1,4 +1,9 @@
-import { test, expect } from '@playwright/test'
+// Opt into structural network lockdown: e2e/fixtures/network-lockdown.ts
+// blocks any request to a non-local origin at the route level and fails
+// the test naming the URL, rather than relying on the environment having
+// no internet or on requestfailed firing (it doesn't fire for a real
+// unshimmed call that simply succeeds, or for a 404/500).
+import { test, expect } from '../fixtures/network-lockdown'
 
 // Known, allowlisted-pending-a-product-decision console error: webamp's own
 // audio-element error handler (node_modules/webamp/built/webamp.bundle.js,
