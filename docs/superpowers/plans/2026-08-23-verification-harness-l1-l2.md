@@ -18,7 +18,9 @@
 - L1 lives inside `src-tauri/src/` (not `tests/`): the crate's modules are private and `db::test_db()` is `#[cfg(test)]`, so an integration-test crate cannot reach them.
 - Mock apps use `mock_context(noop_assets())` — never `generate_context!` — so tests do not require a built `dist/`.
 - L1 tests manage only `db::Db`. Commands needing `RadioStreamState`, `NodeProcess`, or `MediaControlsState` are registration-only; they are never invoked with real arguments.
-- L2 must not require any change under `src/`.
+- L2 requires no change to production *behaviour* under `src/`. The one edit it
+  may make is a test-visibility affordance: a `data-panel` attribute carrying the
+  panel id, if the host mounts panels without a stable selector (Task 9).
 - L3 (real binary under `tauri-driver`) is out of scope for this plan and gets its own.
 
 ---
@@ -119,6 +121,29 @@ pub fn mock_app() -> (App<MockRuntime>, WebviewWindow<MockRuntime>) {
         .expect("failed to build mock webview");
 
     (app, webview)
+}
+
+/// Seeds a track's identity (artist/title) straight through the managed
+/// database. This is fixture setup, not the thing under test: the real
+/// `resolve_track_id` command is async and can reach out to MusicBrainz, which
+/// the offline constraint forbids. Everything under test still goes over IPC.
+pub fn seed_identity(
+    app: &App<MockRuntime>,
+    canonical_id: &str,
+    source: &str,
+    source_id: &str,
+    artist: &str,
+    title: &str,
+) {
+    use tauri::Manager;
+    let db = app.state::<crate::db::Db>();
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
+    conn.execute(
+        "INSERT OR REPLACE INTO track_identity (source, source_id, canonical_id, artist, title)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![source, source_id, canonical_id, artist, title],
+    )
+    .expect("seeding track_identity must succeed");
 }
 
 /// Invoke a command through the real IPC path. `args` is the command's argument
@@ -387,12 +412,18 @@ fn cases() -> Vec<(&'static str, serde_json::Value)> {
 /// Puts two completed listens in history so charts and recommendations have
 /// something to return. Offsets are relative to now — never absolute dates —
 /// so the week/month windows stay valid forever.
-fn seed(webview: &tauri::WebviewWindow<tauri::test::MockRuntime>) {
+fn seed(
+    app: &tauri::App<tauri::test::MockRuntime>,
+    webview: &tauri::WebviewWindow<tauri::test::MockRuntime>,
+) {
     let now = chrono::Utc::now().timestamp();
     for (id, artist, title, plays) in [
         ("aaa", "Portishead", "Roads", 3),
         ("bbb", "Massive Attack", "Angel", 1),
     ] {
+        // Artist/title live in track_identity — record_track_listen does not
+        // carry them — so seed identity directly, then record listens over IPC.
+        super::harness::seed_identity(app, id, "local", id, artist, title);
         for i in 0..plays {
             invoke(
                 webview,
@@ -405,8 +436,6 @@ fn seed(webview: &tauri::WebviewWindow<tauri::test::MockRuntime>) {
                     "listenedSecs": 240,
                     "completed": true,
                     "skippedEarly": false,
-                    "artist": artist,
-                    "title": title,
                 }),
             )
             .unwrap_or_else(|e| panic!("seeding {id} failed: {e}"));
@@ -416,8 +445,8 @@ fn seed(webview: &tauri::WebviewWindow<tauri::test::MockRuntime>) {
 
 #[test]
 fn golden_matches_the_real_backend() {
-    let (_app, webview) = mock_app();
-    seed(&webview);
+    let (app, webview) = mock_app();
+    seed(&app, &webview);
 
     let regenerate = std::env::var("GOAMP_GOLDEN_REGENERATE").is_ok();
     std::fs::create_dir_all(golden_dir()).expect("golden dir is creatable");
@@ -513,8 +542,9 @@ use super::harness::{invoke, mock_app};
 /// at the top of the real charts query — UI-Rust-SQLite proven from the data side.
 #[test]
 fn a_completed_listen_reaches_the_charts() {
-    let (_app, webview) = mock_app();
+    let (app, webview) = mock_app();
     let now = chrono::Utc::now().timestamp();
+    super::harness::seed_identity(&app, "top-track", "local", "top-track", "Boards of Canada", "Roygbiv");
 
     for i in 0..2 {
         invoke(
@@ -528,8 +558,6 @@ fn a_completed_listen_reaches_the_charts() {
                 "listenedSecs": 200,
                 "completed": true,
                 "skippedEarly": false,
-                "artist": "Boards of Canada",
-                "title": "Roygbiv",
             }),
         )
         .expect("recording a listen must succeed");
@@ -586,8 +614,6 @@ fn charts_respect_the_period_window() {
             "listenedSecs": 200,
             "completed": true,
             "skippedEarly": false,
-            "artist": "Old",
-            "title": "Twenty Days Ago",
         }),
     )
     .expect("recording must succeed");
@@ -656,8 +682,6 @@ fn a_disliked_track_never_comes_back() {
                 "listenedSecs": 200,
                 "completed": true,
                 "skippedEarly": false,
-                "artist": "Artist",
-                "title": id,
             }),
         )
         .expect("seeding must succeed");
