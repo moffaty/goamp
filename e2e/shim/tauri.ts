@@ -78,3 +78,8 @@ export const listen = async () => () => {}
 export const open = async () => '/fixtures'
 export const openUrl = async () => {}
 export const check = async () => null
+
+// Lets specs assert which commands the UI actually issued.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).__E2E_CALLS__ = calls
+}
