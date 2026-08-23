@@ -79,6 +79,20 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verification gate (L1 + L2)
+        run: make verify
+
+      - name: Upload verification artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-artifacts
+          path: e2e/artifacts/
+          retention-days: 7
+
   # Build only on master pushes and manual triggers (not on PRs)
   build:
     needs: lint-and-test

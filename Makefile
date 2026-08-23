@@ -1,5 +1,6 @@
 .PHONY: dev build build-win build-android install lint lint-rust test test-watch \
-       test-coverage check fmt clean release android-init help
+       test-coverage check fmt clean release android-init help \
+       verify verify-ipc verify-ui verify-golden
 
 CARGO_PATH := $(HOME)/.cargo/bin
 export PATH := $(CARGO_PATH):$(PATH)
@@ -95,7 +96,21 @@ lint-rust: ## Rust clippy + fmt check
 build-check: ## Verify the frontend bundles (catches issues tsc misses, e.g. top-level await on old targets)
 	pnpm build
 
-check: lint lint-rust test test-rust build-check ## Run all checks (lint + tests + frontend bundle)
+check: lint lint-rust test test-rust verify build-check ## Run all checks (lint + tests + verification gate + frontend bundle)
+
+# ─── Verification gate ────────────────────────────────────────
+
+verify: verify-ipc verify-ui ## Run the verification gate (L1 + L2)
+
+verify-ipc: ## L1 — real commands over the real IPC path
+	cd src-tauri && cargo test verify:: -- --nocapture
+
+verify-ui: ## L2 — the real bundle in Playwright
+	node_modules/.bin/playwright test
+
+verify-golden: ## Regenerate golden IPC responses (by hand, never in CI)
+	cd src-tauri && GOAMP_GOLDEN_REGENERATE=1 cargo test verify::golden
+	node -e 'const fs=require("fs"),path=require("path");const d="e2e/golden";const o={};for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".json")&&f!=="index.json"))o[path.basename(f,".json")]=JSON.parse(fs.readFileSync(path.join(d,f),"utf8"));fs.writeFileSync(path.join(d,"index.json"),JSON.stringify(o,null,2)+"\n");console.log("indexed",Object.keys(o).length,"commands")'
 
 fmt: ## Format all code
 	cargo fmt --manifest-path $(TAURI_MANIFEST)
