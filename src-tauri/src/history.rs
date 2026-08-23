@@ -138,8 +138,8 @@ pub fn record_track_listen<R: tauri::Runtime>(
 }
 
 #[tauri::command]
-pub fn set_track_like(
-    app: tauri::AppHandle,
+pub fn set_track_like<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     canonical_id: String,
     liked: bool,
 ) -> Result<(), String> {

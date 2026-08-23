@@ -15,6 +15,7 @@ pub const GATE_COMMANDS: &[&str] = &[
     "get_liked_tracks",
     "build_profile",
     "record_track_signal",
+    "set_track_like",
 ];
 
 /// A mock app carrying the gate's commands and a fresh in-memory database.
@@ -30,6 +31,7 @@ pub fn mock_app() -> (App<MockRuntime>, WebviewWindow<MockRuntime>) {
             crate::history::get_liked_tracks,
             crate::taste_profile::build_profile,
             crate::commands::mood::record_track_signal,
+            crate::history::set_track_like,
         ])
         .manage(crate::db::test_db())
         .build(mock_context(noop_assets()))
