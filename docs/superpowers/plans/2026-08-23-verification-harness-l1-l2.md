@@ -25,63 +25,77 @@
 
 ---
 
-### Task 1: Extract command registration and prove the IPC harness works
+### Task 1: Make the gate's commands runtime-generic and stand up the harness
 
 **Files:**
 - Modify: `src-tauri/Cargo.toml`
-- Modify: `src-tauri/src/lib.rs:57-169`
+- Modify: `src-tauri/src/feature_flags.rs:14`
+- Modify: `src-tauri/src/charts.rs:132`, `src-tauri/src/charts.rs:143`
+- Modify: `src-tauri/src/recommend.rs:170`
+- Modify: `src-tauri/src/history.rs:115`, `src-tauri/src/history.rs:173`
+- Modify: `src-tauri/src/taste_profile.rs:122`
 - Create: `src-tauri/src/verify/mod.rs`
 - Create: `src-tauri/src/verify/harness.rs`
+- Modify: `src-tauri/src/lib.rs` (one `mod` line only)
+
+**Why this shape:** `tauri::AppHandle` is `AppHandle<Wry>`. A command written
+against it cannot be registered in a `MockRuntime` app at all, so the gate's
+commands must accept `AppHandle<R>` instead. Only the commands the gate actually
+invokes are converted — seven of them. The other 95 keep their concrete handle and
+are covered by Task 2's source-level registration guard. `run()` is not touched.
 
 **Interfaces:**
-- Produces: `pub fn register_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R>` in `lib.rs`; `verify::harness::mock_app() -> (App<MockRuntime>, WebviewWindow<MockRuntime>)`; `verify::harness::invoke(&WebviewWindow<MockRuntime>, &str, serde_json::Value) -> Result<serde_json::Value, serde_json::Value>`.
+- Produces: `verify::harness::mock_app() -> (App<MockRuntime>, WebviewWindow<MockRuntime>)`, `verify::harness::invoke(&WebviewWindow<MockRuntime>, &str, serde_json::Value) -> Result<serde_json::Value, serde_json::Value>`, `verify::harness::seed_identity(&App<MockRuntime>, &str, &str, &str, &str, &str)`, and `verify::harness::GATE_COMMANDS: &[&str]`.
 
 - [ ] **Step 1: Add the `test` feature as a dev-dependency**
 
-In `src-tauri/Cargo.toml`, add (or extend) the `[dev-dependencies]` section:
+In `src-tauri/Cargo.toml`:
 
 ```toml
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }
 ```
 
-- [ ] **Step 2: Extract the command list out of `run()`**
+- [ ] **Step 2: Probe one command before converting the rest**
 
-In `src-tauri/src/lib.rs`, the builder chain currently reads
-`.invoke_handler(tauri::generate_handler![ ... 102 commands ... ])`. Move that
-call into a new public function placed directly above `pub fn run()`, keeping the
-command list byte-for-byte identical (including the `#[cfg(desktop)]` and
-`#[cfg(not(target_os = "android"))]` attributes inside the macro):
+Convert exactly one command and prove the approach compiles before touching the
+others. In `src-tauri/src/feature_flags.rs`, change the signature only — the body
+stays byte-for-byte identical:
 
 ```rust
-/// Registers every Tauri command. Extracted from `run()` so the verification
-/// harness can build a mock app with the exact production command set.
-pub fn register_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
-    builder.invoke_handler(tauri::generate_handler![
-        commands::account::account_create,
-        // ... the entire existing list, unchanged ...
-        commands::p2p::p2p_catalog_announce,
-    ])
-}
+#[tauri::command]
+pub fn feature_flags_list<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<Vec<FeatureFlag>, String> {
 ```
 
-Then in `run()`, replace the `.invoke_handler(...)` link with a call to it:
+Run: `cd src-tauri && cargo check 2>&1 | grep -E "^error" | head`
+Expected: no output. `generate_handler!` in `run()` infers `R = Wry` at that call
+site, so production is unaffected.
 
-```rust
-    let builder = register_commands(builder);
+**If this step fails, STOP and report BLOCKED with the exact error.** Everything
+below depends on it.
 
-    builder
-        .setup(|app| {
-```
+- [ ] **Step 3: Convert the remaining six**
 
-- [ ] **Step 3: Verify the extraction changed nothing**
+Same edit — add `<R: tauri::Runtime>` and change `tauri::AppHandle` to
+`tauri::AppHandle<R>`. Bodies stay identical. The six:
 
-Run: `cd src-tauri && cargo check 2>&1 | grep -E "^(error|warning)" | head`
+| File | Function |
+|---|---|
+| `src-tauri/src/charts.rs` | `get_top_tracks_cmd` |
+| `src-tauri/src/charts.rs` | `get_community_charts_cmd` |
+| `src-tauri/src/recommend.rs` | `get_hybrid_recommendations` |
+| `src-tauri/src/history.rs` | `record_track_listen` |
+| `src-tauri/src/history.rs` | `get_liked_tracks` |
+| `src-tauri/src/taste_profile.rs` | `build_profile` |
+
+Run: `cd src-tauri && cargo check 2>&1 | grep -E "^error" | head`
 Expected: no output.
 
 - [ ] **Step 4: Declare the verify module**
 
-In `src-tauri/src/lib.rs`, with the other `mod` declarations, add:
+In `src-tauri/src/lib.rs`, beside the other `mod` declarations:
 
 ```rust
 #[cfg(test)]
@@ -93,8 +107,8 @@ mod verify;
 Create `src-tauri/src/verify/mod.rs`:
 
 ```rust
-//! Verification harness (L1): drives the real command set over the real IPC
-//! path on Tauri's MockRuntime. See
+//! Verification harness (L1): drives the gate's commands over the real IPC path
+//! on Tauri's MockRuntime. See
 //! docs/superpowers/specs/2026-08-23-verification-harness-design.md
 pub mod harness;
 ```
@@ -107,11 +121,36 @@ Create `src-tauri/src/verify/harness.rs`:
 use tauri::ipc::{CallbackFn, InvokeBody};
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime, INVOKE_KEY};
 use tauri::webview::InvokeRequest;
-use tauri::{App, WebviewWindow, WebviewWindowBuilder};
+use tauri::{App, Manager, WebviewWindow, WebviewWindowBuilder};
 
-/// A mock app carrying the production command set and a fresh in-memory DB.
+/// The commands the gate invokes for real. Every name here must also appear in
+/// the production handler in `lib.rs` — `verify::registration` enforces that.
+pub const GATE_COMMANDS: &[&str] = &[
+    "feature_flags_list",
+    "list_playlists",
+    "get_top_tracks_cmd",
+    "get_community_charts_cmd",
+    "get_hybrid_recommendations",
+    "record_track_listen",
+    "get_liked_tracks",
+    "build_profile",
+    "record_track_signal",
+];
+
+/// A mock app carrying the gate's commands and a fresh in-memory database.
 pub fn mock_app() -> (App<MockRuntime>, WebviewWindow<MockRuntime>) {
-    let app = crate::register_commands(mock_builder())
+    let app = mock_builder()
+        .invoke_handler(tauri::generate_handler![
+            crate::feature_flags::feature_flags_list,
+            crate::commands::playlists::list_playlists,
+            crate::charts::get_top_tracks_cmd,
+            crate::charts::get_community_charts_cmd,
+            crate::recommend::get_hybrid_recommendations,
+            crate::history::record_track_listen,
+            crate::history::get_liked_tracks,
+            crate::taste_profile::build_profile,
+            crate::commands::mood::record_track_signal,
+        ])
         .manage(crate::db::test_db())
         .build(mock_context(noop_assets()))
         .expect("failed to build mock app");
@@ -124,7 +163,7 @@ pub fn mock_app() -> (App<MockRuntime>, WebviewWindow<MockRuntime>) {
 }
 
 /// Seeds a track's identity (artist/title) straight through the managed
-/// database. This is fixture setup, not the thing under test: the real
+/// database. Fixture setup, not the thing under test: the real
 /// `resolve_track_id` command is async and can reach out to MusicBrainz, which
 /// the offline constraint forbids. Everything under test still goes over IPC.
 pub fn seed_identity(
@@ -135,13 +174,12 @@ pub fn seed_identity(
     artist: &str,
     title: &str,
 ) {
-    use tauri::Manager;
     let db = app.state::<crate::db::Db>();
     let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute(
-        "INSERT OR REPLACE INTO track_identity (source, source_id, canonical_id, artist, title)
+        "INSERT OR REPLACE INTO track_identity (canonical_id, source, source_id, artist, title)
          VALUES (?1, ?2, ?3, ?4, ?5)",
-        rusqlite::params![source, source_id, canonical_id, artist, title],
+        rusqlite::params![canonical_id, source, source_id, artist, title],
     )
     .expect("seeding track_identity must succeed");
 }
@@ -169,7 +207,7 @@ pub fn invoke(
 }
 ```
 
-- [ ] **Step 7: Write the failing smoke test**
+- [ ] **Step 7: Write the smoke test**
 
 Append to `src-tauri/src/verify/harness.rs`:
 
@@ -187,78 +225,179 @@ mod tests {
 
         assert!(res.is_array(), "expected an array of flags, got {res}");
     }
+
+    #[test]
+    fn every_gate_command_is_reachable() {
+        let (_app, webview) = mock_app();
+
+        for cmd in GATE_COMMANDS {
+            // Empty args: most commands reject them, and that is fine. What must
+            // never happen is Tauri reporting the command does not exist.
+            if let Err(e) = invoke(&webview, cmd, serde_json::json!({})) {
+                let msg = e.to_string();
+                assert!(
+                    !msg.contains("not found"),
+                    "gate command `{cmd}` is not reachable over IPC: {msg}"
+                );
+            }
+        }
+    }
 }
 ```
 
-- [ ] **Step 8: Run it**
+- [ ] **Step 8: Run the tests**
 
 Run: `cd src-tauri && cargo test verify:: 2>&1 | tail -20`
-Expected: PASS. A failure naming `INVOKE_KEY` or `mock_builder` means Step 1's dev-dependency did not take effect.
+Expected: PASS, 2 tests.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 9: Confirm production still builds untouched**
+
+Run: `cd src-tauri && cargo clippy -- -D warnings 2>&1 | grep -E "^error" | head`
+Expected: no output.
+
+- [ ] **Step 10: Commit**
 
 ```bash
-git add src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/src/lib.rs src-tauri/src/verify
-git commit -m "test(verify): drive real commands over the real IPC path
+git add src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/src
+git commit -m "test(verify): drive the gate's commands over the real IPC path
 
-Extracts the command registration out of run() into register_commands so a
-MockRuntime app can be built with the exact production command set, and adds
-the harness that invokes commands through get_ipc_response rather than calling
-them as plain functions."
+Tauri's AppHandle is AppHandle<Wry>, so a command written against it cannot be
+registered in a MockRuntime app. The seven commands the gate invokes now take
+AppHandle<R>; production infers Wry at the call site and is unaffected. Adds the
+harness that invokes them through get_ipc_response rather than calling them as
+plain functions."
 ```
 
 ---
 
-### Task 2: Prove every registered command is reachable
+### Task 2: Prove no command escapes registration
 
 **Files:**
 - Create: `src-tauri/src/verify/registration.rs`
 - Modify: `src-tauri/src/verify/mod.rs`
 
+**Why this shape:** the 95 commands outside the gate cannot be invoked under
+MockRuntime, but the failure that actually reaches users — a `#[tauri::command]`
+that nobody registered, which the frontend hits as "command not found" — is
+detectable statically. This task closes that hole for all 108.
+
 **Interfaces:**
-- Consumes: `harness::mock_app`, `harness::invoke` from Task 1.
-- Produces: `verify::registration::REGISTERED` — a `&[&str]` of every command name the gate knows about.
+- Consumes: `harness::GATE_COMMANDS` from Task 1.
 
 - [ ] **Step 1: Write the failing test**
 
 Create `src-tauri/src/verify/registration.rs`:
 
 ```rust
-use super::harness::{invoke, mock_app};
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
 
-/// Every command registered in `register_commands`. Kept in sync by
-/// `every_registered_command_is_reachable` and `no_command_is_unregistered`.
-pub const REGISTERED: &[&str] = &[
-    "feature_flags_list",
-    "list_playlists",
-    "load_session",
-    "get_top_tracks_cmd",
-    "get_community_charts_cmd",
-    "get_hybrid_recommendations",
-    "get_coldstart_recommendations",
-    "list_mood_channels",
-    "get_liked_tracks",
-    "build_profile",
-    // The list is completed in Step 3 from the real handler.
-];
+fn src_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
+}
 
-#[test]
-fn every_registered_command_is_reachable() {
-    let (_app, webview) = mock_app();
-
-    for cmd in REGISTERED {
-        // Empty args: most commands will reject them, and that is fine. What
-        // must never happen is Tauri reporting the command does not exist,
-        // which is what a missing registration looks like from the frontend.
-        let res = invoke(&webview, cmd, serde_json::json!({}));
-        if let Err(e) = &res {
-            let msg = e.to_string();
-            assert!(
-                !msg.contains("not found") && !msg.contains("not allowed"),
-                "command `{cmd}` is not reachable over IPC: {msg}"
-            );
+/// Every `#[tauri::command]` function name in the source tree.
+fn declared_commands() -> BTreeSet<String> {
+    fn walk(dir: &Path, out: &mut BTreeSet<String>) {
+        for entry in std::fs::read_dir(dir).expect("readable source dir") {
+            let path = entry.expect("readable entry").path();
+            if path.is_dir() {
+                walk(&path, out);
+                continue;
+            }
+            if path.extension().is_none_or(|e| e != "rs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).expect("readable source file");
+            let mut lines = text.lines().peekable();
+            while let Some(line) = lines.next() {
+                if !line.trim_start().starts_with("#[tauri::command") {
+                    continue;
+                }
+                // The attribute may be followed by more attributes.
+                for next in lines.by_ref() {
+                    let t = next.trim_start();
+                    if t.starts_with('#') {
+                        continue;
+                    }
+                    if let Some(rest) = t
+                        .strip_prefix("pub async fn ")
+                        .or_else(|| t.strip_prefix("pub fn "))
+                    {
+                        let name = rest.split(['(', '<']).next().unwrap_or("").trim();
+                        if !name.is_empty() {
+                            out.insert(name.to_string());
+                        }
+                    }
+                    break;
+                }
+            }
         }
     }
+
+    let mut out = BTreeSet::new();
+    walk(&src_dir(), &mut out);
+    out
+}
+
+/// Every command name registered in `run()`'s `generate_handler!`.
+fn registered_commands() -> BTreeSet<String> {
+    let text = std::fs::read_to_string(src_dir().join("lib.rs")).expect("lib.rs is readable");
+    let start = text
+        .find("generate_handler![")
+        .expect("lib.rs registers commands");
+    let body = &text[start..];
+    let end = body.find("])").expect("the handler list is closed");
+
+    body[..end]
+        .lines()
+        .skip(1)
+        .filter_map(|line| {
+            let t = line.trim().trim_end_matches(',');
+            if t.is_empty() || t.starts_with('#') || t.starts_with("//") {
+                return None;
+            }
+            t.rsplit("::").next().map(str::to_string)
+        })
+        .filter(|name| !name.is_empty())
+        .collect()
+}
+
+/// A `#[tauri::command]` that nobody registered is invisible to every existing
+/// test and fails at runtime as "command not found" the moment the UI calls it.
+#[test]
+fn every_declared_command_is_registered() {
+    let declared = declared_commands();
+    let registered = registered_commands();
+
+    assert!(
+        declared.len() > 90,
+        "the parser found only {} commands — it is broken, not the code",
+        declared.len()
+    );
+
+    let missing: Vec<&String> = declared.difference(&registered).collect();
+    assert!(
+        missing.is_empty(),
+        "these #[tauri::command] functions are never registered in lib.rs: {missing:?}"
+    );
+}
+
+/// The gate invokes a subset of the real command set — never a name production
+/// does not register.
+#[test]
+fn gate_commands_are_a_subset_of_production() {
+    let registered = registered_commands();
+
+    let strays: Vec<&&str> = super::harness::GATE_COMMANDS
+        .iter()
+        .filter(|cmd| !registered.contains(**cmd))
+        .collect();
+
+    assert!(
+        strays.is_empty(),
+        "the gate invokes commands production does not register: {strays:?}"
+    );
 }
 ```
 
@@ -271,101 +410,22 @@ pub mod harness;
 pub mod registration;
 ```
 
-- [ ] **Step 3: Fill `REGISTERED` from the real handler**
-
-Generate the full list mechanically so it cannot drift by hand:
-
-```bash
-cd /home/moffaty/projects/goamp
-awk '/generate_handler!\[/,/^    \]\)/' src-tauri/src/lib.rs \
-  | grep -oE '[a-z_0-9]+,$' | tr -d ',' | sort -u \
-  | sed 's/^/    "/;s/$/",/'
-```
-
-Paste the output as the body of `REGISTERED`, replacing the placeholder entries
-and the trailing comment.
-
-- [ ] **Step 4: Run it**
+- [ ] **Step 3: Run it**
 
 Run: `cd src-tauri && cargo test verify::registration 2>&1 | tail -15`
-Expected: PASS.
+Expected: PASS, 2 tests. If `every_declared_command_is_registered` reports missing
+names, check them by hand: either register the command in `lib.rs` or, if it is
+genuinely dead code, delete it — do not weaken the test.
 
-- [ ] **Step 5: Write the drift guard**
-
-Append to `src-tauri/src/verify/registration.rs`:
-
-```rust
-/// Guards against a `#[tauri::command]` being added and never registered — the
-/// frontend would fail at runtime with "command not found" and every existing
-/// test would stay green.
-#[test]
-fn no_command_is_unregistered() {
-    use std::collections::BTreeSet;
-
-    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut declared: BTreeSet<String> = BTreeSet::new();
-
-    fn walk(dir: &std::path::Path, declared: &mut BTreeSet<String>) {
-        for entry in std::fs::read_dir(dir).expect("readable source dir") {
-            let path = entry.expect("readable entry").path();
-            if path.is_dir() {
-                walk(&path, declared);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                let text = std::fs::read_to_string(&path).expect("readable source file");
-                let mut lines = text.lines().peekable();
-                while let Some(line) = lines.next() {
-                    if !line.trim_start().starts_with("#[tauri::command") {
-                        continue;
-                    }
-                    // The attribute may be followed by other attributes.
-                    for next in lines.by_ref() {
-                        let t = next.trim_start();
-                        if t.starts_with('#') {
-                            continue;
-                        }
-                        if let Some(name) = t
-                            .strip_prefix("pub async fn ")
-                            .or_else(|| t.strip_prefix("pub fn "))
-                        {
-                            let name = name.split('(').next().unwrap_or("").trim();
-                            if !name.is_empty() {
-                                declared.insert(name.to_string());
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    walk(&src, &mut declared);
-
-    let registered: BTreeSet<String> = REGISTERED.iter().map(|s| s.to_string()).collect();
-    let missing: Vec<&String> = declared.difference(&registered).collect();
-
-    assert!(
-        missing.is_empty(),
-        "these #[tauri::command] functions are not in REGISTERED: {missing:?}"
-    );
-}
-```
-
-- [ ] **Step 6: Run both tests**
-
-Run: `cd src-tauri && cargo test verify::registration 2>&1 | tail -15`
-Expected: PASS, 2 tests. If `missing` is non-empty, either register the command
-in `register_commands` or add it to `REGISTERED` — do not silence the test.
-
-- [ ] **Step 7: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add src-tauri/src/verify
-git commit -m "test(verify): prove every command is reachable and none unregistered
+git commit -m "test(verify): prove no #[tauri::command] escapes registration
 
-Invokes each registered command over the real IPC path and fails if Tauri
-reports it missing, plus a source-level guard so a new #[tauri::command] cannot
-be added without being registered."
+Parses every command declaration in the source tree and the handler list in
+lib.rs and fails when a command exists but is never registered — the failure the
+frontend hits as \"command not found\" and no existing test can see."
 ```
 
 ---
@@ -406,6 +466,7 @@ fn cases() -> Vec<(&'static str, serde_json::Value)> {
         ("get_community_charts_cmd", serde_json::json!({ "limit": 50 })),
         ("get_hybrid_recommendations", serde_json::json!({ "limit": 20 })),
         ("get_liked_tracks", serde_json::json!({})),
+        ("build_profile", serde_json::json!({})),
     ]
 }
 
@@ -710,26 +771,33 @@ fn a_disliked_track_never_comes_back() {
     );
 }
 
-/// Cold start must still produce something for a brand-new user.
+/// A like must survive into the liked-tracks list the UI reads.
 #[test]
-fn cold_start_returns_something_on_an_empty_history() {
-    let (_app, webview) = mock_app();
+fn a_like_is_visible_to_the_reader_command() {
+    let (app, webview) = mock_app();
+    super::harness::seed_identity(&app, "liked", "local", "liked", "Artist", "Liked Song");
 
-    let res = invoke(
+    invoke(
         &webview,
-        "get_coldstart_recommendations",
-        serde_json::json!({ "limit": 10 }),
-    );
+        "record_track_signal",
+        serde_json::json!({ "canonicalId": "liked", "signal": 1, "scope": "global" }),
+    )
+    .expect("recording a like must succeed");
 
-    // Cold start may legitimately need the network; what must not happen is a
-    // panic or a missing command. Either a list or a clean error is acceptable.
-    match res {
-        Ok(v) => assert!(v.is_array(), "expected an array, got {v}"),
-        Err(e) => assert!(
-            !e.to_string().contains("not found"),
-            "get_coldstart_recommendations must stay registered: {e}"
-        ),
-    }
+    let liked = invoke(&webview, "get_liked_tracks", serde_json::json!({}))
+        .expect("get_liked_tracks must succeed");
+
+    let ids: Vec<String> = liked
+        .as_array()
+        .expect("array")
+        .iter()
+        .filter_map(|v| v.as_str().map(str::to_string))
+        .collect();
+
+    assert!(
+        ids.iter().any(|id| id == "liked"),
+        "a liked track must appear in get_liked_tracks, got {ids:?}"
+    );
 }
 ```
 
