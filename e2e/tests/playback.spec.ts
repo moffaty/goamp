@@ -33,6 +33,16 @@ import { test, expect } from '@playwright/test'
 //    a plain numeric attribute that's trivial to poll and assert on — and
 //    it's the actual user-visible position indicator, not an implementation
 //    detail. That's what this test reads.
+//
+// Fix round 1: the fixture is 10s (not 3s) specifically so the observation
+// below has room. At one update tick per elapsed second, a 3s clip only
+// gives {0, 33.3, 66.7, 100} — a single observed increase proves one tick
+// fired, not that position is genuinely advancing, and a short paused-wait
+// has too little margin against `timeupdate` jitter (~250ms, worse under
+// CI load) before it risks reporting "frozen" on a track that is still
+// playing. Ten seconds gives ten ticks of room: two independent increases
+// prove advancing, and a ~2.5s paused-wait spans multiple tick boundaries,
+// so jitter cannot produce a false "frozen" reading.
 test('a local file loads and playback advances', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('#main-window')).toBeVisible({ timeout: 15_000 })
@@ -52,30 +62,37 @@ test('a local file loads and playback advances', async ({ page }) => {
 
   await page.locator('#play').click()
 
-  // Position must actually move — a paused/stalled player would keep
-  // reporting 0. Read the seek bar's `value` (0-100, percent of duration)
-  // rather than an <audio> element, which doesn't exist in this DOM (see
-  // file header). Poll rather than sleep-then-check so this isn't tied to a
-  // fixed timing assumption.
+  // Read the seek bar's `value` (0-100, percent of duration) rather than an
+  // <audio> element, which doesn't exist in this DOM (see file header).
   const readPosition = () =>
     page.evaluate(() => {
       const el = document.getElementById('position') as HTMLInputElement | null
       return el ? parseFloat(el.value) : -1
     })
 
+  // "Advancing" means two independent increases, not one tick. Poll for the
+  // first increase above 0, then poll again for a further increase past
+  // that — a stalled player that ticked exactly once (e.g. an initial
+  // loaded-metadata nudge) would pass a single->0 check but not this one.
+  // Generous timeouts (matching the existing 10s headroom style) so a
+  // loaded runner doesn't go spuriously red.
   await expect.poll(readPosition, { timeout: 10_000 }).toBeGreaterThan(0)
+  const firstTick = await readPosition()
+  await expect.poll(readPosition, { timeout: 10_000 }).toBeGreaterThan(firstTick)
   const moving = await readPosition()
 
   await page.locator('#pause').click()
 
   // Bounded wait to prove the *absence* of further advancement, not to
-  // detect the initial advancement (that's the poll above). The fixture
-  // track is 3s and the seek bar updates once per elapsed second, so at the
-  // moment we caught `moving` there are at least ~2s of track left; waiting
-  // ~1.1s here would span a full update tick if pause had failed to stop
-  // playback, while staying safely short of the track's end (which would
-  // otherwise also freeze the value and falsely look "paused").
-  await page.waitForTimeout(1_100)
+  // detect advancement itself (that's the two polls above — legitimate use
+  // of a fixed wait per the harness's "no waitForTimeout as primary sync"
+  // rule). 2.5s spans at least two of the position bar's ~1s update ticks:
+  // with the 10s fixture there is ample track remaining at this point (at
+  // most ~2 ticks have elapsed), so a still-playing track could not
+  // possibly hold the same value through jitter for that whole window, and
+  // there's no risk of the wait itself running past end-of-track and
+  // producing a false "frozen" reading via natural stop.
+  await page.waitForTimeout(2_500)
   const paused = await readPosition()
   expect(paused).toBe(moving)
 

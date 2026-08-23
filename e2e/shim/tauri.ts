@@ -34,7 +34,7 @@ const FIXTURE_TRACK = {
   artist: 'Fixture',
   title: 'Sample Tone',
   album: 'E2E',
-  duration: 3,
+  duration: 10,
   genre: '',
 }
 
