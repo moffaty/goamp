@@ -711,83 +711,89 @@ period window checked against relative offsets so the test cannot rot."
 
 ---
 
-### Task 5: The recommender actually responds to feedback
+### Task 5: The like/dislike commands honour their own contract
 
 **Files:**
-- Modify: `src-tauri/src/verify/scenarios.rs`
+- Modify: `src-tauri/src/history.rs:141` (`set_track_like` signature only)
+- Modify: `src-tauri/src/verify/harness.rs` (add `set_track_like` to the gate)
+- Modify: `src-tauri/src/verify/scenarios.rs` (append tests)
+
+**Why this shape:** the original version of this task asserted that a dislike
+recorded via `record_track_signal` removes a track from
+`get_hybrid_recommendations`, and that a like via the same command appears in
+`get_liked_tracks`. Both were wrong about where the behaviour lives, and the
+investigation produced two findings worth keeping:
+
+- `record_track_signal` writes only `track_signals`. The recommender
+  (`content_recommend`, `collaborative_recommend`, `hybrid_recommend`) never
+  reads that table — it excludes tracks via `track_likes`. The user-visible
+  "a disliked track never comes back" is delivered client-side by
+  `blockTrack`/`isBlocked` in `src/features/autoplay/autoplay-feedback.ts`,
+  which persists to `localStorage`. So there is no backend invariant to assert.
+- `set_track_like` / `remove_track_like` are registered but called from nowhere
+  in `src/`, so `track_likes` is never written by the app and `get_liked_tracks`
+  is always empty in production. That is a real product gap, recorded for the
+  user; this task does not fix it.
+
+What remains genuinely assertable at this layer is that the like commands
+honour their own contract, and that the recommender returns well-formed output.
 
 **Interfaces:**
-- Consumes: `harness::mock_app`, `harness::invoke`.
+- Consumes: `harness::{mock_app, invoke, seed_identity}`.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Make `set_track_like` runtime-generic**
+
+In `src-tauri/src/history.rs:141`, signature only — the body does not change:
+
+```rust
+#[tauri::command]
+pub fn set_track_like<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    canonical_id: String,
+    liked: bool,
+) -> Result<(), String> {
+```
+
+Run: `cd src-tauri && cargo check 2>&1 | grep -E "^error" | head`
+Expected: no output.
+
+- [ ] **Step 2: Add it to the gate**
+
+In `src-tauri/src/verify/harness.rs`, add `"set_track_like"` to `GATE_COMMANDS`
+and `crate::history::set_track_like,` to the `generate_handler!` list in
+`mock_app()`. Keep both lists in the same relative order as each other.
+
+- [ ] **Step 3: Write the failing tests**
 
 Append to `src-tauri/src/verify/scenarios.rs`:
 
 ```rust
-/// Scenario 5: a dislike must remove a track from recommendations. Order is not
-/// asserted — the recommender shuffles — only the invariant.
+/// The like commands own `track_likes`, and `get_liked_tracks` reads it. This
+/// pair is the contract; whether the UI currently calls it is a separate
+/// question (it does not — see the plan's Task 5 notes).
 #[test]
-fn a_disliked_track_never_comes_back() {
-    let (_app, webview) = mock_app();
-    let now = chrono::Utc::now().timestamp();
-
-    for id in ["keeper", "unwanted"] {
-        invoke(
-            &webview,
-            "record_track_listen",
-            serde_json::json!({
-                "canonicalId": id,
-                "source": "local",
-                "startedAt": now - 1200,
-                "durationSecs": 200,
-                "listenedSecs": 200,
-                "completed": true,
-                "skippedEarly": false,
-            }),
-        )
-        .expect("seeding must succeed");
-    }
-
-    invoke(
-        &webview,
-        "record_track_signal",
-        serde_json::json!({ "canonicalId": "unwanted", "signal": -1, "scope": "global" }),
-    )
-    .expect("recording a dislike must succeed");
-
-    let recs = invoke(&webview, "get_hybrid_recommendations", serde_json::json!({ "limit": 50 }))
-        .expect("recommendations must succeed");
-
-    let ids: Vec<String> = recs
-        .as_array()
-        .expect("array")
-        .iter()
-        .filter_map(|r| r["canonical_id"].as_str().map(str::to_string))
-        .collect();
-
-    assert!(
-        !ids.iter().any(|id| id == "unwanted"),
-        "a disliked track must never be recommended, got {ids:?}"
-    );
-}
-
-/// A like must survive into the liked-tracks list the UI reads.
-#[test]
-fn a_like_is_visible_to_the_reader_command() {
+fn a_like_round_trips_through_the_like_commands() {
     let (app, webview) = mock_app();
     super::harness::seed_identity(&app, "liked", "local", "liked", "Artist", "Liked Song");
 
+    let before = invoke(&webview, "get_liked_tracks", serde_json::json!({}))
+        .expect("get_liked_tracks must succeed");
+    assert!(
+        before.as_array().expect("array").is_empty(),
+        "nothing is liked before the command runs, got {before}"
+    );
+
     invoke(
         &webview,
-        "record_track_signal",
-        serde_json::json!({ "canonicalId": "liked", "signal": 1, "scope": "global" }),
+        "set_track_like",
+        serde_json::json!({ "canonicalId": "liked", "liked": true }),
     )
-    .expect("recording a like must succeed");
+    .expect("set_track_like must succeed");
 
-    let liked = invoke(&webview, "get_liked_tracks", serde_json::json!({}))
+    let after = invoke(&webview, "get_liked_tracks", serde_json::json!({}))
         .expect("get_liked_tracks must succeed");
 
-    let ids: Vec<String> = liked
+    let ids: Vec<String> = after
         .as_array()
         .expect("array")
         .iter()
@@ -799,24 +805,87 @@ fn a_like_is_visible_to_the_reader_command() {
         "a liked track must appear in get_liked_tracks, got {ids:?}"
     );
 }
+
+/// The recommender must return well-formed rows once there is history to work
+/// with. Shape matters as much as content: RecEntry is a positional tuple, so a
+/// field reorder in production would otherwise slip through silently.
+#[test]
+fn the_recommender_returns_well_formed_rows() {
+    let (app, webview) = mock_app();
+    let now = chrono::Utc::now().timestamp();
+
+    // content_recommend needs at least two completed listens per track.
+    for (id, artist, title) in [
+        ("rec-a", "Portishead", "Roads"),
+        ("rec-b", "Massive Attack", "Angel"),
+        ("rec-c", "Tricky", "Hell Is Round The Corner"),
+    ] {
+        super::harness::seed_identity(&app, id, "local", id, artist, title);
+        for i in 0..3 {
+            invoke(
+                &webview,
+                "record_track_listen",
+                serde_json::json!({
+                    "canonicalId": id,
+                    "source": "local",
+                    "startedAt": now - 3600 - i,
+                    "durationSecs": 200,
+                    "listenedSecs": 200,
+                    "completed": true,
+                    "skippedEarly": false,
+                }),
+            )
+            .expect("seeding must succeed");
+        }
+    }
+
+    let recs = invoke(&webview, "get_hybrid_recommendations", serde_json::json!({ "limit": 20 }))
+        .expect("recommendations must succeed");
+
+    let rows = recs.as_array().expect("recommendations return an array");
+    assert!(
+        !rows.is_empty(),
+        "the recommender must return something once history exists"
+    );
+
+    for row in rows {
+        let entry = row.as_array().expect("each RecEntry is a positional tuple");
+        assert_eq!(entry.len(), 5, "RecEntry must have 5 fields, got {entry:?}");
+        assert!(
+            entry[0].as_str().is_some_and(|s| !s.is_empty()),
+            "field 0 must be a non-empty canonical_id, got {entry:?}"
+        );
+        assert!(
+            entry[1].is_number(),
+            "field 1 must be the numeric score, got {entry:?}"
+        );
+    }
+}
 ```
 
-- [ ] **Step 2: Run it**
+- [ ] **Step 4: Run the whole verify module**
 
-Run: `cd src-tauri && cargo test verify::scenarios 2>&1 | tail -15`
-Expected: PASS, 4 tests. If `a_disliked_track_never_comes_back` fails because the
-recommender returns nothing at all for two seeded tracks, keep the assertion and
-seed more listens — do not weaken it into a tautology.
+Run: `cd src-tauri && cargo test verify:: 2>&1 | tail -20`
+Expected: all tests PASS.
 
-- [ ] **Step 3: Commit**
+If `the_recommender_returns_well_formed_rows` finds an empty list, seed more
+tracks and more listens per track — do NOT weaken the assertion to allow empty.
+
+- [ ] **Step 5: Clippy**
+
+Run: `cd src-tauri && cargo clippy -- -D warnings 2>&1 | grep -E "^error" | head`
+Expected: no output.
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src-tauri/src/verify
-git commit -m "test(verify): scenario 5 — feedback moves the recommender
+git add src-tauri/src
+git commit -m "test(verify): the like commands honour their own contract
 
-Asserts a disliked track disappears from hybrid recommendations and that cold
-start survives an empty history, checking invariants rather than exact order
-because the recommender shuffles."
+set_track_like becomes runtime-generic and joins the gate, so the
+set_track_like/get_liked_tracks pair is exercised over the real IPC path, and
+the recommender's output shape is pinned — RecEntry is a positional tuple, so a
+field reorder would otherwise pass silently."
 ```
 
 ---
