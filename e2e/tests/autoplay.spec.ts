@@ -127,3 +127,56 @@ test('pressing n sends no backend signal (local-only state)', async ({ page }) =
 
   await page.screenshot({ path: 'e2e/artifacts/autoplay-normal.png', fullPage: true })
 })
+
+// Scenario 5: "a disliked track never appears again" — the invariant that
+// actually delivers this is client-side, not backend (there is no backend
+// dislike invariant: `record_track_signal` just logs a signal the
+// recommender weighs; see verify::scenarios and the ledger's Ruling 6).
+// `src/features/autoplay/autoplay-feedback.ts` `blockTrack`/`isBlocked`
+// persist to `localStorage` under `autoplay:blocked`, and
+// `AutoplayFeature.takeBatch` (private, not reachable from L2) filters pool
+// candidates against `isBlocked()` before ever adding them to the queue.
+//
+// That filtering step itself is NOT observable from L2 as built: it only
+// runs once `ensurePool()` calls `getRecommendations()`/`youtubeMix()`,
+// both of which require real network access that `network-lockdown.ts`
+// structurally blocks in every spec that opts in (this one included) — so
+// asserting "the blocked track never re-enters the queue" here would either
+// require weakening the offline guarantee or fabricating a code path this
+// harness cannot exercise. Per this task's brief: the honest assertion is
+// the one L2 CAN make — that pressing 'd' durably persists the block via
+// the exact key `blockTrack`/`isBlocked` share (`feedbackKey`), independent
+// of the current page's in-memory state (localStorage survives reload).
+test('pressing d persists a durable block that outlives the page', async ({ page }) => {
+  await openAndPlayFixtureTrack(page)
+
+  await page.keyboard.press('d')
+  await expect.poll(async () => (await recordSignalCalls(page)).length).toBeGreaterThan(0)
+
+  // feedbackKey(artist, title) = `${artist.toLowerCase().trim()}|${title.toLowerCase().trim()}`
+  // — FIXTURE_TRACK is { artist: 'Fixture', title: 'Sample Tone' }.
+  const EXPECTED_KEY = 'fixture|sample tone'
+
+  const blockedRaw = await page.evaluate(() => localStorage.getItem('autoplay:blocked'))
+  expect(blockedRaw, 'blockTrack must persist to the autoplay:blocked localStorage key').not.toBeNull()
+  const blocked = JSON.parse(blockedRaw ?? '[]') as string[]
+  expect(blocked, `expected "${EXPECTED_KEY}" in ${blockedRaw}`).toContain(EXPECTED_KEY)
+
+  // The block must survive a fresh page load (the case that actually matters
+  // — "a disliked track never comes back" means never, not "until the tab
+  // reloads"), and isBlocked() must agree once it re-reads localStorage on
+  // the reloaded page.
+  await page.reload()
+  await expect(page.locator('#main-window')).toBeVisible({ timeout: 15_000 })
+
+  const blockedAfterReload = await page.evaluate(() => {
+    const raw = localStorage.getItem('autoplay:blocked')
+    return raw ? (JSON.parse(raw) as string[]) : []
+  })
+  expect(
+    blockedAfterReload,
+    `block must survive reload, expected "${EXPECTED_KEY}" in ${JSON.stringify(blockedAfterReload)}`,
+  ).toContain(EXPECTED_KEY)
+
+  await page.screenshot({ path: 'e2e/artifacts/autoplay-block-persisted.png', fullPage: true })
+})

@@ -16,6 +16,14 @@ pub const GATE_COMMANDS: &[&str] = &[
     "build_profile",
     "record_track_signal",
     "set_track_like",
+    // Added while closing I2/Fix 3: both fire during cold start and were
+    // previously unverified (throwing in the L2 shim, silently swallowed by
+    // a `.catch()` in src/). Both are cheap to add for real: `load_session`
+    // already only needs `State<Db>`, and `get_seed_enabled` was made
+    // runtime-generic (see commands/youtube.rs) the same way the other 8
+    // gate commands already were.
+    "load_session",
+    "get_seed_enabled",
 ];
 
 /// A mock app carrying the gate's commands and a fresh in-memory database.
@@ -32,6 +40,8 @@ pub fn mock_app() -> (App<MockRuntime>, WebviewWindow<MockRuntime>) {
             crate::taste_profile::build_profile,
             crate::commands::mood::record_track_signal,
             crate::history::set_track_like,
+            crate::commands::playlists::load_session,
+            crate::commands::youtube::get_seed_enabled,
         ])
         .manage(crate::db::test_db())
         .build(mock_context(noop_assets()))

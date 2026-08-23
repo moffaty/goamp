@@ -77,23 +77,36 @@ test('switching to Month re-queries instead of reusing the week rows', async ({ 
   // the "before" count reflects a settled panel, not a race with the first load.
   await expect(panel).toContainText(rows[0].title, { timeout: 10_000 })
 
-  const callsBefore = await page.evaluate(() => (window as any).__E2E_CALLS__?.length ?? 0)
+  // `window.__E2E_CALLS__` is a single append-only log fed by
+  // `src/webamp/window-drag.ts`'s `setupClickThrough()`, which polls
+  // `cursor_position` continuously in the background (measured ~42 calls/sec,
+  // unrelated to this test). Reading the raw length or the array's tail is
+  // therefore both vacuous — the counter climbs whether or not the Month
+  // click did anything — and racy — the tail is only `get_top_tracks_cmd`
+  // for a ~24ms window out of every ~24ms cycle. Filter by command name
+  // instead, the same idiom `recordSignalCalls` already uses in
+  // autoplay.spec.ts, so the count can only advance because of a real
+  // `get_top_tracks_cmd` call and "last" is unambiguous.
+  const chartCalls = () =>
+    page.evaluate(() =>
+      ((window as any).__E2E_CALLS__ ?? []).filter(
+        (c: { command: string }) => c.command === 'get_top_tracks_cmd',
+      ),
+    )
+
+  const callsBefore = (await chartCalls()).length
   expect(callsBefore, '__E2E_CALLS__ must be populated by the initial Week load').toBeGreaterThan(0)
 
   await panel.getByText('Month', { exact: true }).click()
 
-  await expect
-    .poll(() => page.evaluate(() => (window as any).__E2E_CALLS__?.length ?? 0))
-    .toBeGreaterThan(callsBefore)
+  await expect.poll(async () => (await chartCalls()).length).toBeGreaterThan(callsBefore)
 
-  const last = await page.evaluate(() => {
-    const calls = (window as any).__E2E_CALLS__ ?? []
-    return calls[calls.length - 1]
-  })
   // The shim serves the same golden rows for every period (single fixture
   // file), so the rendered rows cannot distinguish Week from Month — the
   // only way to prove a real re-query happened is to inspect the call the
-  // UI actually issued, which is exactly what the shim's `calls` log is for.
+  // UI actually issued, which is exactly what the shim's (filtered) call log
+  // is for.
+  const last = (await chartCalls()).at(-1)
   expect(last.command).toBe('get_top_tracks_cmd')
   expect(last.args.period).toBe('month')
 })

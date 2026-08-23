@@ -101,6 +101,7 @@
     ]
   ],
   "get_liked_tracks": [],
+  "get_seed_enabled": false,
   "get_top_tracks_cmd": [
     {
       "artist": "Portishead",
@@ -115,5 +116,6 @@
       "title": "Angel"
     }
   ],
-  "list_playlists": []
+  "list_playlists": [],
+  "load_session": []
 }
