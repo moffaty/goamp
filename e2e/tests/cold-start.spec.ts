@@ -1,5 +1,21 @@
 import { test, expect } from '@playwright/test'
 
+// Known, allowlisted-pending-a-product-decision console error: webamp's own
+// audio-element error handler (node_modules/webamp/built/webamp.bundle.js,
+// `console.error("MEDIA_ERR_SRC_NOT_SUPPORTED", e)`) fires because
+// src/main.ts seeds Webamp's initial playlist with a placeholder track that
+// has `url: ''`. This fires on EVERY cold start, including in the real Tauri
+// webview — it is not a harness artifact. It is allowlisted here because the
+// plan owner ruled that patching src/main.ts (e.g. embedding a silent-audio
+// data URI) purely to silence a third-party console.error is worse
+// engineering than documenting a known, user-invisible (no devtools in
+// production) issue — not because the error is harmless noise. This is a
+// tracked exemption, not a blanket pass: it matches only this exact message,
+// and the test below asserts the error was actually observed, so if someone
+// fixes the placeholder track this allowlist entry goes stale loudly instead
+// of silently.
+const ALLOWLISTED_CONSOLE_ERRORS = ['MEDIA_ERR_SRC_NOT_SUPPORTED Event']
+
 // Scenario 1 (UI half): the bundle boots, Webamp renders, nothing explodes.
 // This is also the first thing in the repo that ever executes src/main.ts.
 test('the app boots with a rendered player and no errors', async ({ page }) => {
@@ -26,6 +42,22 @@ test('the app boots with a rendered player and no errors', async ({ page }) => {
 
   await page.screenshot({ path: 'e2e/artifacts/cold-start.png', fullPage: true })
 
-  expect(consoleErrors, `console errors: ${consoleErrors.join(' | ')}`).toEqual([])
+  const unexpectedConsoleErrors = consoleErrors.filter(
+    (msg) => !ALLOWLISTED_CONSOLE_ERRORS.includes(msg),
+  )
+  expect(
+    unexpectedConsoleErrors,
+    `console errors: ${unexpectedConsoleErrors.join(' | ')}`,
+  ).toEqual([])
   expect(failedRequests, `failed requests: ${failedRequests.join(' | ')}`).toEqual([])
+
+  // The allowlist must stay honest: if webamp ever stops emitting this
+  // specific error (e.g. the placeholder track gets fixed), fail loudly
+  // instead of letting a dead exemption sit here forever.
+  for (const allowlisted of ALLOWLISTED_CONSOLE_ERRORS) {
+    expect(
+      consoleErrors,
+      `expected allowlisted console error not observed: ${allowlisted}`,
+    ).toContain(allowlisted)
+  }
 })
