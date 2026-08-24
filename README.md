@@ -95,8 +95,8 @@ This is exactly what CI runs on every push. **Always passes locally before
 opening a PR** — `pnpm build` was added because tsc alone does not catch
 issues like top-level await on old bundler targets.
 
-`make check` includes `make verify` — the verification gate. It runs 12 of the
-app's 106 Tauri commands (`GATE_COMMANDS`, `src-tauri/src/verify/harness.rs`)
+`make check` includes `make verify` — the verification gate. It runs 14 of the
+app's 108 Tauri commands (`GATE_COMMANDS`, `src-tauri/src/verify/harness.rs`)
 through the real IPC path against a real SQLite database, then boots the real
 frontend in headless Chromium (the vite **dev server**, not a built/minified
 bundle — see "What this gate does not cover" below) and drives the core flows.
@@ -110,12 +110,13 @@ failed check rather than a silent update.
 
 #### What this gate does not cover
 
-- **94 of the app's 106 Tauri commands** rest only on the static registration
+- **94 of the app's 108 Tauri commands** rest only on the static registration
   guard (`verify::registration`): it proves every `#[tauri::command]` fn is
   actually wired into `lib.rs`'s handler, not that the command *works*. Radio,
-  moods, playlists (beyond `list_playlists`/`load_session`), YouTube (beyond
-  `get_seed_enabled`), settings, surveys, downloads, and P2P are not invoked by
-  anything in this gate.
+  moods (beyond `list_mood_channels`/`list_tag_weights`), playlists (beyond
+  `list_playlists`/`load_session`), YouTube (beyond `get_seed_enabled`),
+  settings, surveys, downloads, and P2P are not invoked by anything in this
+  gate.
 - **The dev server, not the production bundle.** `playwright.config.ts` points
   at `vite --config vite.e2e.config.ts`, not a `vite build` artifact. No
   tree-shaking, minification, or production `import.meta.env` branches run

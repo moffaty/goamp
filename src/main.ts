@@ -32,7 +32,10 @@ try {
     initialTracks: [
       {
         metaData: { artist: 'GOAMP', title: 'Press Ctrl+O to open a folder' },
-        url: '',
+        // ponytail: 44-byte silent WAV. An empty url makes webamp's <audio>
+        // raise MEDIA_ERR_SRC_NOT_SUPPORTED on every cold start; a valid
+        // zero-sample source keeps the placeholder row without the error.
+        url: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
         duration: 0,
       },
     ],

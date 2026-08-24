@@ -224,7 +224,9 @@ pub struct MoodChannel {
 }
 
 #[tauri::command]
-pub fn list_mood_channels(app: tauri::AppHandle) -> Result<Vec<MoodChannel>, String> {
+pub fn list_mood_channels<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<Vec<MoodChannel>, String> {
     let db = app.state::<crate::db::Db>();
     let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
 

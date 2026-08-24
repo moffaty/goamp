@@ -112,21 +112,8 @@ const local: Record<string, unknown> = {
 //   Chromium for L1 to record a meaningful value from, so this can never be
 //   a golden recording. `src/webamp/window-drag.ts` polls it ~42x/sec purely
 //   to decide click-through and tolerates any coordinate.
-// - `list_moods`: `src/recommendations/mood-service.ts` calls
-//   `invoke('list_moods')`, but NO `list_moods` Tauri command exists
-//   anywhere in `src-tauri` (confirmed: not in `lib.rs`'s handler list, no
-//   `#[tauri::command] fn list_moods` in the crate). This is a real product
-//   bug — the mood tabs feature (`WebampUIFeature.ts` `renderMoodTabs()`)
-//   has been calling a command that was never implemented, and every real
-//   launch has silently failed and been swallowed by `.catch()` the same
-//   way L2 was silently failing before this fix. Stubbed to an empty list
-//   here (matching what "no moods" already renders as) so cold start stays
-//   green while this is reported rather than hidden; the real fix is a
-//   product decision (implement `list_moods` or remove the call), not a
-//   harness one.
 const BOOT_STUBS: Record<string, unknown> = {
   cursor_position: [0, 0],
-  list_moods: [],
 }
 
 export async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {

@@ -24,6 +24,13 @@ pub const GATE_COMMANDS: &[&str] = &[
     // gate commands already were.
     "load_session",
     "get_seed_enabled",
+    // The mood tabs boot path: `src/recommendations/mood-service.ts` used to
+    // invoke `list_moods`/`create_mood`/`delete_mood`, none of which existed.
+    // Gated so a rename on either side fails here instead of silently in a
+    // `.catch()`. `list_tag_weights` backs the tag chips in
+    // `src/settings/FeatureFlagsPanel.ts`.
+    "list_mood_channels",
+    "list_tag_weights",
 ];
 
 /// A mock app carrying the gate's commands and a fresh in-memory database.
@@ -42,6 +49,8 @@ pub fn mock_app() -> (App<MockRuntime>, WebviewWindow<MockRuntime>) {
             crate::history::set_track_like,
             crate::commands::playlists::load_session,
             crate::commands::youtube::get_seed_enabled,
+            crate::recommend::list_mood_channels,
+            crate::commands::mood::list_tag_weights,
         ])
         .manage(crate::db::test_db())
         .build(mock_context(noop_assets()))

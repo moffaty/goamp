@@ -64,6 +64,5 @@ export async function renderMoodTabs(): Promise<void> {
 function promptCreateMood(): void {
   const name = window.prompt("Mood name:");
   if (!name?.trim()) return;
-  const id = name.trim().toLowerCase().replace(/\s+/g, "_");
-  moodService.createMood(id, name.trim(), []).then(() => renderMoodTabs());
+  moodService.createMood(name.trim()).then(() => renderMoodTabs());
 }

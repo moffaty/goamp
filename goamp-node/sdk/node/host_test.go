@@ -16,13 +16,31 @@ func connectNodes(t *testing.T, a, b *node.P2PNode) {
 	t.Helper()
 	// Retry the dial: an ephemeral listen port can briefly collide with an
 	// outbound socket from a sibling test, which fails the security handshake.
-	require.Eventually(t, func() bool {
+	// The window matches waitForGossipMesh's — under `go test ./...` every
+	// package's nodes churn ports at once and 5s was measurably too tight
+	// (1 failure in 10 runs of this package alone). The last dial error is
+	// kept so a genuine failure says why instead of "condition never
+	// satisfied".
+	var lastErr error
+	require.Eventuallyf(t, func() bool {
 		if len(a.Peers()) > 0 {
 			return true
 		}
-		_ = a.Connect(context.Background(), b.AddrInfo())
+		lastErr = a.Connect(context.Background(), b.AddrInfo())
 		return len(a.Peers()) > 0
-	}, 5*time.Second, 100*time.Millisecond, "nodes must be connected")
+	}, 10*time.Second, 100*time.Millisecond, "nodes must be connected; last dial error: %v", &lastErrStringer{&lastErr})
+}
+
+// lastErrStringer defers formatting until require actually builds the failure
+// message, so it reports the final dial error rather than the nil it held when
+// Eventuallyf was called.
+type lastErrStringer struct{ err *error }
+
+func (l *lastErrStringer) String() string {
+	if l.err == nil || *l.err == nil {
+		return "<none — dial succeeded but no peer appeared>"
+	}
+	return (*l.err).Error()
 }
 
 // newTestNode spins up a P2PNode on a random port with a fresh ephemeral identity.

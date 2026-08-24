@@ -38,6 +38,8 @@ fn cases() -> Vec<(&'static str, serde_json::Value)> {
         ("build_profile", serde_json::json!({})),
         ("load_session", serde_json::json!({})),
         ("get_seed_enabled", serde_json::json!({})),
+        ("list_mood_channels", serde_json::json!({})),
+        ("list_tag_weights", serde_json::json!({ "scope": "global" })),
     ]
 }
 
