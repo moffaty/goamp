@@ -5,38 +5,25 @@
 // unshimmed call that simply succeeds, or for a 404/500).
 import { test, expect } from '../fixtures/network-lockdown'
 
-// Known, allowlisted-pending-a-product-decision console error: webamp's own
-// audio-element error handler (node_modules/webamp/built/webamp.bundle.js,
-// `console.error("MEDIA_ERR_SRC_NOT_SUPPORTED", e)`) fires because
-// src/main.ts seeds Webamp's initial playlist with a placeholder track that
-// has `url: ''`. This fires on EVERY cold start, including in the real Tauri
-// webview — it is not a harness artifact. It is allowlisted here because the
-// plan owner ruled that patching src/main.ts (e.g. embedding a silent-audio
-// data URI) purely to silence a third-party console.error is worse
-// engineering than documenting a known, user-invisible (no devtools in
-// production) issue — not because the error is harmless noise. This is a
-// tracked exemption, not a blanket pass: it matches only this exact message,
-// and the test below asserts the error was actually observed, so if someone
-// fixes the placeholder track this allowlist entry goes stale loudly instead
-// of silently.
-const ALLOWLISTED_CONSOLE_ERRORS = ['MEDIA_ERR_SRC_NOT_SUPPORTED Event']
 
 // A whole-branch review measured that on cold start, 4 of the 5 commands
 // main.ts's boot path issues (get_seed_enabled, list_moods, load_session,
 // cursor_position) failed inside the shim and were swallowed by `.catch(()
 // => {})` in application code — meaning this exact test was green while 80%
-// of boot's IPC was failing. The fix has two parts, both landed:
+// of boot's IPC was failing. The fix has three parts, all landed:
 // 1. e2e/shim/tauri.ts now records every invoke() it rejects into
 //    `window.__E2E_REJECTIONS__` (command + reason), so a boot-time IPC
 //    failure can no longer be silently absorbed by an app-side `.catch()`.
-// 2. Of the four that were failing: `load_session` and `get_seed_enabled`
-//    are now real gate commands (src-tauri/src/verify/harness.rs
-//    GATE_COMMANDS) with real golden responses recorded from the real
-//    backend — no longer stubs. `cursor_position` (no OS window exists
-//    under MockRuntime to record from) and `list_moods` (no such Tauri
-//    command exists in src-tauri at all — a real product bug, not a harness
-//    gap) are answered by a documented, reviewed stub in
-//    e2e/shim/tauri.ts's BOOT_STUBS.
+// 2. `load_session`, `get_seed_enabled` and `list_mood_channels` are now
+//    real gate commands (src-tauri/src/verify/harness.rs GATE_COMMANDS)
+//    with golden responses recorded from the real backend — no longer stubs.
+// 3. `list_moods` never existed as a Tauri command at all: the frontend was
+//    calling a name the backend does not have. That was a real product bug,
+//    fixed by pointing src/recommendations/mood-service.ts at the commands
+//    that do exist (`list_mood_channels`, `create_mood_channel`,
+//    `delete_mood_channel`) — not by stubbing it.
+// `cursor_position` (no OS window exists under MockRuntime to record from)
+// remains the single documented BOOT_STUBS entry.
 // The assertion below is the enforcement: if a *new* command starts failing
 // during boot, this test goes red naming it, instead of the failure being
 // invisible the way it was before this fix.
@@ -81,22 +68,26 @@ test('the app boots with a rendered player and no errors', async ({ page }) => {
 
   await page.screenshot({ path: 'e2e/artifacts/cold-start.png', fullPage: true })
 
-  const unexpectedConsoleErrors = consoleErrors.filter(
-    (msg) => !ALLOWLISTED_CONSOLE_ERRORS.includes(msg),
-  )
-  expect(
-    unexpectedConsoleErrors,
-    `console errors: ${unexpectedConsoleErrors.join(' | ')}`,
-  ).toEqual([])
+  // No exemptions: a cold start must be console-error clean. The placeholder
+  // track used to emit MEDIA_ERR_SRC_NOT_SUPPORTED on every boot; src/main.ts
+  // now seeds a valid silent-WAV data URI, so that error must not reappear.
+  expect(consoleErrors, `console errors: ${consoleErrors.join(' | ')}`).toEqual([])
   expect(failedRequests, `failed requests: ${failedRequests.join(' | ')}`).toEqual([])
+})
 
-  // The allowlist must stay honest: if webamp ever stops emitting this
-  // specific error (e.g. the placeholder track gets fixed), fail loudly
-  // instead of letting a dead exemption sit here forever.
-  for (const allowlisted of ALLOWLISTED_CONSOLE_ERRORS) {
-    expect(
-      consoleErrors,
-      `expected allowlisted console error not observed: ${allowlisted}`,
-    ).toContain(allowlisted)
-  }
+// The mood tabs are the visible payoff of fixing the `list_moods` ->
+// `list_mood_channels` rename: before it, renderMoodTabs()'s invoke rejected
+// and `.catch(() => {})` in WebampUIFeature swallowed it, so no tab ever
+// rendered. The four names below are the backend's preset mood channels
+// (e2e/golden/list_mood_channels.json, recorded from the real backend), so
+// this goes red again if either side renames the command or the response.
+test('boot renders the preset mood tabs from the backend', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('#main-window')).toBeVisible({ timeout: 15_000 })
+
+  const tabs = page.locator('#mood-tabs .mood-tab')
+  await expect(tabs).toHaveCount(4)
+  await expect(tabs).toHaveText(['Calm', 'Discovery', 'Energetic', 'Focus'])
+
+  await page.screenshot({ path: 'e2e/artifacts/mood-tabs.png', fullPage: true })
 })

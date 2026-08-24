@@ -154,10 +154,11 @@ function videoIdFromSourceId(sourceId?: string): string {
 }
 
 /**
- * Bridge a user (or auto) signal to GOAMP's backend `track_signals` table so
- * the mood/hybrid recommender learns from autoplay feedback. Best-effort —
- * any failure (no backend, no canonical id) is silently swallowed: the local
- * block/like state is the source of truth for autoplay filtering.
+ * Bridge a user (or auto) signal to GOAMP's backend `track_signals` and
+ * `track_likes` tables so the mood/hybrid recommender and the taste profile
+ * learn from autoplay feedback. Best-effort — any failure (no backend, no
+ * canonical id) is silently swallowed: the local block/like state is the
+ * source of truth for autoplay filtering.
  */
 export async function recordTrackSignal(
   track: TrackForSignal,
@@ -178,6 +179,10 @@ export async function recordTrackSignal(
       signal,
       scope: 'global',
     })
+    // Also persist the verdict in `track_likes` — that table backs
+    // get_liked_tracks and the "liked" half of build_profile, and nothing
+    // else writes to it.
+    await invoke('set_track_like', { canonicalId, liked: signal === 1 })
   } catch {
     /* best-effort — local state already updated */
   }

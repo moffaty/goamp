@@ -3,8 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 export interface MoodChannel {
   id: string;
   name: string;
-  is_preset: boolean;
-  seed_tags: string[];
+  description: string;
+  seed_tracks: string[];
+  is_default: boolean;
 }
 
 export interface QueueTrack {
@@ -55,19 +56,15 @@ export class MoodService {
   }
 
   async listMoods(): Promise<MoodChannel[]> {
-    return invoke("list_moods");
+    return invoke("list_mood_channels");
   }
 
-  async createMood(id: string, name: string, seedTags: string[]): Promise<void> {
-    return invoke("create_mood", {
-      id,
-      name,
-      seedTagsJson: JSON.stringify(seedTags),
-    });
+  async createMood(name: string, description = ""): Promise<MoodChannel> {
+    return invoke("create_mood_channel", { name, description });
   }
 
-  async deleteMood(id: string): Promise<void> {
-    return invoke("delete_mood", { id });
+  async deleteMood(channelId: string): Promise<void> {
+    return invoke("delete_mood_channel", { channelId });
   }
 
   async generateQueue(moodId: string, limit = 20): Promise<QueueTrack[]> {
@@ -87,19 +84,6 @@ export class MoodService {
     return invoke("record_track_signal", { canonicalId, signal, scope });
   }
 
-  async listTagWeights(scope = "global"): Promise<TagWeight[]> {
-    return invoke("list_tag_weights", { scope });
-  }
-
-  async deleteTagWeight(tag: string, scope: string): Promise<void> {
-    return invoke("delete_tag_weight", { tag, scope });
-  }
-
-  async prefetchFeatures(canonicalId: string, artist: string, title: string): Promise<void> {
-    await invoke("get_track_features", { canonicalId, artist, title }).catch(() => {
-      // Non-fatal: features are optional for cold start fallback
-    });
-  }
 }
 
 export const moodService = new MoodService();

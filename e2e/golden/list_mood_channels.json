@@ -1,0 +1,30 @@
+[
+  {
+    "description": "Relaxing and ambient music",
+    "id": "calm",
+    "is_default": true,
+    "name": "Calm",
+    "seed_tracks": []
+  },
+  {
+    "description": "New tracks from recommendations",
+    "id": "discovery",
+    "is_default": true,
+    "name": "Discovery",
+    "seed_tracks": []
+  },
+  {
+    "description": "Upbeat and driving tracks",
+    "id": "energetic",
+    "is_default": true,
+    "name": "Energetic",
+    "seed_tracks": []
+  },
+  {
+    "description": "Music for concentration",
+    "id": "focus",
+    "is_default": true,
+    "name": "Focus",
+    "seed_tracks": []
+  }
+]

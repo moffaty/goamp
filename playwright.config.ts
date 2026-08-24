@@ -22,7 +22,12 @@ export default defineConfig({
     // local binary directly instead of `pnpm exec vite ...`.
     command: 'node_modules/.bin/vite --config vite.e2e.config.ts',
     url: 'http://localhost:5199',
-    reuseExistingServer: !process.env.CI,
+    // Never reuse: a vite dev server left running from an earlier session (or
+    // from another worktree of this repo — same port) serves that session's
+    // source, so the whole gate silently grades stale code and reports green.
+    // That happened once already. Paying ~2s of startup per run is the price
+    // of every run grading the tree it was actually invoked on.
+    reuseExistingServer: false,
     timeout: 60_000,
   },
 })

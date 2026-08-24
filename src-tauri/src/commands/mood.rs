@@ -3,6 +3,13 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TagWeight {
+    pub tag: String,
+    pub scope: String,
+    pub weight: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MoodTrackScore {
     pub mood_id: String,
     pub canonical_id: String,
@@ -117,6 +124,34 @@ pub fn set_tag_weight_internal(db: &Db, tag: &str, scope: &str, weight: f64) -> 
     Ok(())
 }
 
+pub fn list_tag_weights_internal(db: &Db, scope: &str) -> Result<Vec<TagWeight>, String> {
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
+    let mut stmt = conn
+        .prepare("SELECT tag, scope, weight FROM tag_weights WHERE scope = ?1 ORDER BY tag")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(rusqlite::params![scope], |r| {
+            Ok(TagWeight {
+                tag: r.get(0)?,
+                scope: r.get(1)?,
+                weight: r.get(2)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+pub fn delete_tag_weight_internal(db: &Db, tag: &str, scope: &str) -> Result<(), String> {
+    let conn = db.0.lock().unwrap_or_else(|e| e.into_inner());
+    conn.execute(
+        "DELETE FROM tag_weights WHERE tag = ?1 AND scope = ?2",
+        rusqlite::params![tag, scope],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -173,10 +208,43 @@ pub fn get_tag_weight(db: State<Db>, tag: String, scope: String) -> Result<f64, 
     get_tag_weight_internal(&db, &tag, &scope)
 }
 
+#[tauri::command]
+pub fn list_tag_weights(db: State<Db>, scope: String) -> Result<Vec<TagWeight>, String> {
+    list_tag_weights_internal(&db, &scope)
+}
+
+#[tauri::command]
+pub fn delete_tag_weight(db: State<Db>, tag: String, scope: String) -> Result<(), String> {
+    delete_tag_weight_internal(&db, &tag, &scope)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::test_db;
+
+    #[test]
+    fn test_list_and_delete_tag_weights() {
+        let db = test_db();
+        set_tag_weight_internal(&db, "chill", "global", 1.5).unwrap();
+        set_tag_weight_internal(&db, "metal", "global", 0.2).unwrap();
+        set_tag_weight_internal(&db, "chill", "mood:calm", 2.0).unwrap();
+
+        let global = list_tag_weights_internal(&db, "global").unwrap();
+        assert_eq!(global.len(), 2, "scope filter must exclude mood:calm");
+        assert_eq!(global[0].tag, "chill", "ordered by tag");
+        assert!((global[0].weight - 1.5).abs() < 1e-9);
+
+        delete_tag_weight_internal(&db, "chill", "global").unwrap();
+        let after = list_tag_weights_internal(&db, "global").unwrap();
+        assert_eq!(after.len(), 1);
+        assert_eq!(after[0].tag, "metal");
+        // The other scope's row must survive a scoped delete.
+        assert_eq!(
+            list_tag_weights_internal(&db, "mood:calm").unwrap().len(),
+            1
+        );
+    }
 
     #[test]
     fn test_record_mood_play_creates_and_updates_score() {

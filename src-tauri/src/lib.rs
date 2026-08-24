@@ -160,6 +160,8 @@ pub fn run() {
             commands::mood::delete_track_signal,
             commands::mood::set_tag_weight,
             commands::mood::get_tag_weight,
+            commands::mood::list_tag_weights,
+            commands::mood::delete_tag_weight,
             mood_engine::generate_mood_queue,
             mood_engine::update_mood_centroid,
             commands::window::window_send_to_back,
