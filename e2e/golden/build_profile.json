@@ -1,0 +1,31 @@
+{
+  "generated_at": 0,
+  "genre_weights": {},
+  "liked_hashes": [],
+  "listen_pairs": [
+    [
+      "aaa",
+      "aaa"
+    ],
+    [
+      "aaa",
+      "bbb"
+    ]
+  ],
+  "top_tracks": [
+    {
+      "artist": "Portishead",
+      "canonical_id": "aaa",
+      "play_count": 3,
+      "title": "Roads"
+    },
+    {
+      "artist": "Massive Attack",
+      "canonical_id": "bbb",
+      "play_count": 1,
+      "title": "Angel"
+    }
+  ],
+  "total_listens": 4,
+  "version": 1
+}

@@ -1,0 +1,121 @@
+{
+  "build_profile": {
+    "generated_at": 0,
+    "genre_weights": {},
+    "liked_hashes": [],
+    "listen_pairs": [
+      [
+        "aaa",
+        "aaa"
+      ],
+      [
+        "aaa",
+        "bbb"
+      ]
+    ],
+    "top_tracks": [
+      {
+        "artist": "Portishead",
+        "canonical_id": "aaa",
+        "play_count": 3,
+        "title": "Roads"
+      },
+      {
+        "artist": "Massive Attack",
+        "canonical_id": "bbb",
+        "play_count": 1,
+        "title": "Angel"
+      }
+    ],
+    "total_listens": 4,
+    "version": 1
+  },
+  "feature_flags_list": [
+    {
+      "description": "Auto-scrobble after 50% or 4 min",
+      "enabled": true,
+      "key": "auto_scrobble"
+    },
+    {
+      "description": "Last.fm scrobbling",
+      "enabled": true,
+      "key": "lastfm_scrobble"
+    },
+    {
+      "description": "ListenBrainz scrobbling",
+      "enabled": true,
+      "key": "listenbrainz_scrobble"
+    },
+    {
+      "description": "System media keys / MPRIS",
+      "enabled": true,
+      "key": "media_keys"
+    },
+    {
+      "description": "GOAMP recommendations and mood radio",
+      "enabled": true,
+      "key": "recommendations"
+    },
+    {
+      "description": "SoundCloud search",
+      "enabled": true,
+      "key": "soundcloud_search"
+    },
+    {
+      "description": "System tray icon",
+      "enabled": true,
+      "key": "system_tray"
+    },
+    {
+      "description": "Butterchurn visualizer",
+      "enabled": true,
+      "key": "visualizer"
+    },
+    {
+      "description": "YouTube search and playback",
+      "enabled": true,
+      "key": "youtube_search"
+    }
+  ],
+  "get_community_charts_cmd": [
+    {
+      "artist": "Portishead",
+      "canonical_id": "aaa",
+      "play_count": 3,
+      "title": "Roads"
+    },
+    {
+      "artist": "Massive Attack",
+      "canonical_id": "bbb",
+      "play_count": 1,
+      "title": "Angel"
+    }
+  ],
+  "get_hybrid_recommendations": [
+    [
+      "aaa",
+      0.3,
+      "content",
+      "Portishead",
+      "Roads"
+    ]
+  ],
+  "get_liked_tracks": [],
+  "get_seed_enabled": false,
+  "get_top_tracks_cmd": [
+    {
+      "artist": "Portishead",
+      "canonical_id": "aaa",
+      "play_count": 3,
+      "title": "Roads"
+    },
+    {
+      "artist": "Massive Attack",
+      "canonical_id": "bbb",
+      "play_count": 1,
+      "title": "Angel"
+    }
+  ],
+  "list_playlists": [],
+  "load_session": []
+}

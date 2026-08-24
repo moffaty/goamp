@@ -1,0 +1,14 @@
+[
+  {
+    "artist": "Portishead",
+    "canonical_id": "aaa",
+    "play_count": 3,
+    "title": "Roads"
+  },
+  {
+    "artist": "Massive Attack",
+    "canonical_id": "bbb",
+    "play_count": 1,
+    "title": "Angel"
+  }
+]

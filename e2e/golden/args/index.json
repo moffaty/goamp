@@ -1,0 +1,36 @@
+{
+  "build_profile": {},
+  "feature_flags_list": {},
+  "get_community_charts_cmd": {
+    "limit": 50
+  },
+  "get_hybrid_recommendations": {
+    "limit": 20
+  },
+  "get_liked_tracks": {},
+  "get_seed_enabled": {},
+  "get_top_tracks_cmd": {
+    "limit": 50,
+    "period": "all"
+  },
+  "list_playlists": {},
+  "load_session": {},
+  "record_track_listen": {
+    "canonicalId": "args-shape-track",
+    "completed": true,
+    "durationSecs": 200,
+    "listenedSecs": 200,
+    "skippedEarly": false,
+    "source": "local",
+    "startedAt": 0
+  },
+  "record_track_signal": {
+    "canonicalId": "args-shape-track",
+    "scope": "global",
+    "signal": 1
+  },
+  "set_track_like": {
+    "canonicalId": "args-shape-track",
+    "liked": true
+  }
+}

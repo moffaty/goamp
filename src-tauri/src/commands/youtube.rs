@@ -416,9 +416,16 @@ pub fn set_seed_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), Stri
 }
 
 /// Whether P2P seeding of downloaded tracks is currently enabled.
+///
+/// Runtime-generic (unlike `seed_enabled`/`set_seed_enabled`'s concrete
+/// `AppHandle`) so the verification gate can invoke it for real against
+/// `tauri::test::MockRuntime` — same minimal, behaviour-preserving pattern
+/// already used for `get_top_tracks_cmd`, `build_profile`, and friends;
+/// production still infers `Wry` at the call site.
 #[tauri::command]
-pub fn get_seed_enabled(app: tauri::AppHandle) -> Result<bool, String> {
-    Ok(seed_enabled(&app))
+pub fn get_seed_enabled<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<bool, String> {
+    let db = app.state::<Db>();
+    Ok(parse_seed_enabled(db.get_setting(SEED_ENABLED_SETTING)))
 }
 
 /// Best-effort peer fetch: if a peer serves `cid`, write the bytes to

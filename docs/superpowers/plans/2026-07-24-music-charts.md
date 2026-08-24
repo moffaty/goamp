@@ -3,6 +3,7 @@
 **Date:** 2026-07-24
 **Scope:** "Your Top Tracks" panel — local listen history only, no network aggregation.
 **Approach:** TDD (red-green-refactor), one task per layer.
+**Status:** done — shipped and merged to master; community charts followed in a later slice.
 
 ---
 
@@ -24,8 +25,8 @@
 ## Task 1 — Rust: `get_top_tracks` query function + tests
 
 ### 1.1 Write failing test
-- [ ] Create `src-tauri/src/charts.rs`
-- [ ] Add `#[cfg(test)] mod tests` with a test `test_top_tracks_ordering`:
+- [x] Create `src-tauri/src/charts.rs`
+- [x] Add `#[cfg(test)] mod tests` with a test `test_top_tracks_ordering`:
   - Seed via `crate::history::record_listen(&conn, ...)`:
     - Track A (`canonical_id = "aaa"`): 5 completed listens at `now - 3600` (within week)
     - Track B (`canonical_id = "bbb"`): 3 completed listens at `now - 3600`
@@ -36,25 +37,25 @@
     - Returns 3 entries (D excluded)
     - Order: A (5), B (3), C (1)
     - Each `ChartEntry` has correct `artist`, `title`, `play_count`
-- [ ] Add test `test_top_tracks_period_filtering`:
+- [x] Add test `test_top_tracks_period_filtering`:
   - Track E: 3 completed listens at `now - 2 days` (inside week)
   - Track F: 4 completed listens at `now - 20 days` (outside week, inside month)
   - Call with `"week"` -> only E returned
   - Call with `"month"` -> both E and F, F first (4 > 3)
   - Call with `"all"` -> both returned
-- [ ] Add test `test_top_tracks_limit`:
+- [x] Add test `test_top_tracks_limit`:
   - Seed 5 tracks with different play counts
   - Call with `limit = 3` -> only top 3 returned
-- [ ] Add test `test_top_tracks_empty`:
+- [x] Add test `test_top_tracks_empty`:
   - No listens seeded
   - Call returns empty `Vec`
-- [ ] Add test `test_top_tracks_dedupes_identity`:
+- [x] Add test `test_top_tracks_dedupes_identity`:
   - Seed `track_identity` with 2 rows for same `canonical_id` (different sources)
   - Seed completed listens for that canonical_id
   - Assert result has exactly 1 entry (not duplicated)
 
 ### 1.2 Make tests pass
-- [ ] Define `ChartEntry` struct with `Serialize`:
+- [x] Define `ChartEntry` struct with `Serialize`:
   ```
   #[derive(Serialize, Debug, PartialEq)]
   pub struct ChartEntry {
@@ -64,7 +65,7 @@
       pub play_count: i32,
   }
   ```
-- [ ] Implement `get_top_tracks(conn: &Connection, period: &str, limit: i32) -> Vec<ChartEntry>`:
+- [x] Implement `get_top_tracks(conn: &Connection, period: &str, limit: i32) -> Vec<ChartEntry>`:
   - Map period to cutoff: `"week"` = `now - 7*86400`, `"month"` = `now - 30*86400`, `"all"` = `0`
   - SQL:
     ```sql
@@ -77,22 +78,22 @@
     LIMIT ?2
     ```
   - Use `rusqlite::params![cutoff, limit]`, collect rows into `Vec<ChartEntry>`
-- [ ] Run `cd src-tauri && cargo test charts` -- all green
+- [x] Run `cd src-tauri && cargo test charts` -- all green
 
 ### 1.3 Add Tauri command wrapper
-- [ ] Add `#[tauri::command] pub fn get_top_tracks_cmd(app: tauri::AppHandle, period: String, limit: i32) -> Result<Vec<ChartEntry>, String>` following `history.rs` pattern (lock `app.state::<crate::db::Db>()`)
-- [ ] In `src-tauri/src/lib.rs`:
+- [x] Add `#[tauri::command] pub fn get_top_tracks_cmd(app: tauri::AppHandle, period: String, limit: i32) -> Result<Vec<ChartEntry>, String>` following `history.rs` pattern (lock `app.state::<crate::db::Db>()`)
+- [x] In `src-tauri/src/lib.rs`:
   - Add `mod charts;` to the module list
   - Add `charts::get_top_tracks_cmd` to `invoke_handler![...]`
-- [ ] `cd src-tauri && cargo test` -- full suite still green
-- [ ] `cd src-tauri && cargo check` -- no warnings
+- [x] `cd src-tauri && cargo test` -- full suite still green
+- [x] `cd src-tauri && cargo check` -- no warnings
 
 ---
 
 ## Task 2 — TypeScript: `ChartsService` + types
 
 ### 2.1 Add types to interfaces
-- [ ] In `src/services/interfaces.ts`, add:
+- [x] In `src/services/interfaces.ts`, add:
   ```ts
   export type ChartPeriod = 'week' | 'month' | 'all'
 
@@ -109,7 +110,7 @@
   ```
 
 ### 2.2 Write failing ChartsService test
-- [ ] Create `src/services/ChartsService.test.ts`:
+- [x] Create `src/services/ChartsService.test.ts`:
   - Test: `getTopTracks calls transport with correct command and args`
     - `transport.setResponse('get_top_tracks_cmd', [...])`
     - Call `svc.getTopTracks('week', 20)`
@@ -123,7 +124,7 @@
     - Assert return value matches
 
 ### 2.3 Make tests pass
-- [ ] Create `src/services/ChartsService.ts`:
+- [x] Create `src/services/ChartsService.ts`:
   ```ts
   import type { ITransport } from './transport'
   import type { IChartsService, ChartEntry, ChartPeriod } from './interfaces'
@@ -136,15 +137,15 @@
     }
   }
   ```
-- [ ] `pnpm test --run` -- ChartsService tests green
-- [ ] `pnpm exec tsc --noEmit` -- no type errors
+- [x] `pnpm test --run` -- ChartsService tests green
+- [x] `pnpm exec tsc --noEmit` -- no type errors
 
 ---
 
 ## Task 3 — TypeScript: `ChartsFeature` (panel + menu registration)
 
 ### 3.1 Write failing ChartsFeature tests
-- [ ] Create `src/features/charts/ChartsFeature.test.ts` using the P2PFeature test as template:
+- [x] Create `src/features/charts/ChartsFeature.test.ts` using the P2PFeature test as template:
   - Helper `makeCtx()` with `MockTransport`, `EventBus`, mock `ui`, `LocalKVStorage('test-charts')`
   - Test: `has id "charts"`
   - Test: `init registers panel with id "charts"`
@@ -169,7 +170,7 @@
   - Test: `destroy without init does not throw`
 
 ### 3.2 Make tests pass
-- [ ] Create `src/features/charts/ChartsFeature.ts`:
+- [x] Create `src/features/charts/ChartsFeature.ts`:
   - `implements IFeature`, `id = 'charts'`
   - Constructor takes `ITransport`, creates `ChartsService`
   - `init(ctx)`:
@@ -185,31 +186,33 @@
     - Empty state: "No plays yet -- go listen to something"
     - Error state: "Could not load charts"
   - `destroy()`: clear cleanups array
-- [ ] `pnpm test --run` -- ChartsFeature tests green
+- [x] `pnpm test --run` -- ChartsFeature tests green
 
 ---
 
 ## Task 4 — Wire into main.ts + final verification
 
 ### 4.1 Wire feature
-- [ ] In `src/main.ts`:
+- [x] In `src/main.ts`:
   - Add import: `import { ChartsFeature } from './features/charts/ChartsFeature'`
   - Add `.feature(new ChartsFeature(transport))` in the GoampCore builder chain (after `P2PFeature`, before `AutoplayFeature`)
 
 ### 4.2 Full verification
-- [ ] `cd /home/moffaty/projects/goamp/src-tauri && cargo test charts` -- Rust tests pass
-- [ ] `cd /home/moffaty/projects/goamp && pnpm test --run` -- all TS tests pass
-- [ ] `cd /home/moffaty/projects/goamp && pnpm exec tsc --noEmit` -- no type errors
-- [ ] `cd /home/moffaty/projects/goamp/goamp-node && go build ./...` -- unaffected, still compiles
+- [x] `cd /home/moffaty/projects/goamp/src-tauri && cargo test charts` -- Rust tests pass
+- [x] `cd /home/moffaty/projects/goamp && pnpm test --run` -- all TS tests pass
+- [x] `cd /home/moffaty/projects/goamp && pnpm exec tsc --noEmit` -- no type errors
+- [x] `cd /home/moffaty/projects/goamp/goamp-node && go build ./...` -- unaffected, still compiles
 
 ---
 
 ## Out of Scope
 
-These are explicitly deferred to later slices:
+These were explicitly deferred to later slices:
 
-- **Network-aggregated charts** (charts computed from P2P peer data)
-- **Charts-over-P2P** (sharing/gossiping chart data between peers)
+- ~~**Network-aggregated charts** (charts computed from P2P peer data)~~ — shipped
+  later as the Community tab (`get_community_charts`), see `openspec/specs/charts`
+- ~~**Charts-over-P2P** (sharing/gossiping chart data between peers)~~ — shipped:
+  `top_tracks` rides the gossiped taste profile
 - **Artist charts** (top artists view -- only top tracks in this slice)
 - **Sparklines / graphs / trend indicators** (visual enhancements)
 - **Date range picker** (custom date ranges beyond week/month/all)
