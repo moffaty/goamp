@@ -1,0 +1,11 @@
+# pnpm 11 no longer reads `pnpm.onlyBuiltDependencies` from package.json and
+# refuses to install while any dependency's build script is undecided, which
+# broke `make check` (its `pnpm test` step runs a deps-status check first).
+# This mirrors the package.json policy: esbuild is the only dependency whose
+# install script may run. lefthook's git hooks come from the `lefthook install`
+# postinstall script in package.json, not from lefthook's own build step, so it
+# stays denied; core-js's script only prints a funding banner.
+allowBuilds:
+  core-js: false
+  esbuild: true
+  lefthook: false
