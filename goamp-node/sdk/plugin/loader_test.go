@@ -3,8 +3,6 @@ package plugin_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,20 +25,13 @@ func buildFakePlugin(t *testing.T) string {
 	_, filename, _, _ := runtime.Caller(0)
 	moduleRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
 
-	// Find a free port
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := ln.Addr().(*net.TCPAddr).Port
-	ln.Close()
-
 	bin := filepath.Join(dir, "fake-plugin")
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
 
-	// Build from module root where go.mod lives; embed port via ldflags
+	// Build from module root where go.mod lives
 	cmd := exec.Command("go", "build",
-		"-ldflags", fmt.Sprintf("-X main.port=%d", port),
 		"-o", bin,
 		"./sdk/plugin/testdata/fakeplugin",
 	)
