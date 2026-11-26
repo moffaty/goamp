@@ -4,7 +4,7 @@ import {
   refreshFlagCache,
   type FeatureFlag,
 } from "./feature-flags-service";
-import { escapeHtml } from "../lib/ui-utils";
+import { escapeHtml, wireDismiss } from "../lib/ui-utils";
 import { invoke } from "@tauri-apps/api/core";
 import type { TagWeight } from "../recommendations/mood-service";
 
@@ -39,6 +39,7 @@ function createPanel() {
 
   document.body.appendChild(panel);
   panel.querySelector("#ff-close")!.addEventListener("click", () => toggleFeatureFlagsPanel());
+  wireDismiss(panel, () => { if (visible) toggleFeatureFlagsPanel(); });
 }
 
 async function loadFlags() {

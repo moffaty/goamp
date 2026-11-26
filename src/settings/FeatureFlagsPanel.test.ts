@@ -8,10 +8,6 @@ vi.mock("./feature-flags-service", () => ({
   featureFlagsSet: vi.fn().mockResolvedValue(undefined),
   refreshFlagCache: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock("../lib/ui-utils", () => ({
-  escapeHtml: vi.fn((s: string) => s),
-}));
-
 async function freshModule() {
   vi.resetModules();
   return await import("./FeatureFlagsPanel");

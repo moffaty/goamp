@@ -1,5 +1,6 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { scrobble } from "../services/index";
+import { wireDismiss } from "../lib/ui-utils";
 
 let panel: HTMLDivElement | null = null;
 let visible = false;
@@ -104,6 +105,7 @@ function createPanel() {
   panel.querySelector("#scrobble-close")!.addEventListener("click", () => {
     toggleScrobbleSettings();
   });
+  wireDismiss(panel, () => { if (visible) toggleScrobbleSettings(); });
 
   // ─── Queue flush ───
   panel.querySelector("#scrobble-flush-btn")!.addEventListener("click", async () => {

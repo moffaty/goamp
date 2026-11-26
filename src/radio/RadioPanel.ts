@@ -19,7 +19,7 @@ import {
   type RadioNowPlaying,
   type CachedSegment,
 } from "../lib/tauri-ipc";
-import { escapeHtml, formatDuration } from "../lib/ui-utils";
+import { escapeHtml, formatDuration, wireDismiss } from "../lib/ui-utils";
 import { listen } from "@tauri-apps/api/event";
 import type Webamp from "webamp";
 
@@ -94,6 +94,7 @@ function createPanel() {
   document.body.appendChild(panel);
 
   panel.querySelector("#radio-close")!.addEventListener("click", () => toggleRadioPanel());
+  wireDismiss(panel, () => { if (visible) toggleRadioPanel(); });
 
   panel.querySelectorAll(".radio-nav-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
