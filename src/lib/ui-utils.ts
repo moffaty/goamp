@@ -74,3 +74,20 @@ export function formatDuration(secs: number): string {
   const s = Math.floor(secs % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
+
+/**
+ * Close a persistent toggle-panel (one that flips `display`, not one that is
+ * removed) on Escape or a click outside it. Listeners live for the app's
+ * lifetime — the panel is created once — and no-op while it is hidden.
+ * ponytail: uses mousedown, not click, so the menu-row click that opened the
+ * panel can't bubble straight into this handler and re-close it.
+ */
+export function wireDismiss(panel: HTMLElement, close: () => void): void {
+  const isOpen = () => panel.style.display !== "none";
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && isOpen()) close();
+  });
+  document.addEventListener("mousedown", (e) => {
+    if (isOpen() && !panel.contains(e.target as Node)) close();
+  });
+}

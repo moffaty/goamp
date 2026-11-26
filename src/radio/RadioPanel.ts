@@ -19,7 +19,7 @@ import {
   type RadioNowPlaying,
   type CachedSegment,
 } from "../lib/tauri-ipc";
-import { escapeHtml, formatDuration } from "../lib/ui-utils";
+import { escapeHtml, formatDuration, wireDismiss } from "../lib/ui-utils";
 import { listen } from "@tauri-apps/api/event";
 import type Webamp from "webamp";
 
@@ -59,7 +59,7 @@ function createPanel() {
   panel.id = "radio-panel-overlay";
   panel.style.cssText = `
     display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 560px; max-height: 85vh; background: #1a1a2e; border: 2px solid #444;
+    width: 560px; max-width: calc(100vw - 24px); box-sizing: border-box; max-height: 85vh; background: #1a1a2e; border: 2px solid #444;
     border-radius: 8px; color: #0f0; font-family: 'MS Sans Serif', 'Tahoma', sans-serif;
     font-size: 11px; z-index: 10000; flex-direction: column;
     box-shadow: 0 4px 20px rgba(0,0,0,0.8);
@@ -69,10 +69,10 @@ function createPanel() {
       <span style="font-weight:bold; color:#0f0;">Internet Radio</span>
       <div style="display:flex; gap:4px; align-items:center;">
         <span id="radio-live-badge" style="display:none; color:#f00; font-size:10px; font-weight:bold; animation: radio-blink 1s infinite;">LIVE</span>
-        <button id="radio-close" style="background:none; border:none; color:#888; cursor:pointer; font-size:14px;">&#x2715;</button>
+        <button id="radio-close" aria-label="Close Internet Radio" style="background:none; border:none; color:#888; cursor:pointer; font-size:14px;">&#x2715;</button>
       </div>
     </div>
-    <div id="radio-nav" style="display:flex; gap:0; border-bottom:1px solid #333;">
+    <div id="radio-nav" style="display:flex; flex-wrap:wrap; gap:0; border-bottom:1px solid #333;">
       <button class="radio-nav-btn" data-view="browse" style="flex:1; padding:5px; background:#2a2a4a; border:none; border-bottom:2px solid #0f0; color:#0f0; cursor:pointer; font-family:inherit; font-size:10px;">Browse</button>
       <button class="radio-nav-btn" data-view="search" style="flex:1; padding:5px; background:#1a1a2e; border:none; border-bottom:2px solid transparent; color:#888; cursor:pointer; font-family:inherit; font-size:10px;">Search</button>
       <button class="radio-nav-btn" data-view="favorites" style="flex:1; padding:5px; background:#1a1a2e; border:none; border-bottom:2px solid transparent; color:#888; cursor:pointer; font-family:inherit; font-size:10px;">Favorites</button>
@@ -94,6 +94,7 @@ function createPanel() {
   document.body.appendChild(panel);
 
   panel.querySelector("#radio-close")!.addEventListener("click", () => toggleRadioPanel());
+  wireDismiss(panel, () => { if (visible) toggleRadioPanel(); });
 
   panel.querySelectorAll(".radio-nav-btn").forEach((btn) => {
     btn.addEventListener("click", () => {

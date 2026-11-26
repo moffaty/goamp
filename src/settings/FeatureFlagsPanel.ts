@@ -4,7 +4,7 @@ import {
   refreshFlagCache,
   type FeatureFlag,
 } from "./feature-flags-service";
-import { escapeHtml } from "../lib/ui-utils";
+import { escapeHtml, wireDismiss } from "../lib/ui-utils";
 import { invoke } from "@tauri-apps/api/core";
 import type { TagWeight } from "../recommendations/mood-service";
 
@@ -23,7 +23,7 @@ function createPanel() {
   panel.id = "feature-flags-overlay";
   panel.style.cssText = `
     display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 400px; max-height: 70vh; background: #1a1a2e; border: 2px solid #444; border-radius: 8px;
+    width: 400px; max-width: calc(100vw - 24px); box-sizing: border-box; max-height: 70vh; background: #1a1a2e; border: 2px solid #444; border-radius: 8px;
     color: #0f0; font-family: 'MS Sans Serif', 'Tahoma', sans-serif; font-size: 11px;
     z-index: 10000; flex-direction: column; padding: 0;
     box-shadow: 0 4px 20px rgba(0,0,0,0.8);
@@ -32,13 +32,14 @@ function createPanel() {
   panel.innerHTML = `
     <div style="background:#2a2a4a; padding:6px 10px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444;">
       <span style="font-weight:bold; color:#fc0;">Feature Flags</span>
-      <button id="ff-close" style="background:none; border:none; color:#888; cursor:pointer; font-size:14px;">✕</button>
+      <button id="ff-close" aria-label="Close Feature Flags" style="background:none; border:none; color:#888; cursor:pointer; font-size:14px;">✕</button>
     </div>
     <div id="ff-list" style="padding: 10px; overflow-y: auto; max-height: calc(70vh - 40px);"></div>
   `;
 
   document.body.appendChild(panel);
   panel.querySelector("#ff-close")!.addEventListener("click", () => toggleFeatureFlagsPanel());
+  wireDismiss(panel, () => { if (visible) toggleFeatureFlagsPanel(); });
 }
 
 async function loadFlags() {
