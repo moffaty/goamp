@@ -22,7 +22,7 @@ function createPanel() {
   panel.id = "scrobble-settings-overlay";
   panel.style.cssText = `
     display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 460px; max-height: 80vh; background: #1a1a2e; border: 2px solid #444; border-radius: 8px;
+    width: 460px; max-width: calc(100vw - 24px); box-sizing: border-box; max-height: 80vh; background: #1a1a2e; border: 2px solid #444; border-radius: 8px;
     color: #0f0; font-family: 'MS Sans Serif', 'Tahoma', sans-serif; font-size: 11px;
     z-index: 10000; flex-direction: column; padding: 0;
     box-shadow: 0 4px 20px rgba(0,0,0,0.8);
@@ -31,7 +31,7 @@ function createPanel() {
   panel.innerHTML = `
     <div style="background:#2a2a4a; padding:6px 10px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444;">
       <span style="font-weight:bold; color:#0f0;">Scrobbling Settings</span>
-      <button id="scrobble-close" style="background:none; border:none; color:#888; cursor:pointer; font-size:14px;">✕</button>
+      <button id="scrobble-close" aria-label="Close Scrobbling Settings" style="background:none; border:none; color:#888; cursor:pointer; font-size:14px;">✕</button>
     </div>
     <div style="padding: 12px; overflow-y: auto; max-height: calc(80vh - 40px);">
       <!-- Queue status -->

@@ -7,16 +7,17 @@ async function openMenu(page: any) {
   return menu
 }
 
-test('scrobble panel closes on ✕', async ({ page }) => {
+test('scrobble panel closes on ✕ in a narrow window', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 560 })
   await page.goto('/')
   await expect(page.locator('#main-window')).toBeVisible({ timeout: 15_000 })
 
-  let menu = await openMenu(page)
+  const menu = await openMenu(page)
   await menu.getByText('Scrobbling', { exact: true }).click()
   const overlay = page.locator('#scrobble-settings-overlay')
   await expect(overlay).toBeVisible()
 
-  await page.locator('#scrobble-close').click()
+  await page.getByRole('button', { name: 'Close Scrobbling Settings' }).click()
   await expect(overlay).toBeHidden()
 })
 
