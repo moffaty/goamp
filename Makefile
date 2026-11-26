@@ -1,6 +1,6 @@
 .PHONY: dev build build-win build-android install lint lint-rust test test-watch \
        test-coverage check fmt clean release android-init help \
-       verify verify-ipc verify-ui verify-golden
+       verify verify-ipc verify-ui verify-golden test-node test-rust build-check
 
 CARGO_PATH := $(HOME)/.cargo/bin
 export PATH := $(CARGO_PATH):$(PATH)
@@ -87,16 +87,16 @@ deploy-win: build-win ## Alias for build-win (kept for backwards compat)
 # ─── Quality ──────────────────────────────────────────────────
 
 lint: ## TypeScript type check
-	npx tsc --noEmit
+	pnpm lint
 
 lint-rust: ## Rust clippy + fmt check
-	cargo fmt --manifest-path $(TAURI_MANIFEST) --check
-	cargo clippy --manifest-path $(TAURI_MANIFEST) -- -D warnings
+	cd src-tauri && cargo fmt --check
+	cd src-tauri && cargo clippy -- -D warnings
 
 build-check: ## Verify the frontend bundles (catches issues tsc misses, e.g. top-level await on old targets)
 	pnpm build
 
-check: lint lint-rust test test-rust verify build-check ## Run all checks (lint + tests + verification gate + frontend bundle)
+check: lint test test-node build-check lint-rust test-rust verify ## Run all checks (frontend, Go, Rust, and verification gate)
 
 # ─── Verification gate ────────────────────────────────────────
 
@@ -105,7 +105,7 @@ verify: verify-ipc verify-ui ## Run the verification gate (L1 + L2)
 verify-ipc: ## L1 — real commands over the real IPC path
 	cd src-tauri && cargo test verify:: -- --nocapture
 
-verify-ui: ## L2 — the real bundle in Playwright
+verify-ui: ## L2 — the real frontend in Playwright
 	node_modules/.bin/playwright test
 
 verify-golden: ## Regenerate golden IPC responses + argument shapes (by hand, never in CI)
@@ -135,7 +135,7 @@ test-coverage: ## Run frontend tests with coverage
 	pnpm test:coverage
 
 test-rust: ## Run Rust tests
-	cargo test --manifest-path $(TAURI_MANIFEST)
+	cd src-tauri && cargo test
 
 # ─── Setup ────────────────────────────────────────────────────
 

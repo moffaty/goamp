@@ -5,7 +5,8 @@ export default defineConfig({
   outputDir: './e2e/artifacts/test-output',
   fullyParallel: false,
   workers: 1,
-  timeout: 30_000,
+  // The first navigation can wait for Vite's cold startup on slower runners.
+  timeout: 60_000,
   reporter: [['list'], ['html', { outputFolder: 'e2e/artifacts/report', open: 'never' }]],
   use: {
     baseURL: 'http://localhost:5199',

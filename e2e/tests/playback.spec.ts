@@ -79,9 +79,8 @@ test('a local file loads and playback advances', async ({ page }) => {
   await expect.poll(readPosition, { timeout: 10_000 }).toBeGreaterThan(0)
   const firstTick = await readPosition()
   await expect.poll(readPosition, { timeout: 10_000 }).toBeGreaterThan(firstTick)
-  const moving = await readPosition()
-
   await page.locator('#pause').click()
+  const positionAtPause = await readPosition()
 
   // Bounded wait to prove the *absence* of further advancement, not to
   // detect advancement itself (that's the two polls above — legitimate use
@@ -94,7 +93,7 @@ test('a local file loads and playback advances', async ({ page }) => {
   // producing a false "frozen" reading via natural stop.
   await page.waitForTimeout(2_500)
   const paused = await readPosition()
-  expect(paused).toBe(moving)
+  expect(paused).toBe(positionAtPause)
 
   await page.screenshot({ path: 'e2e/artifacts/playback.png', fullPage: true })
 })

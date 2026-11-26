@@ -32,6 +32,11 @@ func Open(dataDir string) (*SQLiteStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
+	if dataDir == ":memory:" {
+		// Each SQLite connection to :memory: gets its own database.
+		// Keep migrations, HTTP reads, and background writes on one connection.
+		db.SetMaxOpenConns(1)
+	}
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
