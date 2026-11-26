@@ -66,12 +66,12 @@ their titlebar.
 - Node 23 + pnpm 10
 - Rust stable
 - Go 1.25 (see `goamp-node/go.mod`)
-- On Linux: `libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libgtk-3-dev librsvg2-dev`
+- On Linux: `clang mold libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libgtk-3-dev librsvg2-dev`
 
 ### Setup
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 make dev          # hot-reload Tauri dev mode
 ```
 
@@ -88,12 +88,16 @@ make build-win    # cross-compile for Windows via cargo-xwin (Linux/WSL host)
 ### Quality
 
 ```bash
-make check        # tsc + clippy + tests + vite bundle + Go tests
+pnpm lint        # TypeScript
+pnpm test        # frontend unit tests
+make test-node   # Go sidecar tests
+make check       # full CI checks, including Rust and Playwright
 ```
 
-This is exactly what CI runs on every push. **Always passes locally before
-opening a PR** — `pnpm build` was added because tsc alone does not catch
-issues like top-level await on old bundler targets.
+Develop on a branch and open a pull request against `master`. Lefthook runs
+checks on commit and push. Before opening a PR, install Chromium with
+`pnpm exec playwright install --with-deps chromium` on Linux or WSL and run
+`make check`. PRs and pushes to `master` run the same target in GitHub Actions.
 
 `make check` includes `make verify` — the verification gate. It runs 14 of the
 app's 108 Tauri commands (`GATE_COMMANDS`, `src-tauri/src/verify/harness.rs`)
