@@ -96,7 +96,7 @@ lint-rust: ## Rust clippy + fmt check
 build-check: ## Verify the frontend bundles (catches issues tsc misses, e.g. top-level await on old targets)
 	pnpm build
 
-check: lint lint-rust test test-node test-rust verify build-check ## Run all checks (frontend, Go, Rust, and verification gate)
+check: lint test test-node build-check lint-rust test-rust verify ## Run all checks (frontend, Go, Rust, and verification gate)
 
 # ─── Verification gate ────────────────────────────────────────
 

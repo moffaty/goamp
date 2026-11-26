@@ -94,6 +94,14 @@ make test-node   # Go sidecar tests
 make check       # full CI checks, including Rust and Playwright
 ```
 
+On a fresh Linux or WSL checkout, prepare the Tauri sidecars before building or
+running the full check:
+
+```bash
+bash scripts/fetch-yt-dlp.sh x86_64-unknown-linux-gnu
+make node-sidecar
+```
+
 Develop on a branch and open a pull request against `master`. Lefthook runs
 checks on commit and push. Before opening a PR, install Chromium with
 `pnpm exec playwright install --with-deps chromium` on Linux or WSL and run
